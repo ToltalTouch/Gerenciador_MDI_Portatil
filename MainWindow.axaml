@@ -1,0 +1,20 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:AvaloniaMdiApp"
+        x:Class="AvaloniaMdiApp.MainWindow"
+        Title="Gerenciador MDI Portátil"
+        Width="950" Height="650">
+  
+  <DockPanel Name="RootDock" Background="#1e1e1e">
+    <Border DockPanel.Dock="Top" Height="50" Background="#333333">
+      <StackPanel Orientation="Horizontal" Spacing="10" Margin="15,10">
+        <Button Content="+ Abrir Janela" Background="#007acc" Foreground="White" Click="AbrirNovaJanela_Click"/>
+        <Button Content="⚙ Configurações" Background="#3f3f46" Foreground="White" Click="AbrirConfiguracoes_Click"/>
+      </StackPanel>
+    </Border>
+
+    <local:TaskBar x:Name="AppTaskBar" DockPanel.Dock="Bottom"/>
+
+    <Canvas Name="Workspace" Background="#2d2d30"/>
+  </DockPanel>
+</Window>
