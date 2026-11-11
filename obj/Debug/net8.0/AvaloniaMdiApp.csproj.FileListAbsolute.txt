@@ -122,3 +122,4 @@ C:\C#\Gerenciador MDI Portátil\obj\Debug\net8.0\refint\Avalonia\AvaloniaMdiApp.
 C:\C#\Gerenciador MDI Portátil\obj\Debug\net8.0\Avalonia.6A3A3975.Up2Date
 C:\C#\Gerenciador MDI Portátil\obj\Debug\net8.0\AvaloniaMdiApp.genruntimeconfig.cache
 C:\C#\Gerenciador MDI Portátil\obj\Debug\net8.0\ref\AvaloniaMdiApp.dll
+C:\C#\Gerenciador MDI Portátil\bin\Debug\net8.0\AvaloniaMdiApp.exe

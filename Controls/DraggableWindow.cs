@@ -10,14 +10,33 @@ using System.Collections.Generic;
 
 namespace AvaloniaMdiApp
 {
+    public class ChecklistRowState
+    {
+        public CheckBox Check { get; init; } = null!;
+        public TextBox Input { get; init; } = null!;
+        public Border StrikeLine { get; init; } = null!;
+        public Border RowBorder { get; init; } = null!;
+        public Button BtnNote { get; init; } = null!;
+        public string LinkedNoteContent { get; set; } = string.Empty;
+        public TextFormatData LinkedNoteFormat { get; set; } = new();
+        public DraggableWindow? OpenNoteWindow { get; set; }
+    }
+
     public class DraggableWindow : Border
     {
         public event Action? OnClosed;
-        public event Action<string>? OnRequestOpenNotepad;
+        public event Action<DraggableWindow, ChecklistRowState>? OnRequestOpenRowNotepad;
+        public event Action<DraggableWindow>? OnSaveRequested;
+
+        public string WindowId { get; }
         public string WindowTitle { get; private set; }
         public string WindowType { get; }
+        public int AccessCount { get; set; }
         public bool IsMinimized => _isMinimized;
         public bool IsMaximized => _isMaximized;
+
+        private readonly Action<string, string, TextFormatData>? _onLinkedRowSave;
+        public DraggableWindow? ParentChecklistWindow { get; }
 
         private enum ResizeMode { None, Bottom, Right, BottomRight }
 
@@ -35,19 +54,34 @@ namespace AvaloniaMdiApp
         private bool _isDarkMode = true;
         private Rect _normalRect;
 
+        // Estado de formatação de texto do bloco
+        private bool _isBold;
+        private bool _isItalic;
+        private double _fontSize = 13;
+        private string _alignment = "left";
+        private string _fontFamilyName = "default";
+
         private readonly Border _titleBar;
         private readonly Border _statusDot;
         private readonly TextBlock _lblTitle;
         private readonly TextBox _txtTitleEditor;
         private readonly Button _btnEditTitle;
+        private readonly Border? _formatToolbar;
+        private readonly Button? _btnBold;
+        private readonly Button? _btnItalic;
+        private readonly Button? _btnFontDec;
+        private readonly Button? _btnFontInc;
+        private readonly Button? _btnFormatMenu;
+        private readonly TextBlock? _lblFontSize;
         private readonly TextBlock? _lblContentTitle;
         private readonly TextBlock? _lblContentInfo;
         private readonly TextBox? _noteTextBox;
         private readonly StackPanel? _checklistContainer;
         private readonly Button? _btnAddChecklistItem;
-        private readonly List<(CheckBox Check, TextBox Input, Border StrikeLine, Border RowBorder, Button BtnNote)> _checklistRows = new();
+        private readonly List<ChecklistRowState> _checklistRows = new();
         private readonly Border _contentCard;
         private readonly Panel _contentPanel;
+        private readonly TextBlock _btnSaveText;
         private readonly TextBlock _btnMinText;
         private readonly TextBlock _btnMaxText;
         private readonly TextBlock _btnCloseText;
@@ -66,13 +100,31 @@ namespace AvaloniaMdiApp
             bool isDarkMode = true,
             string windowType = "default",
             string initialNote = "",
-            List<ChecklistItemData>? initialChecklist = null)
+            List<ChecklistItemData>? initialChecklist = null,
+            string? windowId = null,
+            int accessCount = 1,
+            DraggableWindow? parentChecklistWindow = null,
+            Action<string, string, TextFormatData>? onLinkedRowSave = null,
+            TextFormatData? initialFormat = null)
         {
             Workspace = workspace;
             _taskBar = taskBar;
+            WindowId = string.IsNullOrWhiteSpace(windowId) ? Guid.NewGuid().ToString("N") : windowId;
             WindowTitle = title;
             WindowType = string.IsNullOrWhiteSpace(windowType) ? "default" : windowType;
+            AccessCount = Math.Max(1, accessCount);
+            ParentChecklistWindow = parentChecklistWindow;
+            _onLinkedRowSave = onLinkedRowSave;
             _isDarkMode = isDarkMode;
+
+            if (initialFormat != null)
+            {
+                _isBold = initialFormat.IsBold;
+                _isItalic = initialFormat.IsItalic;
+                _fontSize = Math.Clamp(initialFormat.FontSize > 0 ? initialFormat.FontSize : 13, 9, 32);
+                _alignment = string.IsNullOrWhiteSpace(initialFormat.Alignment) ? "left" : initialFormat.Alignment;
+                _fontFamilyName = string.IsNullOrWhiteSpace(initialFormat.FontFamilyName) ? "default" : initialFormat.FontFamilyName;
+            }
 
             Width = Math.Max(220, width);
             Height = Math.Max(140, height);
@@ -197,10 +249,14 @@ namespace AvaloniaMdiApp
             };
             Grid.SetColumn(btnPanel, 2);
 
+            var btnSave = CreateControlButton("💾", out _btnSaveText, (s, e) => SalvarJanela());
+            ToolTip.SetTip(btnSave, _onLinkedRowSave != null ? "Salvar nota vinculada à linha da lista (Ctrl+S)" : "Salvar janela (Ctrl+S)");
+
             var btnMin = CreateControlButton("—", out _btnMinText, (s, e) => ToggleMinimize());
             var btnMax = CreateControlButton("▢", out _btnMaxText, (s, e) => ToggleMaximize());
             var btnClose = CreateControlButton("✕", out _btnCloseText, (s, e) => Fechar());
 
+            btnPanel.Children.Add(btnSave);
             btnPanel.Children.Add(btnMin);
             btnPanel.Children.Add(btnMax);
             btnPanel.Children.Add(btnClose);
@@ -214,81 +270,101 @@ namespace AvaloniaMdiApp
             _contentCard = new Border
             {
                 Margin = new Thickness(10),
-                Padding = new Thickness(WindowType == "notepad" ? 0 : 12),
+                Padding = new Thickness(0),
                 CornerRadius = new CornerRadius(6),
                 BorderThickness = new Thickness(1),
+                ClipToBounds = true,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch
             };
 
-            if (WindowType == "notepad")
+            if (WindowType == "notepad" || WindowType == "checklist")
             {
-                _noteTextBox = new TextBox
-                {
-                    Text = initialNote,
-                    Watermark = "Digite suas anotações aqui...",
-                    AcceptsReturn = true,
-                    TextWrapping = TextWrapping.Wrap,
-                    BorderThickness = new Thickness(0),
-                    Background = Brushes.Transparent,
-                    Padding = new Thickness(12),
-                    FontSize = 13,
-                    HorizontalAlignment = HorizontalAlignment.Stretch,
-                    VerticalAlignment = VerticalAlignment.Stretch
-                };
-                _contentCard.Child = _noteTextBox;
-            }
-            else if (WindowType == "checklist")
-            {
-                _checklistContainer = new StackPanel
-                {
-                    Orientation = Orientation.Vertical,
-                    Spacing = 6
-                };
+                var cardDock = new DockPanel();
 
-                _btnAddChecklistItem = new Button
-                {
-                    Content = "+",
-                    HorizontalAlignment = HorizontalAlignment.Stretch,
-                    HorizontalContentAlignment = HorizontalAlignment.Center,
-                    Padding = new Thickness(8, 4),
-                    Margin = new Thickness(0, 2, 0, 0),
-                    CornerRadius = new CornerRadius(6),
-                    BorderThickness = new Thickness(1),
-                    FontSize = 16,
-                    FontWeight = FontWeight.Bold
-                };
-                ToolTip.SetTip(_btnAddChecklistItem, "Adicionar nova linha");
-                _btnAddChecklistItem.Click += (s, e) => AdicionarLinhaChecklist("", false, focusInput: true);
+                _formatToolbar = CriarBarraFormatacao(
+                    out _btnBold,
+                    out _btnItalic,
+                    out _btnFontDec,
+                    out _lblFontSize,
+                    out _btnFontInc,
+                    out _btnFormatMenu);
 
-                var outerListStack = new StackPanel
-                {
-                    Orientation = Orientation.Vertical,
-                    Spacing = 6
-                };
-                outerListStack.Children.Add(_checklistContainer);
-                outerListStack.Children.Add(_btnAddChecklistItem);
+                DockPanel.SetDock(_formatToolbar, Dock.Top);
+                cardDock.Children.Add(_formatToolbar);
 
-                var scrollViewer = new ScrollViewer
+                if (WindowType == "notepad")
                 {
-                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                    Content = outerListStack
-                };
-
-                _contentCard.Child = scrollViewer;
-
-                if (initialChecklist != null && initialChecklist.Count > 0)
-                {
-                    foreach (var item in initialChecklist)
+                    _noteTextBox = new TextBox
                     {
-                        AdicionarLinhaChecklist(item.Text, item.IsChecked, focusInput: false);
-                    }
+                        Text = initialNote,
+                        Watermark = "Digite suas anotações aqui...",
+                        AcceptsReturn = true,
+                        TextWrapping = TextWrapping.Wrap,
+                        BorderThickness = new Thickness(0),
+                        Background = Brushes.Transparent,
+                        Padding = new Thickness(12),
+                        FontSize = _fontSize,
+                        HorizontalAlignment = HorizontalAlignment.Stretch,
+                        VerticalAlignment = VerticalAlignment.Stretch
+                    };
+                    cardDock.Children.Add(_noteTextBox);
                 }
                 else
                 {
-                    AdicionarLinhaChecklist("", false, focusInput: false);
+                    _checklistContainer = new StackPanel
+                    {
+                        Orientation = Orientation.Vertical,
+                        Spacing = 6
+                    };
+
+                    _btnAddChecklistItem = new Button
+                    {
+                        Content = "+",
+                        HorizontalAlignment = HorizontalAlignment.Stretch,
+                        HorizontalContentAlignment = HorizontalAlignment.Center,
+                        Padding = new Thickness(8, 4),
+                        Margin = new Thickness(0, 2, 0, 0),
+                        CornerRadius = new CornerRadius(6),
+                        BorderThickness = new Thickness(1),
+                        FontSize = 16,
+                        FontWeight = FontWeight.Bold
+                    };
+                    ToolTip.SetTip(_btnAddChecklistItem, "Adicionar nova linha");
+                    _btnAddChecklistItem.Click += (s, e) => AdicionarLinhaChecklist("", false, "", null, focusInput: true);
+
+                    var outerListStack = new StackPanel
+                    {
+                        Orientation = Orientation.Vertical,
+                        Spacing = 6,
+                        Margin = new Thickness(10)
+                    };
+                    outerListStack.Children.Add(_checklistContainer);
+                    outerListStack.Children.Add(_btnAddChecklistItem);
+
+                    var scrollViewer = new ScrollViewer
+                    {
+                        VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                        HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                        Content = outerListStack
+                    };
+
+                    cardDock.Children.Add(scrollViewer);
+
+                    if (initialChecklist != null && initialChecklist.Count > 0)
+                    {
+                        foreach (var item in initialChecklist)
+                        {
+                            AdicionarLinhaChecklist(item.Text, item.IsChecked, item.LinkedNoteContent, item.LinkedNoteFormat, focusInput: false);
+                        }
+                    }
+                    else
+                    {
+                        AdicionarLinhaChecklist("", false, "", null, focusInput: false);
+                    }
                 }
+
+                _contentCard.Child = cardDock;
             }
             else
             {
@@ -333,12 +409,300 @@ namespace AvaloniaMdiApp
             PointerPressed += OnWindowPointerPressed;
             PointerMoved += OnWindowPointerMoved;
             PointerReleased += OnWindowPointerReleased;
+            KeyDown += OnWindowKeyDown;
             Workspace.SizeChanged += OnWorkspaceSizeChanged;
 
+            AplicarFormatacaoTexto();
             AtualizarCores();
         }
 
-        private void AdicionarLinhaChecklist(string texto, bool marcado, bool focusInput)
+        private Border CriarBarraFormatacao(
+            out Button btnBold,
+            out Button btnItalic,
+            out Button btnFontDec,
+            out TextBlock lblFontSize,
+            out Button btnFontInc,
+            out Button btnFormatMenu)
+        {
+            var bar = new Border
+            {
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                Padding = new Thickness(8, 4),
+                Height = 32
+            };
+
+            var stack = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 4,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            btnBold = CriarBotaoFormatacao("B", "Negrito (Ctrl+B)", FontWeight.Bold, FontStyle.Normal);
+            btnBold.Click += (s, e) => AlternarNegrito();
+
+            btnItalic = CriarBotaoFormatacao("I", "Itálico (Ctrl+I)", FontWeight.SemiBold, FontStyle.Italic);
+            btnItalic.Click += (s, e) => AlternarItalico();
+
+            btnFontDec = CriarBotaoFormatacao("A-", "Diminuir fonte (Ctrl+-)", FontWeight.SemiBold, FontStyle.Normal, width: 28);
+            btnFontDec.Click += (s, e) => AlterarTamanhoFonte(-1);
+
+            lblFontSize = new TextBlock
+            {
+                Text = $"{(int)_fontSize}pt",
+                FontSize = 11,
+                FontWeight = FontWeight.Medium,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(4, 0)
+            };
+
+            btnFontInc = CriarBotaoFormatacao("A+", "Aumentar fonte (Ctrl++)", FontWeight.SemiBold, FontStyle.Normal, width: 28);
+            btnFontInc.Click += (s, e) => AlterarTamanhoFonte(1);
+
+            btnFormatMenu = new Button
+            {
+                Content = "Aa ▾",
+                Height = 22,
+                Padding = new Thickness(8, 0),
+                CornerRadius = new CornerRadius(4),
+                BorderThickness = new Thickness(1),
+                FontSize = 11,
+                FontWeight = FontWeight.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+            ToolTip.SetTip(btnFormatMenu, "Mais opções de formatação de texto");
+
+            var flyout = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedLeft };
+
+            var miBold = new MenuItem { Header = "𝐁 Alternar Negrito (Ctrl+B)" };
+            miBold.Click += (s, e) => AlternarNegrito();
+
+            var miItalic = new MenuItem { Header = "𝐼 Alternar Itálico (Ctrl+I)" };
+            miItalic.Click += (s, e) => AlternarItalico();
+
+            var miFontInc = new MenuItem { Header = "A+ Aumentar Fonte" };
+            miFontInc.Click += (s, e) => AlterarTamanhoFonte(2);
+
+            var miFontDec = new MenuItem { Header = "A- Diminuir Fonte" };
+            miFontDec.Click += (s, e) => AlterarTamanhoFonte(-2);
+
+            var miAlignLeft = new MenuItem { Header = "⯇ Alinhar à Esquerda" };
+            miAlignLeft.Click += (s, e) => DefinirAlinhamento("left");
+
+            var miAlignCenter = new MenuItem { Header = "⯌ Centralizar Texto" };
+            miAlignCenter.Click += (s, e) => DefinirAlinhamento("center");
+
+            var miAlignRight = new MenuItem { Header = "⯈ Alinhar à Direita" };
+            miAlignRight.Click += (s, e) => DefinirAlinhamento("right");
+
+            var miFontDefault = new MenuItem { Header = "Fonte Padrão (Sans-Serif)" };
+            miFontDefault.Click += (s, e) => DefinirFamiliaFonte("default");
+
+            var miFontMono = new MenuItem { Header = "Fonte Monoespaçada (Código)" };
+            miFontMono.Click += (s, e) => DefinirFamiliaFonte("mono");
+
+            var miFontSerif = new MenuItem { Header = "Fonte Serifada (Leitura)" };
+            miFontSerif.Click += (s, e) => DefinirFamiliaFonte("serif");
+
+            var miReset = new MenuItem { Header = "↺ Restaurar Formatação Padrão" };
+            miReset.Click += (s, e) => RestaurarFormatacaoPadrao();
+
+            flyout.Items.Add(miBold);
+            flyout.Items.Add(miItalic);
+            flyout.Items.Add(new Separator());
+            flyout.Items.Add(miFontInc);
+            flyout.Items.Add(miFontDec);
+            flyout.Items.Add(new Separator());
+            flyout.Items.Add(miAlignLeft);
+            flyout.Items.Add(miAlignCenter);
+            flyout.Items.Add(miAlignRight);
+            flyout.Items.Add(new Separator());
+            flyout.Items.Add(miFontDefault);
+            flyout.Items.Add(miFontMono);
+            flyout.Items.Add(miFontSerif);
+            flyout.Items.Add(new Separator());
+            flyout.Items.Add(miReset);
+
+            btnFormatMenu.Flyout = flyout;
+
+            stack.Children.Add(btnBold);
+            stack.Children.Add(btnItalic);
+            stack.Children.Add(btnFontDec);
+            stack.Children.Add(lblFontSize);
+            stack.Children.Add(btnFontInc);
+            stack.Children.Add(btnFormatMenu);
+
+            bar.Child = stack;
+            return bar;
+        }
+
+        private Button CriarBotaoFormatacao(string texto, string tooltip, FontWeight weight, FontStyle style, double width = 24)
+        {
+            var btn = new Button
+            {
+                Content = texto,
+                Width = width,
+                Height = 22,
+                Padding = new Thickness(0),
+                CornerRadius = new CornerRadius(4),
+                BorderThickness = new Thickness(1),
+                FontSize = 11,
+                FontWeight = weight,
+                FontStyle = style,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            ToolTip.SetTip(btn, tooltip);
+            return btn;
+        }
+
+        private void AlternarNegrito()
+        {
+            _isBold = !_isBold;
+            AplicarFormatacaoTexto();
+            AtualizarCores();
+        }
+
+        private void AlternarItalico()
+        {
+            _isItalic = !_isItalic;
+            AplicarFormatacaoTexto();
+            AtualizarCores();
+        }
+
+        private void AlterarTamanhoFonte(double delta)
+        {
+            _fontSize = Math.Clamp(_fontSize + delta, 9, 32);
+            if (_lblFontSize != null)
+            {
+                _lblFontSize.Text = $"{(int)_fontSize}pt";
+            }
+            AplicarFormatacaoTexto();
+        }
+
+        private void DefinirAlinhamento(string alignment)
+        {
+            _alignment = alignment;
+            AplicarFormatacaoTexto();
+        }
+
+        private void DefinirFamiliaFonte(string familyName)
+        {
+            _fontFamilyName = familyName;
+            AplicarFormatacaoTexto();
+        }
+
+        private void RestaurarFormatacaoPadrao()
+        {
+            _isBold = false;
+            _isItalic = false;
+            _fontSize = 13;
+            _alignment = "left";
+            _fontFamilyName = "default";
+            if (_lblFontSize != null)
+            {
+                _lblFontSize.Text = "13pt";
+            }
+            AplicarFormatacaoTexto();
+            AtualizarCores();
+        }
+
+        private static FontFamily ObterFontFamily(string familyName) => familyName switch
+        {
+            "mono" => new FontFamily("Consolas, Courier New, monospace"),
+            "serif" => new FontFamily("Georgia, Times New Roman, serif"),
+            _ => FontFamily.Default
+        };
+
+        private void AplicarFormatacaoTexto()
+        {
+            var weight = _isBold ? FontWeight.Bold : FontWeight.Normal;
+            var style = _isItalic ? FontStyle.Italic : FontStyle.Normal;
+            var align = _alignment == "center"
+                ? TextAlignment.Center
+                : _alignment == "right"
+                    ? TextAlignment.Right
+                    : TextAlignment.Left;
+            var family = ObterFontFamily(_fontFamilyName);
+
+            if (_noteTextBox != null)
+            {
+                _noteTextBox.FontWeight = weight;
+                _noteTextBox.FontStyle = style;
+                _noteTextBox.FontSize = _fontSize;
+                _noteTextBox.TextAlignment = align;
+                _noteTextBox.FontFamily = family;
+            }
+
+            foreach (var row in _checklistRows)
+            {
+                row.Input.FontWeight = weight;
+                row.Input.FontStyle = style;
+                row.Input.FontSize = _fontSize;
+                row.Input.TextAlignment = align;
+                row.Input.FontFamily = family;
+            }
+        }
+
+        public TextFormatData ExportTextFormat() => new()
+        {
+            IsBold = _isBold,
+            IsItalic = _isItalic,
+            FontSize = _fontSize,
+            Alignment = _alignment,
+            FontFamilyName = _fontFamilyName
+        };
+
+        private void OnWindowKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+            {
+                if (e.Key == Key.S)
+                {
+                    e.Handled = true;
+                    SalvarJanela();
+                }
+                else if (e.Key == Key.B)
+                {
+                    e.Handled = true;
+                    AlternarNegrito();
+                }
+                else if (e.Key == Key.I)
+                {
+                    e.Handled = true;
+                    AlternarItalico();
+                }
+                else if (e.Key == Key.OemPlus || e.Key == Key.Add)
+                {
+                    e.Handled = true;
+                    AlterarTamanhoFonte(1);
+                }
+                else if (e.Key == Key.OemMinus || e.Key == Key.Subtract)
+                {
+                    e.Handled = true;
+                    AlterarTamanhoFonte(-1);
+                }
+            }
+        }
+
+        public void SalvarJanela()
+        {
+            ConfirmarEdicaoTitulo();
+            SincronizarNotaVinculada();
+            OnSaveRequested?.Invoke(this);
+        }
+
+        public void SincronizarNotaVinculada()
+        {
+            if (_onLinkedRowSave != null && _noteTextBox != null)
+            {
+                _onLinkedRowSave(WindowTitle, _noteTextBox.Text ?? string.Empty, ExportTextFormat());
+            }
+        }
+
+        private void AdicionarLinhaChecklist(string texto, bool marcado, string notaVinculada, TextFormatData? formatoNotaVinculada, bool focusInput)
         {
             if (_checklistContainer == null) return;
 
@@ -363,7 +727,10 @@ namespace AvaloniaMdiApp
                 Background = Brushes.Transparent,
                 VerticalAlignment = VerticalAlignment.Center,
                 Padding = new Thickness(4, 6),
-                FontSize = 12.5
+                FontSize = _fontSize,
+                FontWeight = _isBold ? FontWeight.Bold : FontWeight.Normal,
+                FontStyle = _isItalic ? FontStyle.Italic : FontStyle.Normal,
+                FontFamily = ObterFontFamily(_fontFamilyName)
             };
 
             var btnNote = new Button
@@ -378,16 +745,9 @@ namespace AvaloniaMdiApp
                 VerticalContentAlignment = VerticalAlignment.Center,
                 CornerRadius = new CornerRadius(4),
                 FontSize = 11.5,
-                Opacity = 0.85
+                Opacity = string.IsNullOrWhiteSpace(notaVinculada) ? 0.65 : 1.0
             };
-            ToolTip.SetTip(btnNote, "Abrir Bloco de Notas para esta linha");
-            btnNote.Click += (s, e) =>
-            {
-                string nomeLinha = string.IsNullOrWhiteSpace(inputBox.Text)
-                    ? "Nova Nota"
-                    : inputBox.Text.Trim();
-                OnRequestOpenNotepad?.Invoke(nomeLinha);
-            };
+            ToolTip.SetTip(btnNote, "Abrir Bloco de Notas atrelado a esta linha");
 
             var btnRemove = new Button
             {
@@ -432,20 +792,47 @@ namespace AvaloniaMdiApp
 
             checkBox.IsCheckedChanged += (s, e) => AtualizarEstiloMarcacao();
 
+            var entry = new ChecklistRowState
+            {
+                Check = checkBox,
+                Input = inputBox,
+                StrikeLine = strikeLine,
+                RowBorder = rowBorder,
+                BtnNote = btnNote,
+                LinkedNoteContent = notaVinculada ?? string.Empty,
+                LinkedNoteFormat = formatoNotaVinculada ?? new TextFormatData()
+            };
+            _checklistRows.Add(entry);
+
             inputBox.KeyDown += (s, e) =>
             {
                 if (e.Key == Key.Enter)
                 {
                     e.Handled = true;
-                    AdicionarLinhaChecklist("", false, focusInput: true);
+                    AdicionarLinhaChecklist("", false, "", null, focusInput: true);
                 }
             };
 
-            var entry = (checkBox, inputBox, strikeLine, rowBorder, btnNote);
-            _checklistRows.Add(entry);
+            inputBox.TextChanged += (s, e) =>
+            {
+                if (entry.OpenNoteWindow != null && !string.IsNullOrWhiteSpace(inputBox.Text))
+                {
+                    entry.OpenNoteWindow.AtualizarTituloExterno(inputBox.Text.Trim());
+                }
+            };
+
+            btnNote.Click += (s, e) =>
+            {
+                if (string.IsNullOrWhiteSpace(inputBox.Text))
+                {
+                    inputBox.Text = $"Item {_checklistRows.IndexOf(entry) + 1}";
+                }
+                OnRequestOpenRowNotepad?.Invoke(this, entry);
+            };
 
             btnRemove.Click += (s, e) =>
             {
+                entry.OpenNoteWindow?.Fechar();
                 _checklistRows.Remove(entry);
                 _checklistContainer.Children.Remove(rowBorder);
             };
@@ -472,13 +859,35 @@ namespace AvaloniaMdiApp
             }
         }
 
-        private void AtualizarEstiloLinhaChecklist((CheckBox Check, TextBox Input, Border StrikeLine, Border RowBorder, Button BtnNote) row)
+        public void AtualizarIndicadorNotaLinha(ChecklistRowState row)
+        {
+            bool temNota = !string.IsNullOrWhiteSpace(row.LinkedNoteContent);
+            row.BtnNote.Opacity = temNota ? 1.0 : 0.65;
+            row.BtnNote.BorderThickness = temNota ? new Thickness(1) : new Thickness(0);
+            row.BtnNote.BorderBrush = temNota ? ThemePalette.AccentLight : Brushes.Transparent;
+        }
+
+        private void AtualizarEstiloLinhaChecklist(ChecklistRowState row)
         {
             row.RowBorder.Background = _isDarkMode ? ThemePalette.DarkContentBg : ThemePalette.LightContentBg;
             row.RowBorder.BorderBrush = _isDarkMode ? ThemePalette.DarkBorder : ThemePalette.LightBorder;
             row.Input.Foreground = _isDarkMode ? ThemePalette.DarkTextPrimary : ThemePalette.LightTextPrimary;
             row.StrikeLine.Background = _isDarkMode ? ThemePalette.DarkTextSecondary : ThemePalette.LightTextSecondary;
             row.BtnNote.Foreground = _isDarkMode ? ThemePalette.DarkTextPrimary : ThemePalette.LightTextPrimary;
+            AtualizarIndicadorNotaLinha(row);
+        }
+
+        public void AtualizarTituloExterno(string novoTitulo)
+        {
+            if (string.IsNullOrWhiteSpace(novoTitulo)) return;
+            WindowTitle = novoTitulo;
+            _lblTitle.Text = novoTitulo;
+            _txtTitleEditor.Text = novoTitulo;
+            if (_lblContentTitle != null)
+            {
+                _lblContentTitle.Text = novoTitulo;
+            }
+            _taskBar.AtualizarTituloJanela(this, novoTitulo);
         }
 
         private void IniciarEdicaoTitulo()
@@ -490,6 +899,8 @@ namespace AvaloniaMdiApp
             _txtTitleEditor.Focus();
             _txtTitleEditor.SelectAll();
         }
+
+        public string ObterTextoNota() => _noteTextBox?.Text ?? string.Empty;
 
         private void ConfirmarEdicaoTitulo()
         {
@@ -505,6 +916,7 @@ namespace AvaloniaMdiApp
                     _lblContentTitle.Text = novoTitulo;
                 }
                 _taskBar.AtualizarTituloJanela(this, novoTitulo);
+                SincronizarNotaVinculada();
             }
 
             _txtTitleEditor.IsVisible = false;
@@ -522,26 +934,39 @@ namespace AvaloniaMdiApp
 
         public WindowStateData ExportState()
         {
+            SincronizarNotaVinculada();
             Rect bounds = GetNormalBounds();
             var data = new WindowStateData
             {
+                Id = WindowId,
                 Title = WindowTitle,
                 WindowType = WindowType,
                 X = bounds.X,
                 Y = bounds.Y,
                 Width = bounds.Width,
                 Height = bounds.Height,
-                NoteContent = _noteTextBox?.Text ?? string.Empty
+                NoteContent = _noteTextBox?.Text ?? string.Empty,
+                TextFormat = ExportTextFormat(),
+                AccessCount = AccessCount,
+                LastUsedUtc = DateTime.UtcNow
             };
 
             if (WindowType == "checklist")
             {
                 foreach (var row in _checklistRows)
                 {
+                    if (row.OpenNoteWindow != null)
+                    {
+                        row.LinkedNoteContent = row.OpenNoteWindow.ObterTextoNota();
+                        row.LinkedNoteFormat = row.OpenNoteWindow.ExportTextFormat();
+                    }
+
                     data.ChecklistItems.Add(new ChecklistItemData
                     {
                         Text = row.Input.Text ?? string.Empty,
-                        IsChecked = row.Check.IsChecked == true
+                        IsChecked = row.Check.IsChecked == true,
+                        LinkedNoteContent = row.LinkedNoteContent,
+                        LinkedNoteFormat = row.LinkedNoteFormat
                     });
                 }
             }
@@ -599,6 +1024,7 @@ namespace AvaloniaMdiApp
                 _txtTitleEditor.Background = ThemePalette.DarkContentBg;
                 _txtTitleEditor.Foreground = ThemePalette.DarkTextPrimary;
                 _txtTitleEditor.BorderBrush = ThemePalette.DarkBorderActive;
+                _btnSaveText.Foreground = ThemePalette.DarkTextPrimary;
                 _btnMinText.Foreground = ThemePalette.DarkTextPrimary;
                 _btnMaxText.Foreground = ThemePalette.DarkTextPrimary;
                 _btnCloseText.Foreground = ThemePalette.DarkTextPrimary;
@@ -628,6 +1054,7 @@ namespace AvaloniaMdiApp
                 _txtTitleEditor.Background = ThemePalette.LightWindowBg;
                 _txtTitleEditor.Foreground = ThemePalette.LightTextPrimary;
                 _txtTitleEditor.BorderBrush = ThemePalette.LightBorderActive;
+                _btnSaveText.Foreground = headerTextBrush;
                 _btnMinText.Foreground = headerTextBrush;
                 _btnMaxText.Foreground = headerTextBrush;
                 _btnCloseText.Foreground = headerTextBrush;
@@ -650,10 +1077,63 @@ namespace AvaloniaMdiApp
             {
                 AtualizarEstiloLinhaChecklist(row);
             }
+
+            if (_formatToolbar != null)
+            {
+                var barBg = _isDarkMode ? ThemePalette.DarkContentBg : ThemePalette.LightContentBg;
+                var borderBrush = _isDarkMode ? ThemePalette.DarkBorder : ThemePalette.LightBorder;
+                var btnBg = _isDarkMode ? ThemePalette.DarkButtonBg : ThemePalette.LightButtonBg;
+                var textBrush = _isDarkMode ? ThemePalette.DarkTextPrimary : ThemePalette.LightTextPrimary;
+                var subTextBrush = _isDarkMode ? ThemePalette.DarkTextSecondary : ThemePalette.LightTextSecondary;
+
+                _formatToolbar.Background = barBg;
+                _formatToolbar.BorderBrush = borderBrush;
+
+                if (_btnBold != null)
+                {
+                    _btnBold.Background = _isBold ? ThemePalette.Accent : btnBg;
+                    _btnBold.BorderBrush = _isBold ? ThemePalette.AccentLight : borderBrush;
+                    _btnBold.Foreground = _isBold ? Brushes.White : textBrush;
+                }
+
+                if (_btnItalic != null)
+                {
+                    _btnItalic.Background = _isItalic ? ThemePalette.Accent : btnBg;
+                    _btnItalic.BorderBrush = _isItalic ? ThemePalette.AccentLight : borderBrush;
+                    _btnItalic.Foreground = _isItalic ? Brushes.White : textBrush;
+                }
+
+                if (_btnFontDec != null)
+                {
+                    _btnFontDec.Background = btnBg;
+                    _btnFontDec.BorderBrush = borderBrush;
+                    _btnFontDec.Foreground = textBrush;
+                }
+
+                if (_btnFontInc != null)
+                {
+                    _btnFontInc.Background = btnBg;
+                    _btnFontInc.BorderBrush = borderBrush;
+                    _btnFontInc.Foreground = textBrush;
+                }
+
+                if (_btnFormatMenu != null)
+                {
+                    _btnFormatMenu.Background = btnBg;
+                    _btnFormatMenu.BorderBrush = borderBrush;
+                    _btnFormatMenu.Foreground = textBrush;
+                }
+
+                if (_lblFontSize != null)
+                {
+                    _lblFontSize.Foreground = subTextBrush;
+                }
+            }
         }
 
         public void Fechar()
         {
+            SincronizarNotaVinculada();
             Workspace.SizeChanged -= OnWorkspaceSizeChanged;
             _taskBar.RemoverJanela(this);
             Workspace.Children.Remove(this);
@@ -908,25 +1388,6 @@ namespace AvaloniaMdiApp
                 _btnMaxText.Text = "▢";
             }
             AtualizarTextoDimensoes();
-        }
-    }
-
-    public static class ZIndexManager
-    {
-        private static int _maxZIndex = 1;
-        private static DraggableWindow? _activeWindow;
-
-        public static void BringToFront(Control window)
-        {
-            _maxZIndex++;
-            window.SetValue(Panel.ZIndexProperty, _maxZIndex);
-
-            if (window is DraggableWindow dw && _activeWindow != dw)
-            {
-                _activeWindow?.SetActive(false);
-                _activeWindow = dw;
-                _activeWindow.SetActive(true);
-            }
         }
     }
 }

@@ -1,33 +1,7 @@
 using Avalonia.Media;
-using System.Collections.Generic;
 
 namespace AvaloniaMdiApp
 {
-    public class ChecklistItemData
-    {
-        public string Text { get; set; } = string.Empty;
-        public bool IsChecked { get; set; }
-    }
-
-    public class WindowStateData
-    {
-        public string Title { get; set; } = string.Empty;
-        public string WindowType { get; set; } = "default";
-        public double X { get; set; }
-        public double Y { get; set; }
-        public double Width { get; set; }
-        public double Height { get; set; }
-        public string NoteContent { get; set; } = string.Empty;
-        public List<ChecklistItemData> ChecklistItems { get; set; } = new();
-    }
-
-    public class AppSettings
-    {
-        public bool IsDarkMode { get; set; } = true;
-        public bool EnableNotifications { get; set; } = true;
-        public List<WindowStateData> SavedWindows { get; set; } = new();
-    }
-
     /// <summary>
     /// Paleta estática em cache para evitar alocações repetidas de Brushes e reduzir consumo de memória/CPU.
     /// </summary>

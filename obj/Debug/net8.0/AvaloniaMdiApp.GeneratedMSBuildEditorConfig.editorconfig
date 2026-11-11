@@ -24,5 +24,5 @@ build_property.EnableCodeStyleSeverity =
 [C:/C\#/Gerenciador MDI Portátil/App.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
-[C:/C\#/Gerenciador MDI Portátil/MainWindow.axaml]
+[C:/C\#/Gerenciador MDI Portátil/Views/MainWindow.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml

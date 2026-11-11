@@ -30,9 +30,15 @@
                   CornerRadius="6"
                   VerticalAlignment="Center">
             <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedLeft">
-                <MenuItem Header="📝 Bloco de Notas" Click="AbrirBlocoDeNotas_Click"/>
-                <MenuItem Header="☑ Lista de Marcação" Click="AbrirChecklist_Click"/>
+              <MenuFlyout Placement="BottomEdgeAlignedLeft" Opening="MenuWidgets_Opening">
+                <MenuItem Header="📝 Novo Bloco de Notas" Click="AbrirBlocoDeNotas_Click"/>
+                <MenuItem Header="☑ Nova Lista de Marcação" Click="AbrirChecklist_Click"/>
+                <Separator/>
+                <MenuItem Header="💾 Salvar Janela Ativa" Click="SalvarJanelaAtiva_Click"/>
+                <MenuItem Header="💾 Salvar Todas as Janelas" Click="SalvarTodasJanelas_Click"/>
+                <Separator/>
+                <MenuItem Name="MenuMaisUsadas" Header="⭐ Mais Usadas"/>
+                <MenuItem Name="MenuJanelasSalvas" Header="📂 Janelas Salvas"/>
               </MenuFlyout>
             </Button.Flyout>
           </Button>
