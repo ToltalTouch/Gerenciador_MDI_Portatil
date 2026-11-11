@@ -15,14 +15,14 @@ build_property.PlatformNeutralAssembly =
 build_property.EnforceExtendedAnalyzerRules = 
 build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.RootNamespace = AvaloniaMdiApp
-build_property.ProjectDir = C:\Users\micael.amaral\Downloads\GerenciadorMDI_ProntoParaCompilar\
+build_property.ProjectDir = C:\C#\Gerenciador MDI Portátil\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
 build_property.EffectiveAnalysisLevelStyle = 8.0
 build_property.EnableCodeStyleSeverity = 
 
-[C:/Users/micael.amaral/Downloads/GerenciadorMDI_ProntoParaCompilar/App.axaml]
+[C:/C\#/Gerenciador MDI Portátil/App.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
-[C:/Users/micael.amaral/Downloads/GerenciadorMDI_ProntoParaCompilar/MainWindow.axaml]
+[C:/C\#/Gerenciador MDI Portátil/MainWindow.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml

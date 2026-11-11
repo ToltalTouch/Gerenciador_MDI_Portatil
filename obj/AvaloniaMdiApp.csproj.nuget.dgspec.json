@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\micael.amaral\\Downloads\\GerenciadorMDI_ProntoParaCompilar\\AvaloniaMdiApp.csproj": {}
+    "C:\\C#\\Gerenciador MDI Portátil\\AvaloniaMdiApp.csproj": {}
   },
   "projects": {
-    "C:\\Users\\micael.amaral\\Downloads\\GerenciadorMDI_ProntoParaCompilar\\AvaloniaMdiApp.csproj": {
+    "C:\\C#\\Gerenciador MDI Portátil\\AvaloniaMdiApp.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\micael.amaral\\Downloads\\GerenciadorMDI_ProntoParaCompilar\\AvaloniaMdiApp.csproj",
+        "projectUniqueName": "C:\\C#\\Gerenciador MDI Portátil\\AvaloniaMdiApp.csproj",
         "projectName": "AvaloniaMdiApp",
-        "projectPath": "C:\\Users\\micael.amaral\\Downloads\\GerenciadorMDI_ProntoParaCompilar\\AvaloniaMdiApp.csproj",
+        "projectPath": "C:\\C#\\Gerenciador MDI Portátil\\AvaloniaMdiApp.csproj",
         "packagesPath": "C:\\Users\\micael.amaral\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\micael.amaral\\Downloads\\GerenciadorMDI_ProntoParaCompilar\\obj\\",
+        "outputPath": "C:\\C#\\Gerenciador MDI Portátil\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

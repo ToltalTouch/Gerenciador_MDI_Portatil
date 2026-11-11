@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "4QTHaDlj8kU=",
+  "dgSpecHash": "JxYr0holEcA=",
   "success": true,
-  "projectFilePath": "C:\\Users\\micael.amaral\\Downloads\\GerenciadorMDI_ProntoParaCompilar\\AvaloniaMdiApp.csproj",
+  "projectFilePath": "C:\\C#\\Gerenciador MDI Portátil\\AvaloniaMdiApp.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\micael.amaral\\.nuget\\packages\\avalonia\\11.1.0\\avalonia.11.1.0.nupkg.sha512",
     "C:\\Users\\micael.amaral\\.nuget\\packages\\avalonia.angle.windows.natives\\2.1.22045.20230930\\avalonia.angle.windows.natives.2.1.22045.20230930.nupkg.sha512",

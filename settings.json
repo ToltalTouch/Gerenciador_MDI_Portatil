@@ -1,13 +1,5 @@
 {
   "IsDarkMode": true,
   "EnableNotifications": false,
-  "SavedWindows": [
-    {
-      "Title": "Janela Inicial 1",
-      "X": 50,
-      "Y": 50,
-      "Width": 320,
-      "Height": 220
-    }
-  ]
+  "SavedWindows": []
 }

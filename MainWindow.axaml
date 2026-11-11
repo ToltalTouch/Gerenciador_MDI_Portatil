@@ -3,18 +3,72 @@
         xmlns:local="using:AvaloniaMdiApp"
         x:Class="AvaloniaMdiApp.MainWindow"
         Title="Gerenciador MDI Portátil"
-        Width="950" Height="650">
+        Width="1024" Height="680"
+        MinWidth="640" MinHeight="420"
+        WindowStartupLocation="CenterScreen">
   
-  <DockPanel Name="RootDock" Background="#1e1e1e">
-    <Border DockPanel.Dock="Top" Height="50" Background="#333333">
-      <StackPanel Orientation="Horizontal" Spacing="10" Margin="15,10">
-        <Button Content="+ Abrir Janela" Background="#007acc" Foreground="White" Click="AbrirNovaJanela_Click"/>
-        <Button Content="⚙ Configurações" Background="#3f3f46" Foreground="White" Click="AbrirConfiguracoes_Click"/>
-      </StackPanel>
+  <DockPanel Name="RootDock" Background="#0F172A">
+    <Border Name="TopBar" DockPanel.Dock="Top" Height="54" Background="#1E293B" BorderBrush="#334155" BorderThickness="0,0,0,1">
+      <Grid Margin="16,0">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+          <Border Width="10" Height="22" CornerRadius="3" Background="#2563EB" VerticalAlignment="Center"/>
+          <TextBlock Name="AppTitleText" Text="MDI Workspace" FontWeight="Bold" FontSize="15" Foreground="#F8FAFC" VerticalAlignment="Center"/>
+          <Border Name="TitleDivider" Width="1" Height="20" Background="#334155" Margin="4,0" VerticalAlignment="Center"/>
+          <Button Name="BtnWidgets"
+                  Content="🧩 Widgets ▾"
+                  Background="#334155"
+                  Foreground="#F8FAFC"
+                  FontWeight="SemiBold"
+                  FontSize="12.5"
+                  Padding="12,7"
+                  CornerRadius="6"
+                  VerticalAlignment="Center">
+            <Button.Flyout>
+              <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                <MenuItem Header="📝 Bloco de Notas" Click="AbrirBlocoDeNotas_Click"/>
+                <MenuItem Header="☑ Lista de Marcação" Click="AbrirChecklist_Click"/>
+              </MenuFlyout>
+            </Button.Flyout>
+          </Button>
+        </StackPanel>
+
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Button Name="BtnCascata"
+                  Content="❐ Cascata"
+                  Background="#334155"
+                  Foreground="#F8FAFC"
+                  FontSize="12.5"
+                  Padding="12,7"
+                  CornerRadius="6"
+                  Click="OrganizarCascata_Click"/>
+          <Button Name="BtnLadoALado"
+                  Content="⊞ Grade"
+                  Background="#334155"
+                  Foreground="#F8FAFC"
+                  FontSize="12.5"
+                  Padding="12,7"
+                  CornerRadius="6"
+                  Click="OrganizarGrade_Click"/>
+          <Button Name="BtnConfiguracoes"
+                  Content="⚙ Preferências"
+                  Background="#334155"
+                  Foreground="#F8FAFC"
+                  FontSize="12.5"
+                  Padding="12,7"
+                  CornerRadius="6"
+                  Click="AbrirConfiguracoes_Click"/>
+        </StackPanel>
+      </Grid>
     </Border>
 
     <local:TaskBar x:Name="AppTaskBar" DockPanel.Dock="Bottom"/>
 
-    <Canvas Name="Workspace" Background="#2d2d30"/>
+    <Canvas Name="Workspace" Background="#0F172A" ClipToBounds="True"/>
   </DockPanel>
 </Window>
