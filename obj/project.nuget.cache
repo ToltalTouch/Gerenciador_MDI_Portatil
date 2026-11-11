@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "JxYr0holEcA=",
+  "dgSpecHash": "2v/ncwYZyL0=",
   "success": true,
   "projectFilePath": "C:\\C#\\Gerenciador MDI Portátil\\AvaloniaMdiApp.csproj",
   "expectedPackageFiles": [
@@ -21,6 +21,7 @@
     "C:\\Users\\micael.amaral\\.nuget\\packages\\harfbuzzsharp.nativeassets.webassembly\\7.3.0.2\\harfbuzzsharp.nativeassets.webassembly.7.3.0.2.nupkg.sha512",
     "C:\\Users\\micael.amaral\\.nuget\\packages\\harfbuzzsharp.nativeassets.win32\\7.3.0.2\\harfbuzzsharp.nativeassets.win32.7.3.0.2.nupkg.sha512",
     "C:\\Users\\micael.amaral\\.nuget\\packages\\microcom.runtime\\0.11.0\\microcom.runtime.0.11.0.nupkg.sha512",
+    "C:\\Users\\micael.amaral\\.nuget\\packages\\microsoft.web.webview2\\1.0.2903.40\\microsoft.web.webview2.1.0.2903.40.nupkg.sha512",
     "C:\\Users\\micael.amaral\\.nuget\\packages\\skiasharp\\2.88.8\\skiasharp.2.88.8.nupkg.sha512",
     "C:\\Users\\micael.amaral\\.nuget\\packages\\skiasharp.nativeassets.linux\\2.88.8\\skiasharp.nativeassets.linux.2.88.8.nupkg.sha512",
     "C:\\Users\\micael.amaral\\.nuget\\packages\\skiasharp.nativeassets.macos\\2.88.8\\skiasharp.nativeassets.macos.2.88.8.nupkg.sha512",

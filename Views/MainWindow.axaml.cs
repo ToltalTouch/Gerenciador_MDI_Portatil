@@ -14,6 +14,7 @@ namespace AvaloniaMdiApp
         private int _contadorJanelas = 0;
         private int _contadorNotas = 0;
         private int _contadorListas = 0;
+        private int _contadorNavegadores = 0;
         private bool _isDarkMode = true;
         private SettingsWindow? _settingsWindow;
         private readonly List<DraggableWindow> _ativasJanelas = new();
@@ -83,6 +84,7 @@ namespace AvaloniaMdiApp
             {
                 if (winData.WindowType == "notepad") _contadorNotas++;
                 else if (winData.WindowType == "checklist") _contadorListas++;
+                else if (winData.WindowType == "browser") _contadorNavegadores++;
                 else _contadorJanelas++;
 
                 CriarJanelaInterna(
@@ -232,7 +234,7 @@ namespace AvaloniaMdiApp
             {
                 foreach (var item in maisUsadas)
                 {
-                    string icone = item.WindowType == "checklist" ? "☑" : "📝";
+                    string icone = ObterIconeTipo(item.WindowType);
                     var menuItem = new MenuItem
                     {
                         Header = $"{icone} {item.Title} ({item.AccessCount}x)"
@@ -255,7 +257,7 @@ namespace AvaloniaMdiApp
             {
                 foreach (var item in salvas)
                 {
-                    string icone = item.WindowType == "checklist" ? "☑" : "📝";
+                    string icone = ObterIconeTipo(item.WindowType);
                     var menuItem = new MenuItem
                     {
                         Header = $"{icone} {item.Title}"
@@ -268,7 +270,7 @@ namespace AvaloniaMdiApp
                 var menuRemover = new MenuItem { Header = "🗑 Excluir dos Salvos" };
                 foreach (var item in salvas)
                 {
-                    string icone = item.WindowType == "checklist" ? "☑" : "📝";
+                    string icone = ObterIconeTipo(item.WindowType);
                     var delItem = new MenuItem
                     {
                         Header = $"✕ {icone} {item.Title}"
@@ -279,6 +281,13 @@ namespace AvaloniaMdiApp
                 MenuJanelasSalvas.Items.Add(menuRemover);
             }
         }
+
+        private static string ObterIconeTipo(string windowType) => windowType switch
+        {
+            "checklist" => "☑",
+            "browser" => "🌐",
+            _ => "📝"
+        };
 
         private void AbrirJanelaDoCatalogo(string id)
         {
@@ -443,6 +452,22 @@ namespace AvaloniaMdiApp
             if (settings.EnableNotifications)
             {
                 ToastNotification.Mostrar(Workspace, $"{titulo} criada!", "info");
+            }
+        }
+
+        private void AbrirNavegador_Click(object? sender, RoutedEventArgs e)
+        {
+            _contadorNavegadores++;
+            double offsetX = 50 + ((_contadorNavegadores - 1) * 32) % 260;
+            double offsetY = 40 + ((_contadorNavegadores - 1) * 32) % 160;
+
+            string titulo = $"Navegador #{_contadorNavegadores}";
+            CriarJanelaInterna(titulo, offsetX, offsetY, 640, 440, "browser", "https://www.google.com");
+
+            var settings = SettingsManager.Carregar();
+            if (settings.EnableNotifications)
+            {
+                ToastNotification.Mostrar(Workspace, $"{titulo} (Chromium) aberto!", "info");
             }
         }
 

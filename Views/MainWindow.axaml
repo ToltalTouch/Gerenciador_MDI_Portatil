@@ -33,6 +33,7 @@
               <MenuFlyout Placement="BottomEdgeAlignedLeft" Opening="MenuWidgets_Opening">
                 <MenuItem Header="📝 Novo Bloco de Notas" Click="AbrirBlocoDeNotas_Click"/>
                 <MenuItem Header="☑ Nova Lista de Marcação" Click="AbrirChecklist_Click"/>
+                <MenuItem Header="🌐 Novo Navegador Web" Click="AbrirNavegador_Click"/>
                 <Separator/>
                 <MenuItem Header="💾 Salvar Janela Ativa" Click="SalvarJanelaAtiva_Click"/>
                 <MenuItem Header="💾 Salvar Todas as Janelas" Click="SalvarTodasJanelas_Click"/>

@@ -10,19 +10,7 @@ using System.Collections.Generic;
 
 namespace AvaloniaMdiApp
 {
-    public class ChecklistRowState
-    {
-        public CheckBox Check { get; init; } = null!;
-        public TextBox Input { get; init; } = null!;
-        public Border StrikeLine { get; init; } = null!;
-        public Border RowBorder { get; init; } = null!;
-        public Button BtnNote { get; init; } = null!;
-        public string LinkedNoteContent { get; set; } = string.Empty;
-        public TextFormatData LinkedNoteFormat { get; set; } = new();
-        public DraggableWindow? OpenNoteWindow { get; set; }
-    }
-
-    public class DraggableWindow : Border
+    public partial class DraggableWindow : Border
     {
         public event Action? OnClosed;
         public event Action<DraggableWindow, ChecklistRowState>? OnRequestOpenRowNotepad;
@@ -366,6 +354,10 @@ namespace AvaloniaMdiApp
 
                 _contentCard.Child = cardDock;
             }
+            else if (WindowType == "browser")
+            {
+                _contentCard.Child = CriarConteudoNavegador(initialNote);
+            }
             else
             {
                 var contentStack = new StackPanel
@@ -416,277 +408,6 @@ namespace AvaloniaMdiApp
             AtualizarCores();
         }
 
-        private Border CriarBarraFormatacao(
-            out Button btnBold,
-            out Button btnItalic,
-            out Button btnFontDec,
-            out TextBlock lblFontSize,
-            out Button btnFontInc,
-            out Button btnFormatMenu)
-        {
-            var bar = new Border
-            {
-                BorderThickness = new Thickness(0, 0, 0, 1),
-                Padding = new Thickness(8, 4),
-                Height = 32
-            };
-
-            var stack = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Spacing = 4,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-
-            btnBold = CriarBotaoFormatacao("B", "Negrito (Ctrl+B)", FontWeight.Bold, FontStyle.Normal);
-            btnBold.Click += (s, e) => AlternarNegrito();
-
-            btnItalic = CriarBotaoFormatacao("I", "Itálico (Ctrl+I)", FontWeight.SemiBold, FontStyle.Italic);
-            btnItalic.Click += (s, e) => AlternarItalico();
-
-            btnFontDec = CriarBotaoFormatacao("A-", "Diminuir fonte (Ctrl+-)", FontWeight.SemiBold, FontStyle.Normal, width: 28);
-            btnFontDec.Click += (s, e) => AlterarTamanhoFonte(-1);
-
-            lblFontSize = new TextBlock
-            {
-                Text = $"{(int)_fontSize}pt",
-                FontSize = 11,
-                FontWeight = FontWeight.Medium,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(4, 0)
-            };
-
-            btnFontInc = CriarBotaoFormatacao("A+", "Aumentar fonte (Ctrl++)", FontWeight.SemiBold, FontStyle.Normal, width: 28);
-            btnFontInc.Click += (s, e) => AlterarTamanhoFonte(1);
-
-            btnFormatMenu = new Button
-            {
-                Content = "Aa ▾",
-                Height = 22,
-                Padding = new Thickness(8, 0),
-                CornerRadius = new CornerRadius(4),
-                BorderThickness = new Thickness(1),
-                FontSize = 11,
-                FontWeight = FontWeight.SemiBold,
-                VerticalAlignment = VerticalAlignment.Center,
-                VerticalContentAlignment = VerticalAlignment.Center
-            };
-            ToolTip.SetTip(btnFormatMenu, "Mais opções de formatação de texto");
-
-            var flyout = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedLeft };
-
-            var miBold = new MenuItem { Header = "𝐁 Alternar Negrito (Ctrl+B)" };
-            miBold.Click += (s, e) => AlternarNegrito();
-
-            var miItalic = new MenuItem { Header = "𝐼 Alternar Itálico (Ctrl+I)" };
-            miItalic.Click += (s, e) => AlternarItalico();
-
-            var miFontInc = new MenuItem { Header = "A+ Aumentar Fonte" };
-            miFontInc.Click += (s, e) => AlterarTamanhoFonte(2);
-
-            var miFontDec = new MenuItem { Header = "A- Diminuir Fonte" };
-            miFontDec.Click += (s, e) => AlterarTamanhoFonte(-2);
-
-            var miAlignLeft = new MenuItem { Header = "⯇ Alinhar à Esquerda" };
-            miAlignLeft.Click += (s, e) => DefinirAlinhamento("left");
-
-            var miAlignCenter = new MenuItem { Header = "⯌ Centralizar Texto" };
-            miAlignCenter.Click += (s, e) => DefinirAlinhamento("center");
-
-            var miAlignRight = new MenuItem { Header = "⯈ Alinhar à Direita" };
-            miAlignRight.Click += (s, e) => DefinirAlinhamento("right");
-
-            var miFontDefault = new MenuItem { Header = "Fonte Padrão (Sans-Serif)" };
-            miFontDefault.Click += (s, e) => DefinirFamiliaFonte("default");
-
-            var miFontMono = new MenuItem { Header = "Fonte Monoespaçada (Código)" };
-            miFontMono.Click += (s, e) => DefinirFamiliaFonte("mono");
-
-            var miFontSerif = new MenuItem { Header = "Fonte Serifada (Leitura)" };
-            miFontSerif.Click += (s, e) => DefinirFamiliaFonte("serif");
-
-            var miReset = new MenuItem { Header = "↺ Restaurar Formatação Padrão" };
-            miReset.Click += (s, e) => RestaurarFormatacaoPadrao();
-
-            flyout.Items.Add(miBold);
-            flyout.Items.Add(miItalic);
-            flyout.Items.Add(new Separator());
-            flyout.Items.Add(miFontInc);
-            flyout.Items.Add(miFontDec);
-            flyout.Items.Add(new Separator());
-            flyout.Items.Add(miAlignLeft);
-            flyout.Items.Add(miAlignCenter);
-            flyout.Items.Add(miAlignRight);
-            flyout.Items.Add(new Separator());
-            flyout.Items.Add(miFontDefault);
-            flyout.Items.Add(miFontMono);
-            flyout.Items.Add(miFontSerif);
-            flyout.Items.Add(new Separator());
-            flyout.Items.Add(miReset);
-
-            btnFormatMenu.Flyout = flyout;
-
-            stack.Children.Add(btnBold);
-            stack.Children.Add(btnItalic);
-            stack.Children.Add(btnFontDec);
-            stack.Children.Add(lblFontSize);
-            stack.Children.Add(btnFontInc);
-            stack.Children.Add(btnFormatMenu);
-
-            bar.Child = stack;
-            return bar;
-        }
-
-        private Button CriarBotaoFormatacao(string texto, string tooltip, FontWeight weight, FontStyle style, double width = 24)
-        {
-            var btn = new Button
-            {
-                Content = texto,
-                Width = width,
-                Height = 22,
-                Padding = new Thickness(0),
-                CornerRadius = new CornerRadius(4),
-                BorderThickness = new Thickness(1),
-                FontSize = 11,
-                FontWeight = weight,
-                FontStyle = style,
-                HorizontalContentAlignment = HorizontalAlignment.Center,
-                VerticalContentAlignment = VerticalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            ToolTip.SetTip(btn, tooltip);
-            return btn;
-        }
-
-        private void AlternarNegrito()
-        {
-            _isBold = !_isBold;
-            AplicarFormatacaoTexto();
-            AtualizarCores();
-        }
-
-        private void AlternarItalico()
-        {
-            _isItalic = !_isItalic;
-            AplicarFormatacaoTexto();
-            AtualizarCores();
-        }
-
-        private void AlterarTamanhoFonte(double delta)
-        {
-            _fontSize = Math.Clamp(_fontSize + delta, 9, 32);
-            if (_lblFontSize != null)
-            {
-                _lblFontSize.Text = $"{(int)_fontSize}pt";
-            }
-            AplicarFormatacaoTexto();
-        }
-
-        private void DefinirAlinhamento(string alignment)
-        {
-            _alignment = alignment;
-            AplicarFormatacaoTexto();
-        }
-
-        private void DefinirFamiliaFonte(string familyName)
-        {
-            _fontFamilyName = familyName;
-            AplicarFormatacaoTexto();
-        }
-
-        private void RestaurarFormatacaoPadrao()
-        {
-            _isBold = false;
-            _isItalic = false;
-            _fontSize = 13;
-            _alignment = "left";
-            _fontFamilyName = "default";
-            if (_lblFontSize != null)
-            {
-                _lblFontSize.Text = "13pt";
-            }
-            AplicarFormatacaoTexto();
-            AtualizarCores();
-        }
-
-        private static FontFamily ObterFontFamily(string familyName) => familyName switch
-        {
-            "mono" => new FontFamily("Consolas, Courier New, monospace"),
-            "serif" => new FontFamily("Georgia, Times New Roman, serif"),
-            _ => FontFamily.Default
-        };
-
-        private void AplicarFormatacaoTexto()
-        {
-            var weight = _isBold ? FontWeight.Bold : FontWeight.Normal;
-            var style = _isItalic ? FontStyle.Italic : FontStyle.Normal;
-            var align = _alignment == "center"
-                ? TextAlignment.Center
-                : _alignment == "right"
-                    ? TextAlignment.Right
-                    : TextAlignment.Left;
-            var family = ObterFontFamily(_fontFamilyName);
-
-            if (_noteTextBox != null)
-            {
-                _noteTextBox.FontWeight = weight;
-                _noteTextBox.FontStyle = style;
-                _noteTextBox.FontSize = _fontSize;
-                _noteTextBox.TextAlignment = align;
-                _noteTextBox.FontFamily = family;
-            }
-
-            foreach (var row in _checklistRows)
-            {
-                row.Input.FontWeight = weight;
-                row.Input.FontStyle = style;
-                row.Input.FontSize = _fontSize;
-                row.Input.TextAlignment = align;
-                row.Input.FontFamily = family;
-            }
-        }
-
-        public TextFormatData ExportTextFormat() => new()
-        {
-            IsBold = _isBold,
-            IsItalic = _isItalic,
-            FontSize = _fontSize,
-            Alignment = _alignment,
-            FontFamilyName = _fontFamilyName
-        };
-
-        private void OnWindowKeyDown(object? sender, KeyEventArgs e)
-        {
-            if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
-            {
-                if (e.Key == Key.S)
-                {
-                    e.Handled = true;
-                    SalvarJanela();
-                }
-                else if (e.Key == Key.B)
-                {
-                    e.Handled = true;
-                    AlternarNegrito();
-                }
-                else if (e.Key == Key.I)
-                {
-                    e.Handled = true;
-                    AlternarItalico();
-                }
-                else if (e.Key == Key.OemPlus || e.Key == Key.Add)
-                {
-                    e.Handled = true;
-                    AlterarTamanhoFonte(1);
-                }
-                else if (e.Key == Key.OemMinus || e.Key == Key.Subtract)
-                {
-                    e.Handled = true;
-                    AlterarTamanhoFonte(-1);
-                }
-            }
-        }
-
         public void SalvarJanela()
         {
             ConfirmarEdicaoTitulo();
@@ -700,181 +421,6 @@ namespace AvaloniaMdiApp
             {
                 _onLinkedRowSave(WindowTitle, _noteTextBox.Text ?? string.Empty, ExportTextFormat());
             }
-        }
-
-        private void AdicionarLinhaChecklist(string texto, bool marcado, string notaVinculada, TextFormatData? formatoNotaVinculada, bool focusInput)
-        {
-            if (_checklistContainer == null) return;
-
-            var rowGrid = new Grid();
-            rowGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
-            rowGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
-            rowGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
-            rowGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
-
-            var checkBox = new CheckBox
-            {
-                IsChecked = marcado,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(6, 0, 4, 0)
-            };
-
-            var inputBox = new TextBox
-            {
-                Text = texto,
-                Watermark = "Digite um item...",
-                BorderThickness = new Thickness(0),
-                Background = Brushes.Transparent,
-                VerticalAlignment = VerticalAlignment.Center,
-                Padding = new Thickness(4, 6),
-                FontSize = _fontSize,
-                FontWeight = _isBold ? FontWeight.Bold : FontWeight.Normal,
-                FontStyle = _isItalic ? FontStyle.Italic : FontStyle.Normal,
-                FontFamily = ObterFontFamily(_fontFamilyName)
-            };
-
-            var btnNote = new Button
-            {
-                Content = "📝",
-                Width = 26,
-                Height = 24,
-                Padding = new Thickness(0),
-                Margin = new Thickness(2, 0, 2, 0),
-                Background = Brushes.Transparent,
-                HorizontalContentAlignment = HorizontalAlignment.Center,
-                VerticalContentAlignment = VerticalAlignment.Center,
-                CornerRadius = new CornerRadius(4),
-                FontSize = 11.5,
-                Opacity = string.IsNullOrWhiteSpace(notaVinculada) ? 0.65 : 1.0
-            };
-            ToolTip.SetTip(btnNote, "Abrir Bloco de Notas atrelado a esta linha");
-
-            var btnRemove = new Button
-            {
-                Content = "✕",
-                Width = 24,
-                Height = 24,
-                Padding = new Thickness(0),
-                Margin = new Thickness(0, 0, 4, 0),
-                Background = Brushes.Transparent,
-                HorizontalContentAlignment = HorizontalAlignment.Center,
-                VerticalContentAlignment = VerticalAlignment.Center,
-                CornerRadius = new CornerRadius(4),
-                FontSize = 10,
-                Opacity = 0.6
-            };
-            ToolTip.SetTip(btnRemove, "Excluir linha");
-
-            var strikeLine = new Border
-            {
-                Height = 1.5,
-                Margin = new Thickness(6, 0, 8, 0),
-                VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                IsHitTestVisible = false,
-                IsVisible = marcado
-            };
-
-            var rowBorder = new Border
-            {
-                CornerRadius = new CornerRadius(5),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(2),
-                Child = rowGrid
-            };
-
-            void AtualizarEstiloMarcacao()
-            {
-                bool isChecked = checkBox.IsChecked == true;
-                strikeLine.IsVisible = isChecked;
-                inputBox.Opacity = isChecked ? 0.5 : 1.0;
-            }
-
-            checkBox.IsCheckedChanged += (s, e) => AtualizarEstiloMarcacao();
-
-            var entry = new ChecklistRowState
-            {
-                Check = checkBox,
-                Input = inputBox,
-                StrikeLine = strikeLine,
-                RowBorder = rowBorder,
-                BtnNote = btnNote,
-                LinkedNoteContent = notaVinculada ?? string.Empty,
-                LinkedNoteFormat = formatoNotaVinculada ?? new TextFormatData()
-            };
-            _checklistRows.Add(entry);
-
-            inputBox.KeyDown += (s, e) =>
-            {
-                if (e.Key == Key.Enter)
-                {
-                    e.Handled = true;
-                    AdicionarLinhaChecklist("", false, "", null, focusInput: true);
-                }
-            };
-
-            inputBox.TextChanged += (s, e) =>
-            {
-                if (entry.OpenNoteWindow != null && !string.IsNullOrWhiteSpace(inputBox.Text))
-                {
-                    entry.OpenNoteWindow.AtualizarTituloExterno(inputBox.Text.Trim());
-                }
-            };
-
-            btnNote.Click += (s, e) =>
-            {
-                if (string.IsNullOrWhiteSpace(inputBox.Text))
-                {
-                    inputBox.Text = $"Item {_checklistRows.IndexOf(entry) + 1}";
-                }
-                OnRequestOpenRowNotepad?.Invoke(this, entry);
-            };
-
-            btnRemove.Click += (s, e) =>
-            {
-                entry.OpenNoteWindow?.Fechar();
-                _checklistRows.Remove(entry);
-                _checklistContainer.Children.Remove(rowBorder);
-            };
-
-            Grid.SetColumn(checkBox, 0);
-            Grid.SetColumn(inputBox, 1);
-            Grid.SetColumn(strikeLine, 1);
-            Grid.SetColumn(btnNote, 2);
-            Grid.SetColumn(btnRemove, 3);
-            rowGrid.Children.Add(checkBox);
-            rowGrid.Children.Add(inputBox);
-            rowGrid.Children.Add(strikeLine);
-            rowGrid.Children.Add(btnNote);
-            rowGrid.Children.Add(btnRemove);
-
-            _checklistContainer.Children.Add(rowBorder);
-
-            AtualizarEstiloLinhaChecklist(entry);
-            AtualizarEstiloMarcacao();
-
-            if (focusInput)
-            {
-                inputBox.Focus();
-            }
-        }
-
-        public void AtualizarIndicadorNotaLinha(ChecklistRowState row)
-        {
-            bool temNota = !string.IsNullOrWhiteSpace(row.LinkedNoteContent);
-            row.BtnNote.Opacity = temNota ? 1.0 : 0.65;
-            row.BtnNote.BorderThickness = temNota ? new Thickness(1) : new Thickness(0);
-            row.BtnNote.BorderBrush = temNota ? ThemePalette.AccentLight : Brushes.Transparent;
-        }
-
-        private void AtualizarEstiloLinhaChecklist(ChecklistRowState row)
-        {
-            row.RowBorder.Background = _isDarkMode ? ThemePalette.DarkContentBg : ThemePalette.LightContentBg;
-            row.RowBorder.BorderBrush = _isDarkMode ? ThemePalette.DarkBorder : ThemePalette.LightBorder;
-            row.Input.Foreground = _isDarkMode ? ThemePalette.DarkTextPrimary : ThemePalette.LightTextPrimary;
-            row.StrikeLine.Background = _isDarkMode ? ThemePalette.DarkTextSecondary : ThemePalette.LightTextSecondary;
-            row.BtnNote.Foreground = _isDarkMode ? ThemePalette.DarkTextPrimary : ThemePalette.LightTextPrimary;
-            AtualizarIndicadorNotaLinha(row);
         }
 
         public void AtualizarTituloExterno(string novoTitulo)
@@ -945,7 +491,9 @@ namespace AvaloniaMdiApp
                 Y = bounds.Y,
                 Width = bounds.Width,
                 Height = bounds.Height,
-                NoteContent = _noteTextBox?.Text ?? string.Empty,
+                NoteContent = WindowType == "browser"
+                    ? (_browserHost?.CurrentUrl ?? _txtBrowserUrl?.Text ?? "https://www.google.com")
+                    : (_noteTextBox?.Text ?? string.Empty),
                 TextFormat = ExportTextFormat(),
                 AccessCount = AccessCount,
                 LastUsedUtc = DateTime.UtcNow
@@ -1129,11 +677,14 @@ namespace AvaloniaMdiApp
                     _lblFontSize.Foreground = subTextBrush;
                 }
             }
+
+            AtualizarCoresNavegador();
         }
 
         public void Fechar()
         {
             SincronizarNotaVinculada();
+            _browserHost?.DisposeBrowser();
             Workspace.SizeChanged -= OnWorkspaceSizeChanged;
             _taskBar.RemoverJanela(this);
             Workspace.Children.Remove(this);
@@ -1270,6 +821,7 @@ namespace AvaloniaMdiApp
 
                 Canvas.SetLeft(this, newX);
                 Canvas.SetTop(this, newY);
+                _browserHost?.AtualizarLimitesNativos();
 
                 if (_isMinimized)
                 {
@@ -1351,6 +903,7 @@ namespace AvaloniaMdiApp
                 _isMinimized = false;
                 _btnMinText.Text = "—";
             }
+            _browserHost?.SetBrowserVisible(!_isMinimized);
             _taskBar.AtualizarEstadoMinimizado(this, _isMinimized);
         }
 

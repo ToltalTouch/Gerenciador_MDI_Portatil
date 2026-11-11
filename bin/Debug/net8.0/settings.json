@@ -1,5 +1,112 @@
 {
   "IsDarkMode": true,
   "EnableNotifications": true,
-  "SavedWindows": []
+  "SavedWindows": [],
+  "SavedCatalog": [
+    {
+      "Id": "e356dc7a1f004458ae4f703a700e0cde",
+      "Title": "abacate",
+      "WindowType": "notepad",
+      "X": 499,
+      "Y": 133,
+      "Width": 360,
+      "Height": 260,
+      "NoteContent": "abacte",
+      "TextFormat": {
+        "IsBold": false,
+        "IsItalic": false,
+        "FontSize": 13,
+        "Alignment": "left",
+        "FontFamilyName": "default"
+      },
+      "ChecklistItems": [],
+      "AccessCount": 1,
+      "LastUsedUtc": "2026-11-11T19:09:02.4062739Z"
+    },
+    {
+      "Id": "0d297c9377c54ac3812eaa274a3c1955",
+      "Title": "Leitin",
+      "WindowType": "checklist",
+      "X": 83,
+      "Y": 82,
+      "Width": 380,
+      "Height": 290,
+      "NoteContent": "",
+      "TextFormat": {
+        "IsBold": false,
+        "IsItalic": false,
+        "FontSize": 13,
+        "Alignment": "left",
+        "FontFamilyName": "default"
+      },
+      "ChecklistItems": [
+        {
+          "Text": "abacate",
+          "IsChecked": true,
+          "LinkedNoteContent": "abacte",
+          "LinkedNoteFormat": {
+            "IsBold": false,
+            "IsItalic": false,
+            "FontSize": 13,
+            "Alignment": "left",
+            "FontFamilyName": "default"
+          }
+        },
+        {
+          "Text": "lepra",
+          "IsChecked": true,
+          "LinkedNoteContent": "asdasd",
+          "LinkedNoteFormat": {
+            "IsBold": false,
+            "IsItalic": false,
+            "FontSize": 13,
+            "Alignment": "left",
+            "FontFamilyName": "default"
+          }
+        }
+      ],
+      "AccessCount": 1,
+      "LastUsedUtc": "2026-11-11T19:09:02.406051Z"
+    },
+    {
+      "Id": "ed31046ec0ba4390b279dc17febeccbe",
+      "Title": "lepra",
+      "WindowType": "notepad",
+      "X": 552,
+      "Y": 51,
+      "Width": 360,
+      "Height": 260,
+      "NoteContent": "asdasd",
+      "TextFormat": {
+        "IsBold": false,
+        "IsItalic": false,
+        "FontSize": 13,
+        "Alignment": "left",
+        "FontFamilyName": "default"
+      },
+      "ChecklistItems": [],
+      "AccessCount": 1,
+      "LastUsedUtc": "2026-11-11T19:09:02.4062816Z"
+    },
+    {
+      "Id": "cb6386b8427740198039a5f8761bd851",
+      "Title": "trejeitos estranhos",
+      "WindowType": "notepad",
+      "X": 123,
+      "Y": 110,
+      "Width": 360,
+      "Height": 260,
+      "NoteContent": "Trigliseridos",
+      "TextFormat": {
+        "IsBold": true,
+        "IsItalic": false,
+        "FontSize": 13,
+        "Alignment": "left",
+        "FontFamilyName": "default"
+      },
+      "ChecklistItems": [],
+      "AccessCount": 1,
+      "LastUsedUtc": "2026-11-11T19:09:02.406284Z"
+    }
+  ]
 }

@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0.."
 echo ==========================================
 echo Gerando executavel portatil (.exe) para Windows...
 echo ==========================================
