@@ -29,6 +29,7 @@ Projetado com foco extremo em **baixo consumo de memória RAM e CPU**, o aplicat
 ### 1. Visão Geral do Workspace e Fluxograma Interativo
 <!-- Substitua pelo print geral mostrando janelas abertas conectadas por linhas de fluxograma -->
 ![Visão Geral do Workspace e Fluxograma](docs/screenshots/01-visao-geral-fluxograma.gif)
+
 *Múltiplas janelas conectadas com curvas Bézier no modo Fluxograma, barra de menus tradicional no topo e controles de Zoom/Conectar no canto inferior direito.*
 
 ---
@@ -36,13 +37,15 @@ Projetado com foco extremo em **baixo consumo de memória RAM e CPU**, o aplicat
 ### 2. Widget de Planilhas (Fórmulas estilo Excel e Formatação Condicional)
 <!-- Substitua pelo print da Planilha mostrando fórmulas (=SOMA, =MEDIA, =SE) e células coloridas pela formatação condicional -->
 ![Widget de Planilhas e Formatação Condicional](docs/screenshots/02-planilhas-excel-condicional.gif)
-Planilha ativa com barra de fórmulas (`fx`), cálculo automático (`=SOMA`, `=MEDIA`, `=SE`) e realce condicional em verde/vermelho, enquanto outra planilha ao fundo permanece em modo hibernado (`💤`).*
+
+*Planilha ativa com barra de fórmulas (`fx`), cálculo automático (`=SOMA`, `=MEDIA`, `=SE`) e realce condicional em verde/vermelho, enquanto outra planilha ao fundo permanece em modo hibernado (`💤`).*
 
 ---
 
 ### 3. Bloco de Notas, Lista de Marcação (Checklist) e Notas Vinculadas
 <!-- Substitua pelo print mostrando uma Lista de Marcação conectada a um Bloco de Notas de uma tarefa -->
 ![Checklist e Bloco de Notas Vinculado](docs/screenshots/03-checklist-bloco-de-notas.gif)
+
 *Lista de marcação com abertura direta de Bloco de Notas vinculado a cada item da lista e formatação rica de texto.*
 
 ---
@@ -50,13 +53,15 @@ Planilha ativa com barra de fórmulas (`fx`), cálculo automático (`=SOMA`, `=M
 ### 4. Galeria de Imagens, Visualizador e Navegador Web Integrado
 <!-- Substitua pelo print mostrando a Galeria de Imagens, uma imagem aberta em janela e o Navegador Web -->
 ![Galeria de Imagens e Navegador Web](docs/screenshots/04-galeria-e-navegador.gif)
-Galeria de Imagens com suporte a Drag & Drop, aplicação de plano de fundo no Workspace e Navegador Web embutido.*
+
+*Galeria de Imagens com suporte a Drag & Drop, aplicação de plano de fundo no Workspace e Navegador Web embutido.*
 
 ---
 
 ### 5. Múltiplos Workspaces, Personalização de Cores e Ajustes de Layout
 <!-- Substitua pelo print mostrando as abas de Workspaces (ativos e hibernados 💤), cores personalizadas nas janelas e a janela de Preferências -->
 ![Múltiplos Workspaces e Configurações de Layout](docs/screenshots/05-workspaces-e-configuracoes.gif)
+
 *Alternância rápida entre Workspaces (com hibernação automática `💤`), paleta de cores por janela/linha e menu de escala de interface.*
 
 ---
