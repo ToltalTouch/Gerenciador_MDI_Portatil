@@ -12,7 +12,7 @@
 
 ---
 
-## ![GitHub release (latest by date)](https://shields.io)
+#### ![GitHub release (latest by date)](https://shields.io)
 
 ## 📌 Visão Geral
 
