@@ -49,6 +49,38 @@
                   <MenuItem Header="Salvar Estado do Workspace" Click="SalvarTodasJanelas_Click">
                     <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Save}"/></MenuItem.Icon>
                   </MenuItem>
+                  <Separator/>
+                  <MenuItem Header="Exportar Demonstração em PDF..." Click="ExportarWorkspacePdf_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.PdfFile}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Exportar Demonstração (Imagem / HTML)">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Image}"/></MenuItem.Icon>
+                    <MenuItem Header="Exportar Imagem do Workspace (.png)..." Click="ExportarWorkspacePng_Click">
+                      <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Image}"/></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="Exportar Relatório Interativo (.html)..." Click="ExportarWorkspaceHtml_Click">
+                      <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Globe}"/></MenuItem.Icon>
+                    </MenuItem>
+                  </MenuItem>
+                  <MenuItem Header="Importar / Exportar Arquivos">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Folder}"/></MenuItem.Icon>
+                    <MenuItem Header="Importar Arquivo para o Workspace (.txt, .csv, Mídia)..." Click="ImportarArquivoParaWorkspace_Click">
+                      <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Upload}"/></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="Importar Workspace / Pacote (.mdiws, .zip)..." Click="ImportarWorkspace_Click">
+                      <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Folder}"/></MenuItem.Icon>
+                    </MenuItem>
+                    <Separator/>
+                    <MenuItem Header="Exportar Workspace (.mdiws)..." Click="ExportarWorkspaceJson_Click">
+                      <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Download}"/></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="Exportar Pacote Completo com Mídias (.zip)..." Click="ExportarWorkspaceZip_Click">
+                      <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Save}"/></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="Exportar Janela Ativa (.txt / .csv / Mídia)..." Click="ExportarJanelaAtiva_Click">
+                      <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.ExternalLink}"/></MenuItem.Icon>
+                    </MenuItem>
+                  </MenuItem>
                 </MenuItem>
 
                 <MenuItem Name="MenuTopNotas" Header="Bloco de Notas" SubmenuOpened="MenuModulo_SubmenuOpened">
@@ -103,11 +135,14 @@
                 </MenuItem>
 
                 <MenuItem Name="MenuTopGaleria" Header="Galeria" SubmenuOpened="MenuModulo_SubmenuOpened">
-                  <MenuItem Header="Nova Galeria de Imagens" Click="AbrirGaleria_Click">
+                  <MenuItem Header="Nova Galeria (Imagens e Vídeos)" Click="AbrirGaleria_Click">
                     <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Image}"/></MenuItem.Icon>
                   </MenuItem>
                   <MenuItem Header="Abrir Imagem em Janela..." Click="AbrirImagemAvulsa_Click">
                     <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Plus}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Abrir Vídeo em Janela..." Click="AbrirVideoAvulso_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Video}"/></MenuItem.Icon>
                   </MenuItem>
                   <MenuItem Header="Restaurar Fundo do Workspace" Click="RestaurarFundoWorkspace_Click">
                     <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Trash}"/></MenuItem.Icon>
@@ -194,6 +229,10 @@
                   </MenuItem>
                   <MenuItem Header="Redefinir Zoom (100%)" Click="WorkspaceZoomReset_Click">
                     <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Target}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <Separator/>
+                  <MenuItem Header="Exportar Demonstração em PDF..." Click="ExportarWorkspacePdf_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.PdfFile}"/></MenuItem.Icon>
                   </MenuItem>
                 </MenuItem>
 

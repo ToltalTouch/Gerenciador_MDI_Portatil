@@ -76,13 +76,15 @@ namespace AvaloniaMdiApp
         private readonly List<ChecklistRowState> _checklistRows = new();
         private readonly Border _contentCard;
         private readonly Panel _contentPanel;
-        private readonly TextBlock _btnColorText;
-        private readonly TextBlock _btnConnectText;
-        private readonly TextBlock _btnSaveText;
+        private readonly Button _btnConfig;
+        private readonly Button? _btnShapeConfig;
+        private readonly Border? _shapeMoveHandle;
         private readonly TextBlock _btnMinText;
         private readonly TextBlock _btnMaxText;
         private readonly TextBlock _btnCloseText;
         private readonly TaskBar _taskBar;
+        private bool _isHoveringWindow;
+        private bool _isConfigMenuOpen;
 
         public Canvas Workspace { get; }
 
@@ -163,14 +165,16 @@ namespace AvaloniaMdiApp
             BorderThickness = IsFlowchartShape ? new Thickness(0) : new Thickness(1);
             CornerRadius = new CornerRadius(8);
             ClipToBounds = !IsFlowchartShape;
+            Focusable = true;
 
             var rootLayout = new DockPanel();
 
             _titleBar = new Border
             {
                 Name = "TitleBar",
-                Height = IsFlowchartShape ? 28 : 34,
-                CornerRadius = IsFlowchartShape ? new CornerRadius(6) : new CornerRadius(7, 7, 0, 0),
+                Height = 34,
+                CornerRadius = new CornerRadius(7, 7, 0, 0),
+                IsVisible = !IsFlowchartShape,
                 Child = new Grid()
             };
 
@@ -294,76 +298,31 @@ namespace AvaloniaMdiApp
             };
             Grid.SetColumn(btnPanel, 2);
 
-            var btnCriticality = CreateControlButton("", out _, (s, e) => { });
-            btnCriticality.Content = AppIcons.Create(AppIcons.Warning, 11.5, ThemePalette.IconLightGray);
-            ToolTip.SetTip(btnCriticality, "Definir aviso de criticidade");
-            var critFlyout = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedRight };
-            foreach (var crit in NiveisCriticidade)
+            var configFlyout = CriarMenuConfiguracaoJanela();
+            configFlyout.Opened += (s, e) =>
             {
-                var item = new MenuItem
-                {
-                    Icon = AppIcons.Create(crit.Key == "none" ? AppIcons.Minus : AppIcons.Warning, 10.5, ThemePalette.IconLightGray),
-                    Header = crit.Label
-                };
-                string key = crit.Key;
-                item.Click += (s, e) => DefinirCriticidade(key);
-                critFlyout.Items.Add(item);
-            }
-            btnCriticality.Flyout = critFlyout;
-
-            var btnColor = CreateControlButton("", out _btnColorText, (s, e) => { });
-            btnColor.Content = AppIcons.Create(AppIcons.Palette, 12, ThemePalette.IconLightGray);
-            ToolTip.SetTip(btnColor, "Mudar cor desta janela");
-            var colorFlyout = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedRight };
-            foreach (var cor in PaletaCoresJanela)
+                _isConfigMenuOpen = true;
+                AtualizarVisibilidadeControlesHover();
+            };
+            configFlyout.Closed += (s, e) =>
             {
-                var item = new MenuItem
-                {
-                    Icon = AppIcons.Create(AppIcons.CircleDot, 10, ThemePalette.IconLightGray),
-                    Header = cor.Nome
-                };
-                string hex = cor.Hex;
-                item.Click += (s, e) => DefinirCorJanela(hex);
-                colorFlyout.Items.Add(item);
-            }
+                _isConfigMenuOpen = false;
+                AtualizarVisibilidadeControlesHover();
+            };
 
-            if (IsFlowchartShape)
-            {
-                colorFlyout.Items.Add(new Separator());
-                var miRect = new MenuItem { Icon = AppIcons.Create(AppIcons.ShapeRect, 11), Header = "Formato: Retângulo" };
-                miRect.Click += (s, e) => AlterarFormatoGeometrico("shape_rect");
-                var miDiamond = new MenuItem { Icon = AppIcons.Create(AppIcons.ShapeDiamond, 11), Header = "Formato: Losango" };
-                miDiamond.Click += (s, e) => AlterarFormatoGeometrico("shape_diamond");
-                var miCircle = new MenuItem { Icon = AppIcons.Create(AppIcons.ShapeCircle, 11), Header = "Formato: Círculo" };
-                miCircle.Click += (s, e) => AlterarFormatoGeometrico("shape_circle");
-                colorFlyout.Items.Add(miRect);
-                colorFlyout.Items.Add(miDiamond);
-                colorFlyout.Items.Add(miCircle);
-            }
-
-            btnColor.Flyout = colorFlyout;
-
-            var btnConnect = CreateControlButton("", out _btnConnectText, (s, e) => OnConnectRequested?.Invoke(this));
-            btnConnect.Content = AppIcons.Create(AppIcons.Link, 12, ThemePalette.IconLightGray);
-            ToolTip.SetTip(btnConnect, "Conectar esta janela a outra (Fluxograma)");
-
-            var btnSave = CreateControlButton("", out _btnSaveText, (s, e) => SalvarJanela());
-            btnSave.Content = AppIcons.Create(AppIcons.Save, 12, ThemePalette.IconLightGray);
-            ToolTip.SetTip(btnSave, _onLinkedRowSave != null ? "Salvar nota vinculada à linha da lista (Ctrl+S)" : "Salvar janela (Ctrl+S)");
+            _btnConfig = CreateControlButton("", out _, (s, e) => { });
+            _btnConfig.Content = AppIcons.Create(AppIcons.Settings, 12, ThemePalette.IconLightGray);
+            _btnConfig.IsVisible = false;
+            _btnConfig.Flyout = configFlyout;
+            ToolTip.SetTip(_btnConfig, "Configurações da janela (Cor, Criticidade, Conectar, Excluir)");
 
             var btnMin = CreateControlButton("—", out _btnMinText, (s, e) => ToggleMinimize());
             var btnMax = CreateControlButton("▢", out _btnMaxText, (s, e) => ToggleMaximize());
             var btnClose = CreateControlButton("✕", out _btnCloseText, (s, e) => Fechar());
 
-            btnPanel.Children.Add(btnCriticality);
-            btnPanel.Children.Add(btnColor);
-            btnPanel.Children.Add(btnConnect);
-            btnPanel.Children.Add(btnSave);
-            if (!IsFlowchartShape)
-            {
-                btnPanel.Children.Add(btnMin);
-                btnPanel.Children.Add(btnMax);
-            }
+            btnPanel.Children.Add(_btnConfig);
+            btnPanel.Children.Add(btnMin);
+            btnPanel.Children.Add(btnMax);
             btnPanel.Children.Add(btnClose);
             grid.Children.Add(btnPanel);
 
@@ -487,6 +446,10 @@ namespace AvaloniaMdiApp
             {
                 _contentCard.Child = CriarConteudoImagem(initialNote);
             }
+            else if (WindowType == "video")
+            {
+                _contentCard.Child = CriarConteudoVideo(initialNote);
+            }
             else if (WindowType == "spreadsheet")
             {
                 _contentCard.Child = CriarConteudoPlanilha(
@@ -533,7 +496,68 @@ namespace AvaloniaMdiApp
             var mainGrid = new Grid();
             mainGrid.Children.Add(rootLayout);
             AdicionarBordasDeRedimensionamento(mainGrid);
+
+            if (IsFlowchartShape)
+            {
+                var shapeFloatingControls = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 4,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Top,
+                    Margin = new Thickness(6),
+                    ZIndex = 20
+                };
+
+                _shapeMoveHandle = new Border
+                {
+                    Width = 24,
+                    Height = 24,
+                    CornerRadius = new CornerRadius(12),
+                    BorderThickness = new Thickness(1),
+                    Background = SolidColorBrush.Parse("#CC1E293B"),
+                    BorderBrush = SolidColorBrush.Parse("#475569"),
+                    Cursor = new Cursor(StandardCursorType.SizeAll),
+                    IsVisible = false,
+                    Child = AppIcons.Create(AppIcons.Workspace, 11, ThemePalette.IconLightGray)
+                };
+                ToolTip.SetTip(_shapeMoveHandle, "Arrastar forma no fluxograma");
+
+                _btnShapeConfig = new Button
+                {
+                    Width = 24,
+                    Height = 24,
+                    Padding = new Thickness(0),
+                    CornerRadius = new CornerRadius(12),
+                    BorderThickness = new Thickness(1),
+                    Background = SolidColorBrush.Parse("#CC1E293B"),
+                    BorderBrush = SolidColorBrush.Parse("#475569"),
+                    HorizontalContentAlignment = HorizontalAlignment.Center,
+                    VerticalContentAlignment = VerticalAlignment.Center,
+                    IsVisible = false,
+                    Cursor = new Cursor(StandardCursorType.Hand),
+                    Content = AppIcons.Create(AppIcons.Settings, 11.5, ThemePalette.IconLightGray),
+                    Flyout = configFlyout
+                };
+                ToolTip.SetTip(_btnShapeConfig, "Configurar forma (Cor, Formato, Criticidade, Conectar, Excluir)");
+
+                shapeFloatingControls.Children.Add(_shapeMoveHandle);
+                shapeFloatingControls.Children.Add(_btnShapeConfig);
+                mainGrid.Children.Add(shapeFloatingControls);
+            }
+
             Child = mainGrid;
+
+            PointerEntered += (s, e) =>
+            {
+                _isHoveringWindow = true;
+                AtualizarVisibilidadeControlesHover();
+            };
+            PointerExited += (s, e) =>
+            {
+                _isHoveringWindow = false;
+                AtualizarVisibilidadeControlesHover();
+            };
 
             PointerPressed += OnWindowPointerPressed;
             PointerMoved += OnWindowPointerMoved;
@@ -634,7 +658,9 @@ namespace AvaloniaMdiApp
                     ? (_browserHost?.CurrentUrl ?? _txtBrowserUrl?.Text ?? "https://www.google.com")
                     : WindowType == "image"
                         ? _singleImagePath
-                        : (_noteTextBox?.Text ?? string.Empty),
+                        : WindowType == "video"
+                            ? _singleVideoPath
+                            : (_noteTextBox?.Text ?? string.Empty),
                 TextFormat = ExportTextFormat(),
                 SpreadsheetRows = _sheetRows,
                 SpreadsheetCols = _sheetCols,
@@ -669,7 +695,8 @@ namespace AvaloniaMdiApp
                     {
                         Id = card.Id,
                         Title = card.Title,
-                        FilePath = card.FilePath
+                        FilePath = card.FilePath,
+                        MediaType = card.MediaType
                     });
                 }
             }
@@ -815,9 +842,7 @@ namespace AvaloniaMdiApp
                 _txtTitleEditor.Background = ThemePalette.DarkContentBg;
                 _txtTitleEditor.Foreground = ThemePalette.DarkTextPrimary;
                 _txtTitleEditor.BorderBrush = customBrush ?? ThemePalette.DarkBorderActive;
-                _btnColorText.Foreground = ThemePalette.DarkTextPrimary;
-                _btnConnectText.Foreground = ThemePalette.DarkTextPrimary;
-                _btnSaveText.Foreground = ThemePalette.DarkTextPrimary;
+                _btnConfig.Foreground = ThemePalette.DarkTextPrimary;
                 _btnMinText.Foreground = ThemePalette.DarkTextPrimary;
                 _btnMaxText.Foreground = ThemePalette.DarkTextPrimary;
                 _btnCloseText.Foreground = ThemePalette.DarkTextPrimary;
@@ -847,9 +872,7 @@ namespace AvaloniaMdiApp
                 _txtTitleEditor.Background = ThemePalette.LightWindowBg;
                 _txtTitleEditor.Foreground = ThemePalette.LightTextPrimary;
                 _txtTitleEditor.BorderBrush = customBrush ?? ThemePalette.LightBorderActive;
-                _btnColorText.Foreground = headerTextBrush;
-                _btnConnectText.Foreground = headerTextBrush;
-                _btnSaveText.Foreground = headerTextBrush;
+                _btnConfig.Foreground = headerTextBrush;
                 _btnMinText.Foreground = headerTextBrush;
                 _btnMaxText.Foreground = headerTextBrush;
                 _btnCloseText.Foreground = headerTextBrush;
@@ -1015,14 +1038,199 @@ namespace AvaloniaMdiApp
             }
         }
 
+        private void AtualizarVisibilidadeControlesHover()
+        {
+            bool mostrar = _isHoveringWindow || _isConfigMenuOpen;
+            if (IsFlowchartShape)
+            {
+                if (_btnShapeConfig != null) _btnShapeConfig.IsVisible = mostrar;
+                if (_shapeMoveHandle != null) _shapeMoveHandle.IsVisible = mostrar;
+            }
+            else
+            {
+                _btnConfig.IsVisible = mostrar;
+            }
+        }
+
+        private MenuFlyout CriarMenuConfiguracaoJanela()
+        {
+            var flyout = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedRight };
+
+            if (IsFlowchartShape)
+            {
+                var menuFormato = new MenuItem
+                {
+                    Icon = AppIcons.Create(AppIcons.ShapeRect, 11, ThemePalette.IconLightGray),
+                    Header = "Formato Geométrico"
+                };
+                var miRect = new MenuItem { Icon = AppIcons.Create(AppIcons.ShapeRect, 11), Header = "Retângulo (Etapa)" };
+                miRect.Click += (s, e) => AlterarFormatoGeometrico("shape_rect");
+                var miDiamond = new MenuItem { Icon = AppIcons.Create(AppIcons.ShapeDiamond, 11), Header = "Losango (Decisão)" };
+                miDiamond.Click += (s, e) => AlterarFormatoGeometrico("shape_diamond");
+                var miCircle = new MenuItem { Icon = AppIcons.Create(AppIcons.ShapeCircle, 11), Header = "Círculo (Início / Fim)" };
+                miCircle.Click += (s, e) => AlterarFormatoGeometrico("shape_circle");
+                menuFormato.Items.Add(miRect);
+                menuFormato.Items.Add(miDiamond);
+                menuFormato.Items.Add(miCircle);
+                flyout.Items.Add(menuFormato);
+            }
+
+            var menuCores = new MenuItem
+            {
+                Icon = AppIcons.Create(AppIcons.Palette, 11, ThemePalette.IconLightGray),
+                Header = "Mudar Cor"
+            };
+            foreach (var cor in PaletaCoresJanela)
+            {
+                IBrush dotBrush;
+                if (string.IsNullOrWhiteSpace(cor.Hex))
+                {
+                    dotBrush = ThemePalette.IconMutedGray;
+                }
+                else
+                {
+                    try { dotBrush = SolidColorBrush.Parse(cor.Hex); }
+                    catch { dotBrush = ThemePalette.Accent; }
+                }
+
+                var item = new MenuItem
+                {
+                    Icon = new Avalonia.Controls.Shapes.Ellipse
+                    {
+                        Width = 10,
+                        Height = 10,
+                        Fill = dotBrush,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Center
+                    },
+                    Header = cor.Nome
+                };
+                string hex = cor.Hex;
+                item.Click += (s, e) => DefinirCorJanela(hex);
+                menuCores.Items.Add(item);
+            }
+            flyout.Items.Add(menuCores);
+
+            var menuCriticidade = new MenuItem
+            {
+                Icon = AppIcons.Create(AppIcons.Warning, 11, ThemePalette.IconLightGray),
+                Header = "Criticidade"
+            };
+            foreach (var crit in NiveisCriticidade)
+            {
+                IBrush critBrush = ThemePalette.IconMutedGray;
+                if (!string.IsNullOrWhiteSpace(crit.ColorHex))
+                {
+                    try { critBrush = SolidColorBrush.Parse(crit.ColorHex); }
+                    catch { }
+                }
+
+                var item = new MenuItem
+                {
+                    Icon = AppIcons.Create(crit.Key == "none" ? AppIcons.Minus : AppIcons.Warning, 10.5, critBrush),
+                    Header = crit.Label
+                };
+                string key = crit.Key;
+                item.Click += (s, e) => DefinirCriticidade(key);
+                menuCriticidade.Items.Add(item);
+            }
+            flyout.Items.Add(menuCriticidade);
+
+            if (IsFlowchartShape)
+            {
+                var menuTexto = new MenuItem
+                {
+                    Icon = AppIcons.Create(AppIcons.Edit, 11, ThemePalette.IconLightGray),
+                    Header = "Formatação de Texto"
+                };
+                var miBold = new MenuItem { Header = "Negrito (Ctrl+B)" };
+                miBold.Click += (s, e) => AlternarNegrito();
+                var miItalic = new MenuItem { Header = "Itálico (Ctrl+I)" };
+                miItalic.Click += (s, e) => AlternarItalico();
+                var miInc = new MenuItem { Icon = AppIcons.Create(AppIcons.Plus, 10), Header = "Aumentar Fonte" };
+                miInc.Click += (s, e) => AlterarTamanhoFonte(1);
+                var miDec = new MenuItem { Icon = AppIcons.Create(AppIcons.Minus, 10), Header = "Diminuir Fonte" };
+                miDec.Click += (s, e) => AlterarTamanhoFonte(-1);
+                menuTexto.Items.Add(miBold);
+                menuTexto.Items.Add(miItalic);
+                menuTexto.Items.Add(new Separator());
+                menuTexto.Items.Add(miInc);
+                menuTexto.Items.Add(miDec);
+                flyout.Items.Add(menuTexto);
+            }
+
+            flyout.Items.Add(new Separator());
+
+            var miConnect = new MenuItem
+            {
+                Icon = AppIcons.Create(AppIcons.Link, 11, ThemePalette.IconLightGray),
+                Header = "Conectar (Fluxograma)"
+            };
+            miConnect.Click += (s, e) => OnConnectRequested?.Invoke(this);
+            flyout.Items.Add(miConnect);
+
+            var miSave = new MenuItem
+            {
+                Icon = AppIcons.Create(AppIcons.Save, 11, ThemePalette.IconLightGray),
+                Header = _onLinkedRowSave != null ? "Salvar Nota na Lista (Ctrl+S)" : "Salvar (Ctrl+S)"
+            };
+            miSave.Click += (s, e) => SalvarJanela();
+            flyout.Items.Add(miSave);
+
+            if (!IsFlowchartShape)
+            {
+                var miRename = new MenuItem
+                {
+                    Icon = AppIcons.Create(AppIcons.Edit, 11, ThemePalette.IconLightGray),
+                    Header = "Renomear Janela"
+                };
+                miRename.Click += (s, e) => IniciarEdicaoTitulo();
+                flyout.Items.Add(miRename);
+            }
+
+            flyout.Items.Add(new Separator());
+
+            var miDelete = new MenuItem
+            {
+                Icon = AppIcons.Create(AppIcons.Trash, 11, ThemePalette.IconLightGray),
+                Header = "Excluir (Delete)"
+            };
+            miDelete.Click += (s, e) => Fechar();
+            flyout.Items.Add(miDelete);
+
+            return flyout;
+        }
+
         private void OnWindowPointerPressed(object? sender, PointerPressedEventArgs e)
         {
             ZIndexManager.BringToFront(this);
             OnWindowClicked?.Invoke(this);
 
             var source = e.Source as Control;
+            if (source is not TextBox)
+            {
+                Focus();
+            }
+
             if (source == _txtTitleEditor || _txtTitleEditor.IsVisible)
             {
+                return;
+            }
+
+            if (IsFlowchartShape)
+            {
+                bool clicouConfig = _btnShapeConfig != null && (source == _btnShapeConfig || source?.Parent == _btnShapeConfig);
+                if (!clicouConfig && (source != _noteTextBox))
+                {
+                    var props = e.GetCurrentPoint(this);
+                    if (props.Properties.IsLeftButtonPressed && !_isMaximized)
+                    {
+                        _isDragging = true;
+                        _pointerStart = e.GetPosition(Workspace);
+                        _windowStart = new Point(Canvas.GetLeft(this), Canvas.GetTop(this));
+                        e.Pointer.Capture(this);
+                    }
+                }
                 return;
             }
 

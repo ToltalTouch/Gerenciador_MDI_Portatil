@@ -25,6 +25,7 @@ namespace AvaloniaMdiApp
         private int _contadorNavegadores = 0;
         private int _contadorGalerias = 0;
         private int _contadorImagens = 0;
+        private int _contadorVideos = 0;
         private int _contadorPlanilhas = 0;
         private int _contadorFormas = 0;
 
@@ -177,6 +178,23 @@ namespace AvaloniaMdiApp
                 {
                     CancelarModoConexao();
                     e.Handled = true;
+                    return;
+                }
+
+                if (e.Key == Key.Delete && !ModalOverlay.IsVisible)
+                {
+                    var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
+                    if (focused is TextBox)
+                    {
+                        return;
+                    }
+
+                    var ativa = ZIndexManager.ActiveWindow;
+                    if (ativa != null && _ativasJanelas.Contains(ativa))
+                    {
+                        ativa.Fechar();
+                        e.Handled = true;
+                    }
                 }
             };
         }
@@ -816,6 +834,7 @@ namespace AvaloniaMdiApp
             _contadorNavegadores = 0;
             _contadorGalerias = 0;
             _contadorImagens = 0;
+            _contadorVideos = 0;
             _contadorPlanilhas = 0;
             _contadorFormas = 0;
 
@@ -828,6 +847,7 @@ namespace AvaloniaMdiApp
                     else if (winData.WindowType == "browser") _contadorNavegadores++;
                     else if (winData.WindowType == "gallery") _contadorGalerias++;
                     else if (winData.WindowType == "image") _contadorImagens++;
+                    else if (winData.WindowType == "video") _contadorVideos++;
                     else if (winData.WindowType == "spreadsheet") _contadorPlanilhas++;
                     else if (DraggableWindow.EhTipoFormaFluxograma(winData.WindowType)) _contadorFormas++;
                     else _contadorJanelas++;
@@ -1224,7 +1244,7 @@ namespace AvaloniaMdiApp
             PreencherSubmenusModulo(ws, new[] { "notepad" }, MenuNotasMaisUsadas, MenuNotasSalvas);
             PreencherSubmenusModulo(ws, new[] { "checklist" }, MenuListasMaisUsadas, MenuListasSalvas);
             PreencherSubmenusModulo(ws, new[] { "spreadsheet" }, MenuPlanilhasMaisUsadas, MenuPlanilhasSalvas);
-            PreencherSubmenusModulo(ws, new[] { "gallery", "image" }, MenuGaleriaMaisUsadas, MenuGaleriaSalvas);
+            PreencherSubmenusModulo(ws, new[] { "gallery", "image", "video" }, MenuGaleriaMaisUsadas, MenuGaleriaSalvas);
             PreencherSubmenusModulo(ws, new[] { "browser" }, MenuNavegadorMaisUsadas, MenuNavegadorSalvos);
             PreencherSubmenusModulo(ws, null, MenuMaisUsadas, MenuJanelasSalvas);
 
@@ -1711,6 +1731,39 @@ namespace AvaloniaMdiApp
             }
         }
 
+        private async void AbrirVideoAvulso_Click(object? sender, RoutedEventArgs e)
+        {
+            if (StorageProvider == null) return;
+
+            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Abrir Vídeo em Janela no Workspace",
+                AllowMultiple = true,
+                FileTypeFilter = new[]
+                {
+                    new FilePickerFileType("Vídeos")
+                    {
+                        Patterns = new[] { "*.mp4", "*.webm", "*.mkv", "*.avi", "*.mov", "*.wmv", "*.m4v", "*.ogv" }
+                    },
+                    FilePickerFileTypes.All
+                }
+            });
+
+            double f = ObterFatorTamanhoWidget();
+            foreach (var file in files)
+            {
+                string? localPath = file.TryGetLocalPath();
+                if (!string.IsNullOrWhiteSpace(localPath) && File.Exists(localPath))
+                {
+                    _contadorVideos++;
+                    double offsetX = 80 + ((_contadorVideos - 1) * 30) % 260;
+                    double offsetY = 60 + ((_contadorVideos - 1) * 30) % 180;
+                    string nome = Path.GetFileNameWithoutExtension(localPath);
+                    CriarJanelaInterna(nome, offsetX, offsetY, Math.Round(560 * f), Math.Round(380 * f), "video", localPath);
+                }
+            }
+        }
+
         private void RestaurarFundoWorkspace_Click(object? sender, RoutedEventArgs e)
         {
             _workspaceBgImagePath = string.Empty;
@@ -1739,12 +1792,15 @@ namespace AvaloniaMdiApp
                 return;
             }
 
-            string tituloImagem = string.IsNullOrWhiteSpace(card.Title)
+            string tituloMidia = string.IsNullOrWhiteSpace(card.Title)
                 ? Path.GetFileNameWithoutExtension(card.FilePath)
                 : card.Title;
 
+            bool isVideo = card.MediaType == "video" || DraggableWindow.EhArquivoDeVideo(card.FilePath);
+            string targetType = isVideo ? "video" : "image";
+
             var existente = _ativasJanelas.FirstOrDefault(w =>
-                w.WindowType == "image" &&
+                w.WindowType == targetType &&
                 string.Equals(w.ExportState().NoteContent, card.FilePath, StringComparison.OrdinalIgnoreCase));
 
             if (existente != null)
@@ -1760,26 +1816,30 @@ namespace AvaloniaMdiApp
                 return;
             }
 
-            _contadorImagens++;
             double f = ObterFatorTamanhoWidget();
             double offsetX = Math.Max(40, Canvas.GetLeft(galleryWin) + galleryWin.Width + 60);
             double offsetY = Math.Max(40, Canvas.GetTop(galleryWin));
 
-            var imgWin = CriarJanelaInterna(
-                tituloImagem,
+            double winW = isVideo ? Math.Round(560 * f) : Math.Round(440 * f);
+            double winH = isVideo ? Math.Round(380 * f) : Math.Round(340 * f);
+            if (isVideo) _contadorVideos++;
+            else _contadorImagens++;
+
+            var mediaWin = CriarJanelaInterna(
+                tituloMidia,
                 offsetX,
                 offsetY,
-                Math.Round(440 * f),
-                Math.Round(340 * f),
-                "image",
+                winW,
+                winH,
+                targetType,
                 card.FilePath);
 
-            card.OpenImageWindow = imgWin;
-            CriarOuFocarConexaoFluxograma(galleryWin, imgWin);
+            card.OpenImageWindow = mediaWin;
+            CriarOuFocarConexaoFluxograma(galleryWin, mediaWin);
 
-            imgWin.OnClosed += () =>
+            mediaWin.OnClosed += () =>
             {
-                if (card.OpenImageWindow == imgWin)
+                if (card.OpenImageWindow == mediaWin)
                 {
                     card.OpenImageWindow = null;
                 }
@@ -1787,7 +1847,8 @@ namespace AvaloniaMdiApp
 
             if (_settings.EnableNotifications)
             {
-                ToastNotification.Mostrar(Workspace, $"Imagem \"{tituloImagem}\" aberta e conectada!", "info");
+                string tipoLabel = isVideo ? "Vídeo" : "Imagem";
+                ToastNotification.Mostrar(Workspace, $"{tipoLabel} \"{tituloMidia}\" aberto(a) e conectado(a)!", "info");
             }
         }
 
@@ -2108,6 +2169,343 @@ namespace AvaloniaMdiApp
             ModalButtonsPanel.Children.Add(btnBaixar);
             AplicarEstiloModal();
             ModalOverlay.IsVisible = true;
+        }
+
+        // ==================== EXPORTAÇÃO E IMPORTAÇÃO (PDF / ARQUIVOS / WORKSPACE) ====================
+
+        private static string SanitizarNomeArquivo(string nome)
+        {
+            string s = string.IsNullOrWhiteSpace(nome) ? "Workspace" : nome.Trim();
+            foreach (char c in Path.GetInvalidFileNameChars())
+            {
+                s = s.Replace(c, '_');
+            }
+            return s;
+        }
+
+        private async void ExportarWorkspacePdf_Click(object? sender, RoutedEventArgs e)
+        {
+            if (StorageProvider == null) return;
+            SincronizarWorkspaceAtualEmMemoria();
+            var ws = ObterWorkspaceAtual();
+
+            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Exportar Demonstração do Workspace em PDF",
+                SuggestedFileName = $"{SanitizarNomeArquivo(ws.Name)}_Demonstracao.pdf",
+                DefaultExtension = "pdf",
+                FileTypeChoices = new[]
+                {
+                    new FilePickerFileType("Documento PDF") { Patterns = new[] { "*.pdf" } }
+                }
+            });
+
+            string? path = file?.TryGetLocalPath();
+            if (string.IsNullOrWhiteSpace(path)) return;
+
+            bool ok = WorkspaceExportService.ExportarWorkspaceParaPdf(Workspace, ws, path);
+            if (_settings.EnableNotifications)
+            {
+                ToastNotification.Mostrar(
+                    Workspace,
+                    ok ? $"PDF de demonstração salvo em: {Path.GetFileName(path)}" : "Não foi possível gerar o PDF.",
+                    ok ? "success" : "warning");
+            }
+        }
+
+        private async void ExportarWorkspacePng_Click(object? sender, RoutedEventArgs e)
+        {
+            if (StorageProvider == null) return;
+            SincronizarWorkspaceAtualEmMemoria();
+            var ws = ObterWorkspaceAtual();
+
+            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Exportar Imagem do Workspace",
+                SuggestedFileName = $"{SanitizarNomeArquivo(ws.Name)}_Visual.png",
+                DefaultExtension = "png",
+                FileTypeChoices = new[]
+                {
+                    new FilePickerFileType("Imagem PNG") { Patterns = new[] { "*.png" } }
+                }
+            });
+
+            string? path = file?.TryGetLocalPath();
+            if (string.IsNullOrWhiteSpace(path)) return;
+
+            bool ok = WorkspaceExportService.ExportarWorkspaceParaPng(Workspace, path);
+            if (_settings.EnableNotifications)
+            {
+                ToastNotification.Mostrar(
+                    Workspace,
+                    ok ? $"Imagem salva em: {Path.GetFileName(path)}" : "Não foi possível gerar a imagem.",
+                    ok ? "success" : "warning");
+            }
+        }
+
+        private async void ExportarWorkspaceHtml_Click(object? sender, RoutedEventArgs e)
+        {
+            if (StorageProvider == null) return;
+            SincronizarWorkspaceAtualEmMemoria();
+            var ws = ObterWorkspaceAtual();
+
+            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Exportar Relatório Interativo de Demonstração (HTML)",
+                SuggestedFileName = $"{SanitizarNomeArquivo(ws.Name)}_Relatorio.html",
+                DefaultExtension = "html",
+                FileTypeChoices = new[]
+                {
+                    new FilePickerFileType("Página HTML") { Patterns = new[] { "*.html" } }
+                }
+            });
+
+            string? path = file?.TryGetLocalPath();
+            if (string.IsNullOrWhiteSpace(path)) return;
+
+            bool ok = WorkspaceExportService.ExportarWorkspaceParaHtml(Workspace, ws, path);
+            if (_settings.EnableNotifications)
+            {
+                ToastNotification.Mostrar(
+                    Workspace,
+                    ok ? $"Relatório HTML salvo em: {Path.GetFileName(path)}" : "Não foi possível gerar o relatório HTML.",
+                    ok ? "success" : "warning");
+            }
+        }
+
+        private async void ExportarWorkspaceJson_Click(object? sender, RoutedEventArgs e)
+        {
+            if (StorageProvider == null) return;
+            SincronizarWorkspaceAtualEmMemoria();
+            var ws = ObterWorkspaceAtual();
+
+            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Exportar Workspace (.mdiws)",
+                SuggestedFileName = $"{SanitizarNomeArquivo(ws.Name)}.mdiws",
+                DefaultExtension = "mdiws",
+                FileTypeChoices = new[]
+                {
+                    new FilePickerFileType("Workspace MDI") { Patterns = new[] { "*.mdiws", "*.json" } }
+                }
+            });
+
+            string? path = file?.TryGetLocalPath();
+            if (string.IsNullOrWhiteSpace(path)) return;
+
+            bool ok = WorkspaceExportService.ExportarWorkspaceJson(ws, path);
+            if (_settings.EnableNotifications)
+            {
+                ToastNotification.Mostrar(
+                    Workspace,
+                    ok ? $"Workspace exportado: {Path.GetFileName(path)}" : "Erro ao exportar Workspace.",
+                    ok ? "success" : "warning");
+            }
+        }
+
+        private async void ExportarWorkspaceZip_Click(object? sender, RoutedEventArgs e)
+        {
+            if (StorageProvider == null) return;
+            SincronizarWorkspaceAtualEmMemoria();
+            var ws = ObterWorkspaceAtual();
+
+            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Exportar Pacote Portátil Completo com Mídias (.zip)",
+                SuggestedFileName = $"{SanitizarNomeArquivo(ws.Name)}_Pacote.zip",
+                DefaultExtension = "zip",
+                FileTypeChoices = new[]
+                {
+                    new FilePickerFileType("Pacote ZIP") { Patterns = new[] { "*.zip" } }
+                }
+            });
+
+            string? path = file?.TryGetLocalPath();
+            if (string.IsNullOrWhiteSpace(path)) return;
+
+            bool ok = WorkspaceExportService.ExportarWorkspaceZip(ws, path);
+            if (_settings.EnableNotifications)
+            {
+                ToastNotification.Mostrar(
+                    Workspace,
+                    ok ? $"Pacote completo exportado: {Path.GetFileName(path)}" : "Erro ao gerar pacote ZIP.",
+                    ok ? "success" : "warning");
+            }
+        }
+
+        private async void ExportarJanelaAtiva_Click(object? sender, RoutedEventArgs e)
+        {
+            if (StorageProvider == null) return;
+            var ativa = ZIndexManager.ActiveWindow ?? (_ativasJanelas.Count > 0 ? _ativasJanelas[^1] : null);
+            if (ativa == null)
+            {
+                ToastNotification.Mostrar(Workspace, "Nenhuma janela ativa selecionada para exportar.", "warning");
+                return;
+            }
+
+            var state = ativa.ExportState();
+            string ext = state.WindowType switch
+            {
+                "spreadsheet" => "csv",
+                "image" or "video" => Path.GetExtension(state.NoteContent).TrimStart('.'),
+                _ => "txt"
+            };
+            if (string.IsNullOrWhiteSpace(ext)) ext = "txt";
+
+            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = $"Exportar \"{state.Title}\"",
+                SuggestedFileName = $"{SanitizarNomeArquivo(state.Title)}.{ext}",
+                DefaultExtension = ext
+            });
+
+            string? path = file?.TryGetLocalPath();
+            if (string.IsNullOrWhiteSpace(path)) return;
+
+            bool ok = WorkspaceExportService.ExportarJanelaIndividual(state, path);
+            if (_settings.EnableNotifications)
+            {
+                ToastNotification.Mostrar(
+                    Workspace,
+                    ok ? $"\"{state.Title}\" exportado para {Path.GetFileName(path)}!" : "Não foi possível exportar a janela ativa.",
+                    ok ? "success" : "warning");
+            }
+        }
+
+        private async void ImportarWorkspace_Click(object? sender, RoutedEventArgs e)
+        {
+            if (StorageProvider == null) return;
+
+            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Importar Workspace ou Pacote (.mdiws, .json, .zip)",
+                AllowMultiple = false,
+                FileTypeFilter = new[]
+                {
+                    new FilePickerFileType("Workspaces e Pacotes") { Patterns = new[] { "*.mdiws", "*.json", "*.zip" } },
+                    FilePickerFileTypes.All
+                }
+            });
+
+            if (files.Count == 0) return;
+            string? path = files[0].TryGetLocalPath();
+            if (string.IsNullOrWhiteSpace(path)) return;
+
+            var imported = WorkspaceExportService.ImportarWorkspace(path);
+            if (imported == null)
+            {
+                ToastNotification.Mostrar(Workspace, "Arquivo de Workspace inválido ou corrompido.", "warning");
+                return;
+            }
+
+            SincronizarWorkspaceAtualEmMemoria();
+            _settings.Workspaces.Add(imported);
+            AlternarParaWorkspace(imported.Id);
+            SalvarTodosWorkspacesNoDisco();
+
+            if (_settings.EnableNotifications)
+            {
+                ToastNotification.Mostrar(Workspace, $"Workspace \"{imported.Name}\" importado e ativado!", "success");
+            }
+        }
+
+        private async void ImportarArquivoParaWorkspace_Click(object? sender, RoutedEventArgs e)
+        {
+            if (StorageProvider == null) return;
+
+            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Importar Arquivo para o Workspace (.txt, .md, .csv, Imagem, Vídeo)",
+                AllowMultiple = true,
+                FileTypeFilter = new[]
+                {
+                    new FilePickerFileType("Arquivos Suportados")
+                    {
+                        Patterns = new[]
+                        {
+                            "*.txt", "*.md", "*.csv", "*.json", "*.log", "*.xml",
+                            "*.png", "*.jpg", "*.jpeg", "*.webp", "*.bmp", "*.gif",
+                            "*.mp4", "*.webm", "*.mkv", "*.avi", "*.mov", "*.wmv", "*.m4v"
+                        }
+                    },
+                    FilePickerFileTypes.All
+                }
+            });
+
+            if (files.Count == 0) return;
+
+            double f = ObterFatorTamanhoWidget();
+            int importados = 0;
+
+            foreach (var file in files)
+            {
+                string? localPath = file.TryGetLocalPath();
+                if (string.IsNullOrWhiteSpace(localPath) || !File.Exists(localPath)) continue;
+
+                string ext = Path.GetExtension(localPath).ToLowerInvariant();
+                string nome = Path.GetFileNameWithoutExtension(localPath);
+
+                if (DraggableWindow.EhArquivoDeVideo(localPath))
+                {
+                    _contadorVideos++;
+                    CriarJanelaInterna(nome, 70 + (_contadorVideos * 26) % 240, 55 + (_contadorVideos * 26) % 160, Math.Round(560 * f), Math.Round(380 * f), "video", localPath);
+                    importados++;
+                }
+                else if (ext is ".png" or ".jpg" or ".jpeg" or ".webp" or ".bmp" or ".gif")
+                {
+                    _contadorImagens++;
+                    CriarJanelaInterna(nome, 70 + (_contadorImagens * 26) % 240, 55 + (_contadorImagens * 26) % 160, Math.Round(440 * f), Math.Round(340 * f), "image", localPath);
+                    importados++;
+                }
+                else if (ext == ".csv")
+                {
+                    try
+                    {
+                        string csv = File.ReadAllText(localPath);
+                        var (rows, cols, cells) = WorkspaceExportService.ParseCsvParaPlanilha(csv);
+                        _contadorPlanilhas++;
+                        CriarJanelaInterna(
+                            nome,
+                            65 + (_contadorPlanilhas * 28) % 240,
+                            50 + (_contadorPlanilhas * 28) % 160,
+                            Math.Round(640 * f),
+                            Math.Round(420 * f),
+                            "spreadsheet",
+                            "",
+                            null, null, 1, null, null, null, null, "",
+                            rows, cols, cells);
+                        importados++;
+                    }
+                    catch { }
+                }
+                else
+                {
+                    try
+                    {
+                        string text = File.ReadAllText(localPath);
+                        _contadorNotas++;
+                        CriarJanelaInterna(
+                            nome,
+                            60 + (_contadorNotas * 28) % 240,
+                            50 + (_contadorNotas * 28) % 160,
+                            Math.Round(380 * f),
+                            Math.Round(280 * f),
+                            "notepad",
+                            text);
+                        importados++;
+                    }
+                    catch { }
+                }
+            }
+
+            if (importados > 0)
+            {
+                SalvarTodosWorkspacesNoDisco();
+                if (_settings.EnableNotifications)
+                {
+                    ToastNotification.Mostrar(Workspace, $"{importados} arquivo(s) importado(s) para o Workspace!", "success");
+                }
+            }
         }
 
         private void AbrirConfiguracoes_Click(object? sender, RoutedEventArgs e)

@@ -8,8 +8,10 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
 
 namespace AvaloniaMdiApp
 {
@@ -18,9 +20,10 @@ namespace AvaloniaMdiApp
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
         public string Title { get; set; } = string.Empty;
         public string FilePath { get; set; } = string.Empty;
+        public string MediaType { get; set; } = "image"; // "image" ou "video"
         public Border CardBorder { get; init; } = null!;
         public Border ThumbContainer { get; init; } = null!;
-        public Image ThumbImage { get; init; } = null!;
+        public Image? ThumbImage { get; init; }
         public TextBlock TitleLabel { get; init; } = null!;
         public Button BtnOpenWindow { get; init; } = null!;
         public Button BtnSetBg { get; init; } = null!;
@@ -61,6 +64,26 @@ namespace AvaloniaMdiApp
         private double _imageZoomFactor = 1.0;
         private Stretch _imageStretchMode = Stretch.Uniform;
 
+        // Campos da Janela de Vídeo ("video")
+        private Border? _videoToolbar;
+        private Button? _btnVideoReload;
+        private Button? _btnVideoExternal;
+        private TextBlock? _lblVideoInfo;
+        private string _singleVideoPath = string.Empty;
+        private string _tempVideoHtmlPath = string.Empty;
+
+        private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".mp4", ".webm", ".mkv", ".avi", ".mov", ".wmv", ".m4v", ".ogv"
+        };
+
+        public static bool EhArquivoDeVideo(string? filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath)) return false;
+            string ext = Path.GetExtension(filePath);
+            return !string.IsNullOrEmpty(ext) && VideoExtensions.Contains(ext);
+        }
+
         private Control CriarConteudoGaleria(List<GalleryItemData>? initialItems)
         {
             var galleryDock = new DockPanel();
@@ -79,7 +102,7 @@ namespace AvaloniaMdiApp
 
             _btnGalleryAddFiles = new Button
             {
-                Content = AppIcons.WithText(AppIcons.Plus, "Adicionar Imagens...", 10.5, 5, ThemePalette.IconLightGray),
+                Content = AppIcons.WithText(AppIcons.Plus, "Adicionar Mídias...", 10.5, 5, ThemePalette.IconLightGray),
                 Height = 28,
                 Padding = new Thickness(10, 0),
                 Margin = new Thickness(0, 0, 6, 0),
@@ -91,7 +114,7 @@ namespace AvaloniaMdiApp
                 VerticalAlignment = VerticalAlignment.Center,
                 VerticalContentAlignment = VerticalAlignment.Center
             };
-            ToolTip.SetTip(_btnGalleryAddFiles, "Selecionar imagens do computador para a galeria");
+            ToolTip.SetTip(_btnGalleryAddFiles, "Selecionar imagens ou vídeos do computador para a galeria");
             _btnGalleryAddFiles.Click += async (s, e) =>
             {
                 var topLevel = TopLevel.GetTopLevel(this);
@@ -99,14 +122,22 @@ namespace AvaloniaMdiApp
 
                 var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
                 {
-                    Title = "Selecionar Imagens para a Galeria",
+                    Title = "Selecionar Imagens ou Vídeos para a Galeria",
                     AllowMultiple = true,
                     FileTypeFilter = new[]
                     {
+                        new FilePickerFileType("Imagens e Vídeos")
+                        {
+                            Patterns = new[] { "*.png", "*.jpg", "*.jpeg", "*.webp", "*.bmp", "*.gif", "*.mp4", "*.webm", "*.mkv", "*.avi", "*.mov", "*.wmv", "*.m4v", "*.ogv" }
+                        },
                         new FilePickerFileType("Imagens")
                         {
                             Patterns = new[] { "*.png", "*.jpg", "*.jpeg", "*.webp", "*.bmp", "*.gif" },
                             MimeTypes = new[] { "image/png", "image/jpeg", "image/webp", "image/bmp", "image/gif" }
+                        },
+                        new FilePickerFileType("Vídeos")
+                        {
+                            Patterns = new[] { "*.mp4", "*.webm", "*.mkv", "*.avi", "*.mov", "*.wmv", "*.m4v", "*.ogv" }
                         },
                         FilePickerFileTypes.All
                     }
@@ -124,13 +155,13 @@ namespace AvaloniaMdiApp
 
                 if (adicionadas > 0)
                 {
-                    ToastNotification.Mostrar(Workspace, $"{adicionadas} imagem(ns) adicionada(s) à galeria!", "success");
+                    ToastNotification.Mostrar(Workspace, $"{adicionadas} mídia(s) adicionada(s) à galeria!", "success");
                 }
             };
 
             _txtGalleryPath = new TextBox
             {
-                Watermark = "Ou cole o caminho da imagem aqui...",
+                Watermark = "Ou cole o caminho da imagem ou vídeo aqui...",
                 VerticalAlignment = VerticalAlignment.Center,
                 Padding = new Thickness(8, 4),
                 MinHeight = 28,
@@ -161,18 +192,18 @@ namespace AvaloniaMdiApp
 
                 if (!File.Exists(caminho))
                 {
-                    ToastNotification.Mostrar(Workspace, "Arquivo de imagem não encontrado.", "warning");
+                    ToastNotification.Mostrar(Workspace, "Arquivo de mídia não encontrado.", "warning");
                     return;
                 }
 
                 if (AdicionarImagemNaGaleria(caminho, Path.GetFileNameWithoutExtension(caminho)))
                 {
                     if (_txtGalleryPath != null) _txtGalleryPath.Text = string.Empty;
-                    ToastNotification.Mostrar(Workspace, "Imagem adicionada à galeria!", "success");
+                    ToastNotification.Mostrar(Workspace, "Mídia adicionada à galeria!", "success");
                 }
                 else
                 {
-                    ToastNotification.Mostrar(Workspace, "Não foi possível carregar essa imagem.", "warning");
+                    ToastNotification.Mostrar(Workspace, "Não foi possível carregar essa mídia.", "warning");
                 }
             }
 
@@ -229,7 +260,7 @@ namespace AvaloniaMdiApp
 
             _lblGalleryEmptySub = new TextBlock
             {
-                Text = "Clique em \"+ Adicionar Imagens...\", cole um caminho acima\nou arraste arquivos de imagem para cá.\nDepois, clique em \"Janela\" para abrir a imagem na janela principal!",
+                Text = "Clique em \"+ Adicionar Mídias...\", cole um caminho acima\nou arraste arquivos de imagem ou vídeo para cá.\nDepois, clique em \"Janela\" para abrir na área principal!",
                 FontSize = 11.5,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 TextAlignment = TextAlignment.Center,
@@ -277,7 +308,7 @@ namespace AvaloniaMdiApp
 
                 if (count > 0)
                 {
-                    ToastNotification.Mostrar(Workspace, $"{count} imagem(ns) adicionada(s)!", "success");
+                    ToastNotification.Mostrar(Workspace, $"{count} mídia(s) adicionada(s)!", "success");
                 }
             });
 
@@ -287,7 +318,7 @@ namespace AvaloniaMdiApp
             {
                 foreach (var item in initialItems)
                 {
-                    AdicionarImagemNaGaleria(item.FilePath, item.Title, item.Id);
+                    AdicionarImagemNaGaleria(item.FilePath, item.Title, item.Id, item.MediaType);
                 }
             }
 
@@ -295,22 +326,82 @@ namespace AvaloniaMdiApp
             return galleryDock;
         }
 
-        public bool AdicionarImagemNaGaleria(string filePath, string? titulo = null, string? id = null)
+        public bool AdicionarImagemNaGaleria(string filePath, string? titulo = null, string? id = null, string? mediaType = null)
         {
             if (_galleryWrapPanel == null || string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
             {
                 return false;
             }
 
-            Bitmap bitmap;
-            try
+            bool isVideo = string.Equals(mediaType, "video", StringComparison.OrdinalIgnoreCase) || EhArquivoDeVideo(filePath);
+            Bitmap? bitmap = null;
+            Control thumbVisual;
+            Image? imgControl = null;
+
+            if (isVideo)
             {
-                using var fs = File.OpenRead(filePath);
-                bitmap = Bitmap.DecodeToWidth(fs, 220);
+                var videoThumb = new Grid
+                {
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    VerticalAlignment = VerticalAlignment.Stretch,
+                    Background = SolidColorBrush.Parse("#0B1120")
+                };
+
+                var playCircle = new Border
+                {
+                    Width = 42,
+                    Height = 42,
+                    CornerRadius = new CornerRadius(21),
+                    Background = SolidColorBrush.Parse("#AA1E293B"),
+                    BorderBrush = ThemePalette.AccentLight,
+                    BorderThickness = new Thickness(1.5),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Child = AppIcons.Create(AppIcons.Play, 18, ThemePalette.IconLightGray)
+                };
+
+                string ext = Path.GetExtension(filePath).TrimStart('.').ToUpperInvariant();
+                var badge = new Border
+                {
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(5, 1),
+                    Background = ThemePalette.Accent,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    Margin = new Thickness(6),
+                    Child = new TextBlock
+                    {
+                        Text = string.IsNullOrEmpty(ext) ? "VÍDEO" : ext,
+                        FontSize = 9.5,
+                        FontWeight = FontWeight.Bold,
+                        Foreground = Brushes.White
+                    }
+                };
+
+                videoThumb.Children.Add(playCircle);
+                videoThumb.Children.Add(badge);
+                thumbVisual = videoThumb;
             }
-            catch
+            else
             {
-                return false;
+                try
+                {
+                    using var fs = File.OpenRead(filePath);
+                    bitmap = Bitmap.DecodeToWidth(fs, 220);
+                }
+                catch
+                {
+                    return false;
+                }
+
+                imgControl = new Image
+                {
+                    Source = bitmap,
+                    Stretch = Stretch.UniformToFill,
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    VerticalAlignment = VerticalAlignment.Stretch
+                };
+                thumbVisual = imgControl;
             }
 
             string nomeExibicao = string.IsNullOrWhiteSpace(titulo)
@@ -322,23 +413,17 @@ namespace AvaloniaMdiApp
             cardGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
             cardGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
 
-            var imgControl = new Image
-            {
-                Source = bitmap,
-                Stretch = Stretch.UniformToFill,
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                VerticalAlignment = VerticalAlignment.Stretch
-            };
-
             var thumbBorder = new Border
             {
                 CornerRadius = new CornerRadius(5),
                 ClipToBounds = true,
                 Margin = new Thickness(6, 6, 6, 4),
                 Cursor = new Cursor(StandardCursorType.Hand),
-                Child = imgControl
+                Child = thumbVisual
             };
-            ToolTip.SetTip(thumbBorder, "Duplo clique para colocar a imagem em janela na janela principal");
+            ToolTip.SetTip(thumbBorder, isVideo
+                ? "Duplo clique para abrir o vídeo em uma janela"
+                : "Duplo clique para colocar a imagem em janela na janela principal");
 
             var lblTitle = new TextBlock
             {
@@ -361,7 +446,7 @@ namespace AvaloniaMdiApp
 
             var btnOpenWin = new Button
             {
-                Content = AppIcons.WithText(AppIcons.Window, "Janela", 10.5, 4, ThemePalette.IconLightGray),
+                Content = AppIcons.WithText(isVideo ? AppIcons.Play : AppIcons.Window, isVideo ? "Assistir" : "Janela", 10.5, 4, ThemePalette.IconLightGray),
                 Height = 24,
                 Padding = new Thickness(6, 0),
                 Margin = new Thickness(0, 0, 4, 0),
@@ -374,7 +459,9 @@ namespace AvaloniaMdiApp
                 HorizontalContentAlignment = HorizontalAlignment.Center,
                 VerticalContentAlignment = VerticalAlignment.Center
             };
-            ToolTip.SetTip(btnOpenWin, "Abrir esta imagem em uma janela na janela principal");
+            ToolTip.SetTip(btnOpenWin, isVideo
+                ? "Abrir este vídeo em uma janela reprodutora"
+                : "Abrir esta imagem em uma janela na janela principal");
 
             var btnSetBg = new Button
             {
@@ -386,7 +473,8 @@ namespace AvaloniaMdiApp
                 CornerRadius = new CornerRadius(4),
                 BorderThickness = new Thickness(1),
                 HorizontalContentAlignment = HorizontalAlignment.Center,
-                VerticalContentAlignment = VerticalAlignment.Center
+                VerticalContentAlignment = VerticalAlignment.Center,
+                IsVisible = !isVideo
             };
             ToolTip.SetTip(btnSetBg, "Aplicar/remover imagem como plano de fundo da janela principal");
 
@@ -432,6 +520,7 @@ namespace AvaloniaMdiApp
                 Id = string.IsNullOrWhiteSpace(id) ? Guid.NewGuid().ToString("N") : id,
                 Title = nomeExibicao,
                 FilePath = filePath,
+                MediaType = isVideo ? "video" : "image",
                 CardBorder = cardBorder,
                 ThumbContainer = thumbBorder,
                 ThumbImage = imgControl,
@@ -476,8 +565,18 @@ namespace AvaloniaMdiApp
         {
             if (_lblGalleryCount != null)
             {
-                int count = _galleryCards.Count;
-                _lblGalleryCount.Text = count == 1 ? "1 imagem" : $"{count} imagens";
+                int total = _galleryCards.Count;
+                int videos = _galleryCards.Count(c => c.MediaType == "video");
+                int imgs = total - videos;
+
+                if (total == 0)
+                    _lblGalleryCount.Text = "0 mídias";
+                else if (videos == 0)
+                    _lblGalleryCount.Text = imgs == 1 ? "1 imagem" : $"{imgs} imagens";
+                else if (imgs == 0)
+                    _lblGalleryCount.Text = videos == 1 ? "1 vídeo" : $"{videos} vídeos";
+                else
+                    _lblGalleryCount.Text = $"{imgs} img • {videos} vid";
             }
 
             if (_galleryEmptyState != null)
@@ -681,6 +780,136 @@ namespace AvaloniaMdiApp
             return imageDock;
         }
 
+        private Control CriarConteudoVideo(string videoPath)
+        {
+            _singleVideoPath = videoPath ?? string.Empty;
+            var videoDock = new DockPanel();
+
+            _videoToolbar = new Border
+            {
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                Padding = new Thickness(8, 5),
+                Height = 36
+            };
+
+            var barGrid = new Grid();
+            barGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+            barGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+            barGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+
+            _btnVideoReload = CriarBotaoFormatacao("", "Recarregar vídeo", FontWeight.SemiBold, FontStyle.Normal, width: 28);
+            _btnVideoReload.Content = AppIcons.Create(AppIcons.Refresh, 11, ThemePalette.IconLightGray);
+
+            _lblVideoInfo = new TextBlock
+            {
+                Text = File.Exists(_singleVideoPath) ? Path.GetFileName(_singleVideoPath) : "Arquivo de vídeo não encontrado",
+                FontSize = 11.5,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0),
+                TextTrimming = TextTrimming.CharacterEllipsis
+            };
+
+            _btnVideoExternal = new Button
+            {
+                Content = AppIcons.WithText(AppIcons.ExternalLink, "Player Externo", 11, 5, ThemePalette.IconLightGray),
+                Height = 25,
+                Padding = new Thickness(8, 0),
+                CornerRadius = new CornerRadius(4),
+                BorderThickness = new Thickness(1),
+                FontSize = 11,
+                FontWeight = FontWeight.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+            ToolTip.SetTip(_btnVideoExternal, "Abrir vídeo no reprodutor padrão do sistema");
+            _btnVideoExternal.Click += (s, e) =>
+            {
+                if (!string.IsNullOrWhiteSpace(_singleVideoPath) && File.Exists(_singleVideoPath))
+                {
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = _singleVideoPath,
+                            UseShellExecute = true
+                        });
+                    }
+                    catch { }
+                }
+            };
+
+            Grid.SetColumn(_btnVideoReload, 0);
+            Grid.SetColumn(_lblVideoInfo, 1);
+            Grid.SetColumn(_btnVideoExternal, 2);
+            barGrid.Children.Add(_btnVideoReload);
+            barGrid.Children.Add(_lblVideoInfo);
+            barGrid.Children.Add(_btnVideoExternal);
+
+            _videoToolbar.Child = barGrid;
+            DockPanel.SetDock(_videoToolbar, Dock.Top);
+            videoDock.Children.Add(_videoToolbar);
+
+            string playerUrl = "about:blank";
+            if (!string.IsNullOrWhiteSpace(_singleVideoPath) && File.Exists(_singleVideoPath))
+            {
+                try
+                {
+                    string folder = Path.Combine(Path.GetTempPath(), "AvaloniaMdiApp_Video");
+                    Directory.CreateDirectory(folder);
+                    _tempVideoHtmlPath = Path.Combine(folder, $"video_{WindowId}.html");
+
+                    string videoUri = new Uri(Path.GetFullPath(_singleVideoPath)).AbsoluteUri;
+                    string safeTitle = WebUtility.HtmlEncode(Path.GetFileName(_singleVideoPath));
+                    string html = $@"<!DOCTYPE html>
+<html>
+<head>
+<meta charset=""utf-8"">
+<title>{safeTitle}</title>
+<style>
+  html, body {{ margin: 0; padding: 0; width: 100%; height: 100%; background: #090d16; overflow: hidden; display: flex; align-items: center; justify-content: center; }}
+  video {{ width: 100%; height: 100%; object-fit: contain; outline: none; }}
+</style>
+</head>
+<body>
+  <video controls autoplay playsinline src=""{videoUri}""></video>
+</body>
+</html>";
+                    File.WriteAllText(_tempVideoHtmlPath, html);
+                    playerUrl = new Uri(_tempVideoHtmlPath).AbsoluteUri;
+                }
+                catch
+                {
+                    playerUrl = new Uri(Path.GetFullPath(_singleVideoPath)).AbsoluteUri;
+                }
+            }
+
+            _browserHost = new ChromiumWebViewHost(playerUrl, this)
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch
+            };
+
+            _btnVideoReload.Click += (s, e) => _browserHost?.Reload();
+
+            var videoBodyHost = new Grid
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch
+            };
+            videoBodyHost.Children.Add(new TextBlock
+            {
+                Text = File.Exists(_singleVideoPath) ? "Carregando player de vídeo..." : "Arquivo de vídeo não encontrado",
+                FontSize = 12,
+                Foreground = ThemePalette.IconMutedGray,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            videoBodyHost.Children.Add(_browserHost);
+
+            videoDock.Children.Add(videoBodyHost);
+            return videoDock;
+        }
+
         private void AtualizarCoresGaleriaEImagem()
         {
             var barBg = _isDarkMode ? ThemePalette.DarkContentBg : ThemePalette.LightContentBg;
@@ -750,6 +979,27 @@ namespace AvaloniaMdiApp
                     _lblImageInfo.Foreground = textSecondary;
                 }
             }
+
+            if (_videoToolbar != null)
+            {
+                _videoToolbar.Background = barBg;
+                _videoToolbar.BorderBrush = borderBrush;
+
+                foreach (var btn in new[] { _btnVideoReload, _btnVideoExternal })
+                {
+                    if (btn != null)
+                    {
+                        btn.Background = btnBg;
+                        btn.BorderBrush = borderBrush;
+                        btn.Foreground = textPrimary;
+                    }
+                }
+
+                if (_lblVideoInfo != null)
+                {
+                    _lblVideoInfo.Foreground = textSecondary;
+                }
+            }
         }
 
         private void AtualizarHibernacaoGaleriaEImagem(bool hibernar)
@@ -778,7 +1028,10 @@ namespace AvaloniaMdiApp
                 {
                     foreach (var card in _galleryCards)
                     {
-                        card.ThumbImage.Source = null;
+                        if (card.ThumbImage != null)
+                        {
+                            card.ThumbImage.Source = null;
+                        }
                         card.LoadedBitmap?.Dispose();
                         card.LoadedBitmap = null;
                     }
@@ -787,7 +1040,7 @@ namespace AvaloniaMdiApp
                 {
                     foreach (var card in _galleryCards)
                     {
-                        if (card.LoadedBitmap == null && !string.IsNullOrWhiteSpace(card.FilePath) && File.Exists(card.FilePath))
+                        if (card.MediaType != "video" && card.ThumbImage != null && card.LoadedBitmap == null && !string.IsNullOrWhiteSpace(card.FilePath) && File.Exists(card.FilePath))
                         {
                             try
                             {
@@ -813,6 +1066,12 @@ namespace AvaloniaMdiApp
 
             _singleImageBitmap?.Dispose();
             _singleImageBitmap = null;
+
+            if (!string.IsNullOrWhiteSpace(_tempVideoHtmlPath) && File.Exists(_tempVideoHtmlPath))
+            {
+                try { File.Delete(_tempVideoHtmlPath); } catch { }
+                _tempVideoHtmlPath = string.Empty;
+            }
         }
     }
 }

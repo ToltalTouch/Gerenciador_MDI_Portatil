@@ -14,7 +14,7 @@
       "Id": "433e88fa15154b7c9069b47c0effbdc4",
       "Name": "Workspace 1",
       "BackgroundImagePath": "",
-      "WorkspaceZoom": 1,
+      "WorkspaceZoom": 1.09,
       "SavedWindows": [
         {
           "Id": "265f9f73574a447d99558463b0fb0126",
@@ -22,10 +22,10 @@
           "WindowType": "notepad",
           "CustomColor": "",
           "CriticalityLevel": "none",
-          "X": 522.3529411764707,
-          "Y": 454.7058823529412,
-          "Width": 432,
-          "Height": 312,
+          "X": 428.4943335132217,
+          "Y": 59.83270372369134,
+          "Width": 506.11764705882354,
+          "Height": 688.4705882352941,
           "NoteContent": "",
           "TextFormat": {
             "IsBold": false,
@@ -41,34 +41,7 @@
           "SpreadsheetCells": [],
           "ConditionalRules": [],
           "AccessCount": 1,
-          "LastUsedUtc": "2026-11-12T15:09:35.7839047Z"
-        },
-        {
-          "Id": "fecaed12a8074a6aa4a70ba52315ad8c",
-          "Title": "Navegador #1",
-          "WindowType": "browser",
-          "CustomColor": "",
-          "CriticalityLevel": "none",
-          "X": 1445.2941176470588,
-          "Y": 24.705882352941188,
-          "Width": 792,
-          "Height": 540,
-          "NoteContent": "https://www.google.com/",
-          "TextFormat": {
-            "IsBold": false,
-            "IsItalic": false,
-            "FontSize": 13,
-            "Alignment": "left",
-            "FontFamilyName": "default"
-          },
-          "ChecklistItems": [],
-          "GalleryItems": [],
-          "SpreadsheetRows": 12,
-          "SpreadsheetCols": 6,
-          "SpreadsheetCells": [],
-          "ConditionalRules": [],
-          "AccessCount": 1,
-          "LastUsedUtc": "2026-11-12T15:09:35.7839216Z"
+          "LastUsedUtc": "2026-11-12T19:57:16.9244938Z"
         },
         {
           "Id": "966ff49fb5394643824eb6caea703b34",
@@ -76,8 +49,8 @@
           "WindowType": "shape_rect",
           "CustomColor": "#7C3AED",
           "CriticalityLevel": "none",
-          "X": 102.94117647058823,
-          "Y": 533.5294117647059,
+          "X": 55.45062061521858,
+          "Y": 75.89314624932541,
           "Width": 264,
           "Height": 156,
           "NoteContent": "Atualiza\u00E7\u00E3o PC Secund\u00E1rio",
@@ -95,7 +68,7 @@
           "SpreadsheetCells": [],
           "ConditionalRules": [],
           "AccessCount": 1,
-          "LastUsedUtc": "2026-11-12T15:09:35.7839254Z"
+          "LastUsedUtc": "2026-11-12T19:57:16.9246668Z"
         }
       ],
       "SavedCatalog": [
@@ -238,10 +211,10 @@
           "WindowType": "notepad",
           "CustomColor": "",
           "CriticalityLevel": "none",
-          "X": 522.3529411764707,
-          "Y": 454.7058823529412,
-          "Width": 432,
-          "Height": 312,
+          "X": 428.4943335132217,
+          "Y": 59.83270372369134,
+          "Width": 506.11764705882354,
+          "Height": 688.4705882352941,
           "NoteContent": "",
           "TextFormat": {
             "IsBold": false,
@@ -257,7 +230,7 @@
           "SpreadsheetCells": [],
           "ConditionalRules": [],
           "AccessCount": 1,
-          "LastUsedUtc": "2026-11-12T15:09:35.7839047Z"
+          "LastUsedUtc": "2026-11-12T19:57:16.9244938Z"
         }
       ],
       "Connections": [
@@ -279,10 +252,10 @@
       "WindowType": "notepad",
       "CustomColor": "",
       "CriticalityLevel": "none",
-      "X": 522.3529411764707,
-      "Y": 454.7058823529412,
-      "Width": 432,
-      "Height": 312,
+      "X": 428.4943335132217,
+      "Y": 59.83270372369134,
+      "Width": 506.11764705882354,
+      "Height": 688.4705882352941,
       "NoteContent": "",
       "TextFormat": {
         "IsBold": false,
@@ -298,34 +271,7 @@
       "SpreadsheetCells": [],
       "ConditionalRules": [],
       "AccessCount": 1,
-      "LastUsedUtc": "2026-11-12T15:09:35.7839047Z"
-    },
-    {
-      "Id": "fecaed12a8074a6aa4a70ba52315ad8c",
-      "Title": "Navegador #1",
-      "WindowType": "browser",
-      "CustomColor": "",
-      "CriticalityLevel": "none",
-      "X": 1445.2941176470588,
-      "Y": 24.705882352941188,
-      "Width": 792,
-      "Height": 540,
-      "NoteContent": "https://www.google.com/",
-      "TextFormat": {
-        "IsBold": false,
-        "IsItalic": false,
-        "FontSize": 13,
-        "Alignment": "left",
-        "FontFamilyName": "default"
-      },
-      "ChecklistItems": [],
-      "GalleryItems": [],
-      "SpreadsheetRows": 12,
-      "SpreadsheetCols": 6,
-      "SpreadsheetCells": [],
-      "ConditionalRules": [],
-      "AccessCount": 1,
-      "LastUsedUtc": "2026-11-12T15:09:35.7839216Z"
+      "LastUsedUtc": "2026-11-12T19:57:16.9244938Z"
     },
     {
       "Id": "966ff49fb5394643824eb6caea703b34",
@@ -333,8 +279,8 @@
       "WindowType": "shape_rect",
       "CustomColor": "#7C3AED",
       "CriticalityLevel": "none",
-      "X": 102.94117647058823,
-      "Y": 533.5294117647059,
+      "X": 55.45062061521858,
+      "Y": 75.89314624932541,
       "Width": 264,
       "Height": 156,
       "NoteContent": "Atualiza\u00E7\u00E3o PC Secund\u00E1rio",
@@ -352,7 +298,7 @@
       "SpreadsheetCells": [],
       "ConditionalRules": [],
       "AccessCount": 1,
-      "LastUsedUtc": "2026-11-12T15:09:35.7839254Z"
+      "LastUsedUtc": "2026-11-12T19:57:16.9246668Z"
     }
   ],
   "SavedCatalog": [
@@ -495,10 +441,10 @@
       "WindowType": "notepad",
       "CustomColor": "",
       "CriticalityLevel": "none",
-      "X": 522.3529411764707,
-      "Y": 454.7058823529412,
-      "Width": 432,
-      "Height": 312,
+      "X": 428.4943335132217,
+      "Y": 59.83270372369134,
+      "Width": 506.11764705882354,
+      "Height": 688.4705882352941,
       "NoteContent": "",
       "TextFormat": {
         "IsBold": false,
@@ -514,7 +460,7 @@
       "SpreadsheetCells": [],
       "ConditionalRules": [],
       "AccessCount": 1,
-      "LastUsedUtc": "2026-11-12T15:09:35.7839047Z"
+      "LastUsedUtc": "2026-11-12T19:57:16.9244938Z"
     }
   ]
 }

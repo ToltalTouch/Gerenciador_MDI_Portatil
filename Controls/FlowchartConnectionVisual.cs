@@ -30,9 +30,13 @@ namespace AvaloniaMdiApp
         public event Action<FlowchartConnectionVisual>? OnColorChanged;
 
         private readonly Canvas _workspace;
-        private readonly Button _btnColor;
-        private readonly Button _btnRemove;
+        private readonly Path _hitPath;
+        private readonly Button _btnConfig;
+        private readonly MenuFlyout _configFlyout;
         private bool _isDarkMode;
+        private bool _isMenuOpen;
+        private bool _isHoveringLine;
+        private bool _isHoveringBadge;
 
         public static readonly (string Hex, string Nome)[] PaletaCoresLinha =
         {
@@ -71,6 +75,16 @@ namespace AvaloniaMdiApp
                 ZIndex = 0
             };
 
+            _hitPath = new Path
+            {
+                Stroke = Brushes.Transparent,
+                StrokeThickness = 16,
+                StrokeLineCap = PenLineCap.Round,
+                IsHitTestVisible = true,
+                Cursor = new Cursor(StandardCursorType.Hand),
+                ZIndex = 0
+            };
+
             ArrowPath = new Path
             {
                 StrokeThickness = 1.5,
@@ -87,12 +101,39 @@ namespace AvaloniaMdiApp
                 ZIndex = 0
             };
 
-            var colorFlyout = new MenuFlyout { Placement = PlacementMode.Bottom };
+            _configFlyout = new MenuFlyout { Placement = PlacementMode.Bottom };
+            _configFlyout.Opened += (s, e) =>
+            {
+                _isMenuOpen = true;
+                AtualizarVisibilidadeBadge();
+            };
+            _configFlyout.Closed += (s, e) =>
+            {
+                _isMenuOpen = false;
+                AtualizarVisibilidadeBadge();
+            };
+
+            var menuCores = new MenuItem
+            {
+                Icon = AppIcons.Create(AppIcons.Palette, 11, ThemePalette.IconLightGray),
+                Header = "Mudar Cor da Linha"
+            };
             foreach (var cor in PaletaCoresLinha)
             {
+                IBrush dotBrush;
+                try { dotBrush = SolidColorBrush.Parse(cor.Hex); }
+                catch { dotBrush = ThemePalette.Accent; }
+
                 var item = new MenuItem
                 {
-                    Icon = AppIcons.Create(AppIcons.CircleDot, 10, ThemePalette.IconLightGray),
+                    Icon = new Ellipse
+                    {
+                        Width = 10,
+                        Height = 10,
+                        Fill = dotBrush,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Center
+                    },
                     Header = cor.Nome
                 };
                 string hex = cor.Hex;
@@ -101,71 +142,69 @@ namespace AvaloniaMdiApp
                     DefinirCor(hex);
                     OnColorChanged?.Invoke(this);
                 };
-                colorFlyout.Items.Add(item);
+                menuCores.Items.Add(item);
             }
 
-            _btnColor = new Button
+            var menuRemover = new MenuItem
             {
-                Content = AppIcons.Create(AppIcons.Palette, 10.5, ThemePalette.IconLightGray),
-                Padding = new Thickness(4, 1),
-                MinWidth = 22,
-                MinHeight = 20,
-                Height = 20,
-                CornerRadius = new CornerRadius(10, 0, 0, 10),
+                Icon = AppIcons.Create(AppIcons.Trash, 11, ThemePalette.IconLightGray),
+                Header = "Remover Ligação"
+            };
+            menuRemover.Click += (s, e) => OnRemoveRequested?.Invoke(this);
+
+            _configFlyout.Items.Add(menuCores);
+            _configFlyout.Items.Add(new Separator());
+            _configFlyout.Items.Add(menuRemover);
+
+            _btnConfig = new Button
+            {
+                Content = string.IsNullOrWhiteSpace(Label)
+                    ? (object)AppIcons.Create(AppIcons.Settings, 11, ThemePalette.IconLightGray)
+                    : AppIcons.WithText(AppIcons.Settings, Label, 10.5, 4, ThemePalette.IconLightGray),
+                Padding = new Thickness(5, 2),
+                MinWidth = 24,
+                MinHeight = 22,
+                Height = 22,
+                CornerRadius = new CornerRadius(11),
                 BorderThickness = new Thickness(0),
                 Background = Brushes.Transparent,
                 HorizontalContentAlignment = HorizontalAlignment.Center,
                 VerticalContentAlignment = VerticalAlignment.Center,
                 Cursor = new Cursor(StandardCursorType.Hand),
-                Flyout = colorFlyout
+                Flyout = _configFlyout
             };
-            ToolTip.SetTip(_btnColor, "Alterar cor desta linha do fluxograma");
-
-            _btnRemove = new Button
-            {
-                Content = string.IsNullOrWhiteSpace(Label) ? "✕" : $"{Label} ✕",
-                Padding = new Thickness(5, 1),
-                MinWidth = 22,
-                MinHeight = 20,
-                Height = 20,
-                CornerRadius = new CornerRadius(0, 10, 10, 0),
-                BorderThickness = new Thickness(0),
-                Background = Brushes.Transparent,
-                FontSize = 9.5,
-                FontWeight = FontWeight.Bold,
-                HorizontalContentAlignment = HorizontalAlignment.Center,
-                VerticalContentAlignment = VerticalAlignment.Center,
-                Cursor = new Cursor(StandardCursorType.Hand)
-            };
-            ToolTip.SetTip(_btnRemove, $"Desconectar \"{FromWindow.WindowTitle}\" → \"{ToWindow.WindowTitle}\"");
-            _btnRemove.Click += (s, e) => OnRemoveRequested?.Invoke(this);
-
-            var badgeStack = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Spacing = 0
-            };
-            badgeStack.Children.Add(_btnColor);
-            badgeStack.Children.Add(_btnRemove);
+            ToolTip.SetTip(_btnConfig, $"Configurar ligação \"{FromWindow.WindowTitle}\" → \"{ToWindow.WindowTitle}\"");
 
             MidpointBadge = new Border
             {
-                CornerRadius = new CornerRadius(10),
+                CornerRadius = new CornerRadius(11),
                 BorderThickness = new Thickness(1.5),
-                Child = badgeStack,
+                Child = _btnConfig,
+                IsVisible = !string.IsNullOrWhiteSpace(Label),
                 ZIndex = 1
             };
 
-            _workspace.Children.Insert(0, CurvePath);
-            _workspace.Children.Insert(1, ArrowPath);
-            _workspace.Children.Insert(2, OriginDot);
-            _workspace.Children.Insert(3, MidpointBadge);
+            _hitPath.PointerEntered += (s, e) => { _isHoveringLine = true; AtualizarVisibilidadeBadge(); };
+            _hitPath.PointerExited += (s, e) => { _isHoveringLine = false; AtualizarVisibilidadeBadge(); };
+            MidpointBadge.PointerEntered += (s, e) => { _isHoveringBadge = true; AtualizarVisibilidadeBadge(); };
+            MidpointBadge.PointerExited += (s, e) => { _isHoveringBadge = false; AtualizarVisibilidadeBadge(); };
+
+            _workspace.Children.Insert(0, _hitPath);
+            _workspace.Children.Insert(1, CurvePath);
+            _workspace.Children.Insert(2, ArrowPath);
+            _workspace.Children.Insert(3, OriginDot);
+            _workspace.Children.Insert(4, MidpointBadge);
 
             FromWindow.OnBoundsChanged += OnEndpointChanged;
             ToWindow.OnBoundsChanged += OnEndpointChanged;
 
             AplicarTema(isDarkMode);
             AtualizarGeometria();
+        }
+
+        private void AtualizarVisibilidadeBadge()
+        {
+            MidpointBadge.IsVisible = _isHoveringLine || _isHoveringBadge || _isMenuOpen || !string.IsNullOrWhiteSpace(Label);
         }
 
         private void OnEndpointChanged(DraggableWindow _)
@@ -204,8 +243,7 @@ namespace AvaloniaMdiApp
 
             MidpointBadge.Background = badgeBg;
             MidpointBadge.BorderBrush = lineBrush;
-            _btnColor.Foreground = textPrimary;
-            _btnRemove.Foreground = textPrimary;
+            _btnConfig.Foreground = textPrimary;
         }
 
         public void AtualizarGeometria()
@@ -228,6 +266,7 @@ namespace AvaloniaMdiApp
                 ctx.CubicBezierTo(c1, c2, p2);
             }
             CurvePath.Data = curveGeo;
+            _hitPath.Data = curveGeo;
 
             Canvas.SetLeft(OriginDot, p1.X - 4.5);
             Canvas.SetTop(OriginDot, p1.Y - 4.5);
@@ -259,7 +298,7 @@ namespace AvaloniaMdiApp
             double midX = 0.125 * p1.X + 0.375 * c1.X + 0.375 * c2.X + 0.125 * p2.X;
             double midY = 0.125 * p1.Y + 0.375 * c1.Y + 0.375 * c2.Y + 0.125 * p2.Y;
 
-            Canvas.SetLeft(MidpointBadge, midX - 22);
+            Canvas.SetLeft(MidpointBadge, midX - 12);
             Canvas.SetTop(MidpointBadge, midY - 11);
         }
 
@@ -322,6 +361,7 @@ namespace AvaloniaMdiApp
             FromWindow.OnBoundsChanged -= OnEndpointChanged;
             ToWindow.OnBoundsChanged -= OnEndpointChanged;
 
+            _workspace.Children.Remove(_hitPath);
             _workspace.Children.Remove(CurvePath);
             _workspace.Children.Remove(ArrowPath);
             _workspace.Children.Remove(OriginDot);

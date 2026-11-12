@@ -58,6 +58,9 @@ namespace AvaloniaMdiApp
         public static readonly StreamGeometry ShapeDiamond = StreamGeometry.Parse("M 8 1.5 L 14.5 8 L 8 14.5 L 1.5 8 Z M 8 3.6 L 3.6 8 L 8 12.4 L 12.4 8 Z");
         public static readonly StreamGeometry ShapeCircle = StreamGeometry.Parse("M 8 1.8 A 6.2 6.2 0 1 0 8 14.2 A 6.2 6.2 0 1 0 8 1.8 Z M 8 3.4 A 4.6 4.6 0 1 1 8 12.6 A 4.6 4.6 0 1 1 8 3.4 Z");
         public static readonly StreamGeometry Warning = StreamGeometry.Parse("M 8 2 L 14.5 13.5 L 1.5 13.5 Z M 7.3 6.2 L 8.7 6.2 L 8.7 9.8 L 7.3 9.8 Z M 7.3 11 L 8.7 11 L 8.7 12.3 L 7.3 12.3 Z");
+        public static readonly StreamGeometry Video = StreamGeometry.Parse("M 1.5 3.5 L 10.5 3.5 L 10.5 12.5 L 1.5 12.5 Z M 11.2 6 L 14.5 4 L 14.5 12 L 11.2 10 Z");
+        public static readonly StreamGeometry Upload = StreamGeometry.Parse("M 8 2 L 12.5 6.5 L 11.4 7.6 L 8.8 5 L 8.8 11.5 L 7.2 11.5 L 7.2 5 L 4.6 7.6 L 3.5 6.5 Z M 2.5 12.5 L 13.5 12.5 L 13.5 14 L 2.5 14 Z");
+        public static readonly StreamGeometry PdfFile = StreamGeometry.Parse("M 3 1.5 L 10.5 1.5 L 13.5 4.5 L 13.5 14.5 L 3 14.5 Z M 4.8 7 L 11.2 7 L 11.2 8.4 L 4.8 8.4 Z M 4.8 9.8 L 11.2 9.8 L 11.2 11.2 L 4.8 11.2 Z");
 
         public static PathIcon Create(StreamGeometry geometry, double size = 12, IBrush? foreground = null)
         {
@@ -97,6 +100,7 @@ namespace AvaloniaMdiApp
             "browser" => Globe,
             "gallery" => Image,
             "image" => Image,
+            "video" => Video,
             "shape_rect" => ShapeRect,
             "shape_diamond" => ShapeDiamond,
             "shape_circle" => ShapeCircle,
