@@ -14,6 +14,7 @@ namespace AvaloniaMdiApp
         private Button? _btnBrowserReload;
         private Button? _btnBrowserHome;
         private Button? _btnBrowserGo;
+        private Button? _btnBrowserExternal;
         private TextBox? _txtBrowserUrl;
         private ChromiumWebViewHost? _browserHost;
 
@@ -35,6 +36,7 @@ namespace AvaloniaMdiApp
             var navGrid = new Grid();
             navGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
             navGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+            navGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
             navGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
 
             var leftBtns = new StackPanel
@@ -72,7 +74,7 @@ namespace AvaloniaMdiApp
                 Content = "Ir",
                 Height = 26,
                 Padding = new Thickness(10, 0),
-                Margin = new Thickness(6, 0, 0, 0),
+                Margin = new Thickness(6, 0, 4, 0),
                 CornerRadius = new CornerRadius(5),
                 Background = ThemePalette.Accent,
                 Foreground = Brushes.White,
@@ -81,6 +83,8 @@ namespace AvaloniaMdiApp
                 VerticalAlignment = VerticalAlignment.Center,
                 VerticalContentAlignment = VerticalAlignment.Center
             };
+
+            _btnBrowserExternal = CriarBotaoFormatacao("↗", "Abrir página no navegador externo do sistema", FontWeight.Bold, FontStyle.Normal, width: 26);
 
             _browserHost = new ChromiumWebViewHost(urlInicial)
             {
@@ -93,6 +97,7 @@ namespace AvaloniaMdiApp
             _btnBrowserReload.Click += (s, e) => _browserHost.Reload();
             _btnBrowserHome.Click += (s, e) => _browserHost.Navigate("https://www.google.com");
             _btnBrowserGo.Click += (s, e) => _browserHost.Navigate(_txtBrowserUrl.Text ?? string.Empty);
+            _btnBrowserExternal.Click += (s, e) => _browserHost.AbrirNoNavegadorDoSistema();
 
             _txtBrowserUrl.KeyDown += (s, e) =>
             {
@@ -114,9 +119,11 @@ namespace AvaloniaMdiApp
             Grid.SetColumn(leftBtns, 0);
             Grid.SetColumn(_txtBrowserUrl, 1);
             Grid.SetColumn(_btnBrowserGo, 2);
+            Grid.SetColumn(_btnBrowserExternal, 3);
             navGrid.Children.Add(leftBtns);
             navGrid.Children.Add(_txtBrowserUrl);
             navGrid.Children.Add(_btnBrowserGo);
+            navGrid.Children.Add(_btnBrowserExternal);
 
             _browserToolbar.Child = navGrid;
             DockPanel.SetDock(_browserToolbar, Dock.Top);
@@ -140,7 +147,7 @@ namespace AvaloniaMdiApp
             _browserToolbar.Background = barBg;
             _browserToolbar.BorderBrush = borderBrush;
 
-            foreach (var btn in new[] { _btnBrowserBack, _btnBrowserForward, _btnBrowserReload, _btnBrowserHome })
+            foreach (var btn in new[] { _btnBrowserBack, _btnBrowserForward, _btnBrowserReload, _btnBrowserHome, _btnBrowserExternal })
             {
                 if (btn != null)
                 {

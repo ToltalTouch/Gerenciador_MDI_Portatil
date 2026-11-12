@@ -3,79 +3,254 @@
         xmlns:local="using:AvaloniaMdiApp"
         x:Class="AvaloniaMdiApp.MainWindow"
         Title="Gerenciador MDI Portátil"
+        Icon="avares://AvaloniaMdiApp/Assets/app-icon.png"
         Width="1024" Height="680"
         MinWidth="640" MinHeight="420"
         WindowStartupLocation="CenterScreen">
   
-  <DockPanel Name="RootDock" Background="#0F172A">
-    <Border Name="TopBar" DockPanel.Dock="Top" Height="54" Background="#1E293B" BorderBrush="#334155" BorderThickness="0,0,0,1">
-      <Grid Margin="16,0">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="Auto"/>
-          <ColumnDefinition Width="*"/>
-          <ColumnDefinition Width="Auto"/>
-        </Grid.ColumnDefinitions>
+  <LayoutTransformControl Name="RootScaleHost">
+    <Grid>
+      <DockPanel Name="RootDock" Background="#0F172A">
+        <Border Name="TopBar" DockPanel.Dock="Top" Height="42" Background="#18181B" BorderBrush="#27272A" BorderThickness="0,0,0,1">
+          <Grid Margin="12,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-          <Border Width="10" Height="22" CornerRadius="3" Background="#2563EB" VerticalAlignment="Center"/>
-          <TextBlock Name="AppTitleText" Text="MDI Workspace" FontWeight="Bold" FontSize="15" Foreground="#F8FAFC" VerticalAlignment="Center"/>
-          <Border Name="TitleDivider" Width="1" Height="20" Background="#334155" Margin="4,0" VerticalAlignment="Center"/>
-          <Button Name="BtnWidgets"
-                  Content="🧩 Widgets ▾"
-                  Background="#334155"
-                  Foreground="#F8FAFC"
-                  FontWeight="SemiBold"
-                  FontSize="12.5"
-                  Padding="12,7"
-                  CornerRadius="6"
-                  VerticalAlignment="Center">
-            <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedLeft" Opening="MenuWidgets_Opening">
-                <MenuItem Header="📝 Novo Bloco de Notas" Click="AbrirBlocoDeNotas_Click"/>
-                <MenuItem Header="☑ Nova Lista de Marcação" Click="AbrirChecklist_Click"/>
-                <MenuItem Header="🌐 Novo Navegador Web" Click="AbrirNavegador_Click"/>
-                <Separator/>
-                <MenuItem Header="💾 Salvar Janela Ativa" Click="SalvarJanelaAtiva_Click"/>
-                <MenuItem Header="💾 Salvar Todas as Janelas" Click="SalvarTodasJanelas_Click"/>
-                <Separator/>
-                <MenuItem Name="MenuMaisUsadas" Header="⭐ Mais Usadas"/>
-                <MenuItem Name="MenuJanelasSalvas" Header="📂 Janelas Salvas"/>
-              </MenuFlyout>
-            </Button.Flyout>
-          </Button>
-        </StackPanel>
+            <!-- Barra de Menu Tradicional por Módulo -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <Image Source="avares://AvaloniaMdiApp/Assets/app-icon.png" Width="24" Height="24" VerticalAlignment="Center" Margin="0,0,4,0"/>
+              <Menu Name="MainMenu" Background="Transparent" VerticalAlignment="Center">
+                <MenuItem Name="MenuTopWorkspaces" Header="Workspaces" SubmenuOpened="MenuWorkspaces_SubmenuOpened">
+                  <MenuItem Header="➕ Novo Workspace..." Click="NovoWorkspace_Click"/>
+                  <MenuItem Header="✏ Renomear Workspace Atual..." Click="RenomearWorkspaceAtual_Click"/>
+                  <MenuItem Name="MenuExcluirWorkspace" Header="🗑 Excluir Workspace Atual" Click="ExcluirWorkspaceAtual_Click"/>
+                  <Separator/>
+                  <MenuItem Name="MenuListaWorkspaces" Header="🗂 Alternar Workspace"/>
+                  <Separator/>
+                  <MenuItem Header="💾 Salvar Estado do Workspace" Click="SalvarTodasJanelas_Click"/>
+                </MenuItem>
 
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <Button Name="BtnCascata"
-                  Content="❐ Cascata"
-                  Background="#334155"
-                  Foreground="#F8FAFC"
-                  FontSize="12.5"
-                  Padding="12,7"
-                  CornerRadius="6"
-                  Click="OrganizarCascata_Click"/>
-          <Button Name="BtnLadoALado"
-                  Content="⊞ Grade"
-                  Background="#334155"
-                  Foreground="#F8FAFC"
-                  FontSize="12.5"
-                  Padding="12,7"
-                  CornerRadius="6"
-                  Click="OrganizarGrade_Click"/>
-          <Button Name="BtnConfiguracoes"
-                  Content="⚙ Preferências"
-                  Background="#334155"
-                  Foreground="#F8FAFC"
-                  FontSize="12.5"
-                  Padding="12,7"
-                  CornerRadius="6"
-                  Click="AbrirConfiguracoes_Click"/>
-        </StackPanel>
-      </Grid>
-    </Border>
+                <MenuItem Name="MenuTopNotas" Header="Bloco de Notas" SubmenuOpened="MenuModulo_SubmenuOpened">
+                  <MenuItem Header="📝 Novo Bloco de Notas" Click="AbrirBlocoDeNotas_Click"/>
+                  <MenuItem Header="💾 Salvar Nota Ativa" Click="SalvarJanelaAtiva_Click"/>
+                  <Separator/>
+                  <MenuItem Name="MenuNotasMaisUsadas" Header="⭐ Mais Usadas"/>
+                  <MenuItem Name="MenuNotasSalvas" Header="📂 Notas Salvas"/>
+                </MenuItem>
 
-    <local:TaskBar x:Name="AppTaskBar" DockPanel.Dock="Bottom"/>
+                <MenuItem Name="MenuTopListas" Header="Lista de Marcação" SubmenuOpened="MenuModulo_SubmenuOpened">
+                  <MenuItem Header="☑ Nova Lista de Marcação" Click="AbrirChecklist_Click"/>
+                  <MenuItem Header="💾 Salvar Lista Ativa" Click="SalvarJanelaAtiva_Click"/>
+                  <Separator/>
+                  <MenuItem Name="MenuListasMaisUsadas" Header="⭐ Mais Usadas"/>
+                  <MenuItem Name="MenuListasSalvas" Header="📂 Listas Salvas"/>
+                </MenuItem>
 
-    <Canvas Name="Workspace" Background="#0F172A" ClipToBounds="True"/>
-  </DockPanel>
+                <MenuItem Name="MenuTopPlanilhas" Header="Planilhas" SubmenuOpened="MenuModulo_SubmenuOpened">
+                  <MenuItem Header="📊 Nova Planilha em Branco" Click="AbrirPlanilha_Click"/>
+                  <MenuItem Header="📈 Nova Planilha com Exemplo (Fórmulas)" Click="AbrirPlanilhaExemplo_Click"/>
+                  <MenuItem Header="💾 Salvar Planilha Ativa" Click="SalvarJanelaAtiva_Click"/>
+                  <Separator/>
+                  <MenuItem Name="MenuPlanilhasMaisUsadas" Header="⭐ Mais Usadas"/>
+                  <MenuItem Name="MenuPlanilhasSalvas" Header="📂 Planilhas Salvas"/>
+                </MenuItem>
+
+                <MenuItem Name="MenuTopGaleria" Header="Galeria" SubmenuOpened="MenuModulo_SubmenuOpened">
+                  <MenuItem Header="🖼 Nova Galeria de Imagens" Click="AbrirGaleria_Click"/>
+                  <MenuItem Header="🌄 Abrir Imagem em Janela..." Click="AbrirImagemAvulsa_Click"/>
+                  <MenuItem Header="🧹 Restaurar Fundo do Workspace" Click="RestaurarFundoWorkspace_Click"/>
+                  <Separator/>
+                  <MenuItem Name="MenuGaleriaMaisUsadas" Header="⭐ Mais Usadas"/>
+                  <MenuItem Name="MenuGaleriaSalvas" Header="📂 Galerias e Imagens Salvas"/>
+                </MenuItem>
+
+                <MenuItem Name="MenuTopNavegador" Header="Navegador" SubmenuOpened="MenuModulo_SubmenuOpened">
+                  <MenuItem Header="🌐 Novo Navegador Web" Click="AbrirNavegador_Click"/>
+                  <Separator/>
+                  <MenuItem Header="🔍 Abrir Google" Click="AbrirNavegadorGoogle_Click"/>
+                  <MenuItem Header="▶ Abrir YouTube" Click="AbrirNavegadorYouTube_Click"/>
+                  <MenuItem Header="💻 Abrir GitHub" Click="AbrirNavegadorGitHub_Click"/>
+                  <MenuItem Header="📚 Abrir Wikipédia" Click="AbrirNavegadorWikipedia_Click"/>
+                  <Separator/>
+                  <MenuItem Name="MenuNavegadorMaisUsadas" Header="⭐ Mais Usados"/>
+                  <MenuItem Name="MenuNavegadorSalvos" Header="📂 Navegadores Salvos"/>
+                </MenuItem>
+
+                <MenuItem Name="MenuTopFluxograma" Header="Fluxograma" SubmenuOpened="MenuFluxograma_SubmenuOpened">
+                  <MenuItem Header="🔗 Conectar Janelas (Modo Ligação)" Click="AlternarModoConexao_Click"/>
+                  <MenuItem Name="MenuCorLinhasFluxograma" Header="🎨 Cor das Linhas do Fluxograma"/>
+                  <MenuItem Header="🗑 Remover Todas as Ligações" Click="LimparConexoesWorkspace_Click"/>
+                  <Separator/>
+                  <MenuItem Header="➕ Zoom In no Workspace (Ctrl + Scroll)" Click="WorkspaceZoomIn_Click"/>
+                  <MenuItem Header="➖ Zoom Out no Workspace (Ctrl + Scroll)" Click="WorkspaceZoomOut_Click"/>
+                  <MenuItem Header="🎯 Redefinir Zoom (100%)" Click="WorkspaceZoomReset_Click"/>
+                </MenuItem>
+
+                <MenuItem Name="MenuTopJanelas" Header="Janelas" SubmenuOpened="MenuModulo_SubmenuOpened">
+                  <MenuItem Header="❐ Organizar em Cascata" Click="OrganizarCascata_Click"/>
+                  <MenuItem Header="⊞ Organizar em Grade" Click="OrganizarGrade_Click"/>
+                  <MenuItem Name="MenuCorJanelaAtiva" Header="🎨 Cor da Janela Ativa"/>
+                  <Separator/>
+                  <MenuItem Header="💾 Salvar Janela Ativa" Click="SalvarJanelaAtiva_Click"/>
+                  <MenuItem Header="💾 Salvar Todas as Janelas" Click="SalvarTodasJanelas_Click"/>
+                  <Separator/>
+                  <MenuItem Name="MenuMaisUsadas" Header="⭐ Todas as Mais Usadas"/>
+                  <MenuItem Name="MenuJanelasSalvas" Header="📂 Todas as Janelas Salvas"/>
+                  <Separator/>
+                  <MenuItem Header="✕ Fechar Todas as Janelas" Click="FecharTodasJanelas_Click"/>
+                </MenuItem>
+
+                <MenuItem Name="MenuTopPreferencias" Header="Preferências">
+                  <MenuItem Header="⚙ Configurar Preferências e Layout..." Click="AbrirConfiguracoes_Click"/>
+                  <MenuItem Header="🌗 Alternar Tema (Claro / Escuro)" Click="AlternarTemaRapido_Click"/>
+                  <Separator/>
+                  <MenuItem Header="📌 Criar Atalho com Ícone na Área de Trabalho" Click="CriarAtalhoAreaDeTrabalho_Click"/>
+                </MenuItem>
+              </Menu>
+            </StackPanel>
+
+            <!-- Abas rápidas de Workspaces à direita -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" MaxWidth="360">
+                <StackPanel Name="WorkspaceTabsPanel" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center"/>
+              </ScrollViewer>
+              <Button Name="BtnAddWorkspace"
+                      Content="+"
+                      Width="26"
+                      Height="26"
+                      Padding="0"
+                      CornerRadius="5"
+                      FontSize="14"
+                      FontWeight="Bold"
+                      HorizontalContentAlignment="Center"
+                      VerticalContentAlignment="Center"
+                      ToolTip.Tip="Criar novo Workspace"
+                      Click="NovoWorkspace_Click"/>
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <local:TaskBar x:Name="AppTaskBar" DockPanel.Dock="Bottom"/>
+
+        <!-- Área Principal do Workspace com Suporte a Zoom Out/In e Fluxograma -->
+        <Grid Name="WorkspaceViewport" ClipToBounds="True">
+          <ScrollViewer Name="WorkspaceScroller"
+                        HorizontalScrollBarVisibility="Auto"
+                        VerticalScrollBarVisibility="Auto">
+            <LayoutTransformControl Name="WorkspaceZoomHost"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Top">
+              <Canvas Name="Workspace" Background="#0F172A" ClipToBounds="True"/>
+            </LayoutTransformControl>
+          </ScrollViewer>
+
+          <!-- Barra Flutuante (HUD) de Fluxograma e Zoom do Workspace -->
+          <Border Name="WorkspaceHud"
+                  HorizontalAlignment="Right"
+                  VerticalAlignment="Bottom"
+                  Margin="0,0,18,16"
+                  Padding="6,5"
+                  CornerRadius="8"
+                  BorderThickness="1"
+                  Background="#E61E293B"
+                  BorderBrush="#334155"
+                  ZIndex="500">
+            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+              <Button Name="BtnHudConnect"
+                      Content="🔗 Conectar"
+                      Height="26"
+                      Padding="10,0"
+                      CornerRadius="5"
+                      BorderThickness="1"
+                      FontSize="11.5"
+                      FontWeight="SemiBold"
+                      VerticalContentAlignment="Center"
+                      ToolTip.Tip="Ligar duas janelas com uma linha de fluxograma (ou clique no ícone 🔗 no topo de uma janela)"
+                      Click="AlternarModoConexao_Click"/>
+              <Border Name="HudDivider" Width="1" Height="18" Background="#334155" Margin="3,0"/>
+              <Button Name="BtnHudZoomOut"
+                      Content="➖"
+                      Width="26"
+                      Height="26"
+                      Padding="0"
+                      CornerRadius="5"
+                      BorderThickness="1"
+                      FontSize="11"
+                      FontWeight="Bold"
+                      HorizontalContentAlignment="Center"
+                      VerticalContentAlignment="Center"
+                      ToolTip.Tip="Diminuir Zoom do Workspace (Zoom Out para caber mais janelas)"
+                      Click="WorkspaceZoomOut_Click"/>
+              <Button Name="BtnHudZoomReset"
+                      Content="100%"
+                      MinWidth="52"
+                      Height="26"
+                      Padding="6,0"
+                      CornerRadius="5"
+                      BorderThickness="1"
+                      FontSize="11.5"
+                      FontWeight="SemiBold"
+                      HorizontalContentAlignment="Center"
+                      VerticalContentAlignment="Center"
+                      ToolTip.Tip="Clique para redefinir o zoom do Workspace para 100%"
+                      Click="WorkspaceZoomReset_Click"/>
+              <Button Name="BtnHudZoomIn"
+                      Content="➕"
+                      Width="26"
+                      Height="26"
+                      Padding="0"
+                      CornerRadius="5"
+                      BorderThickness="1"
+                      FontSize="11"
+                      FontWeight="Bold"
+                      HorizontalContentAlignment="Center"
+                      VerticalContentAlignment="Center"
+                      ToolTip.Tip="Aumentar Zoom do Workspace (Zoom In)"
+                      Click="WorkspaceZoomIn_Click"/>
+            </StackPanel>
+          </Border>
+        </Grid>
+      </DockPanel>
+
+      <!-- Overlay Modal (Confirmação de Saída e Criação/Renomeação de Workspace) -->
+      <Border Name="ModalOverlay" IsVisible="False" Background="#AA090D16" ZIndex="9999">
+        <Border Name="ModalCard"
+                Width="430"
+                Padding="22"
+                CornerRadius="10"
+                BorderThickness="1"
+                Background="#1E293B"
+                BorderBrush="#3B82F6"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center">
+          <StackPanel Spacing="14">
+            <TextBlock Name="ModalTitle"
+                       Text="Confirmar ação"
+                       FontSize="15"
+                       FontWeight="Bold"
+                       Foreground="#F8FAFC"/>
+            <TextBlock Name="ModalMessage"
+                       Text=""
+                       FontSize="13"
+                       TextWrapping="Wrap"
+                       LineHeight="19"
+                       Foreground="#CBD5E1"/>
+            <TextBox Name="ModalInputBox"
+                     IsVisible="False"
+                     Padding="10,7"
+                     CornerRadius="6"
+                     FontSize="13"/>
+            <StackPanel Name="ModalButtonsPanel"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Spacing="8"
+                        Margin="0,6,0,0"/>
+          </StackPanel>
+        </Border>
+      </Border>
+    </Grid>
+  </LayoutTransformControl>
 </Window>

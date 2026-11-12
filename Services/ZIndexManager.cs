@@ -14,11 +14,29 @@ namespace AvaloniaMdiApp
             _maxZIndex++;
             window.SetValue(Panel.ZIndexProperty, _maxZIndex);
 
-            if (window is DraggableWindow dw && _activeWindow != dw)
+            if (window is DraggableWindow dw)
             {
-                _activeWindow?.SetActive(false);
-                _activeWindow = dw;
-                _activeWindow.SetActive(true);
+                if (_activeWindow != dw)
+                {
+                    var previous = _activeWindow;
+                    _activeWindow = dw;
+                    previous?.SetActive(false);
+                    _activeWindow.SetActive(true);
+                }
+                else
+                {
+                    _activeWindow.SetActive(true);
+                }
+            }
+        }
+
+        public static void ClearActive(DraggableWindow? window = null)
+        {
+            if (window == null || _activeWindow == window)
+            {
+                var previous = _activeWindow;
+                _activeWindow = null;
+                previous?.SetActive(false);
             }
         }
     }

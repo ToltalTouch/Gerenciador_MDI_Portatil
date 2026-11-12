@@ -165,26 +165,45 @@ namespace AvaloniaMdiApp
             if (!_windowButtons.TryGetValue(window, out var btn)) return;
 
             bool isMinimized = window.IsMinimized;
-            btn.Opacity = isMinimized ? 0.65 : 1.0;
+            bool isHibernated = window.WindowType == "spreadsheet" && window.IsSheetHibernated;
+            btn.Opacity = (isMinimized || isHibernated) ? 0.70 : 1.0;
+
+            if (_windowLabels.TryGetValue(window, out var lbl))
+            {
+                lbl.Text = isHibernated ? $"💤 {window.WindowTitle}" : window.WindowTitle;
+            }
 
             if (_isDarkMode)
             {
-                btn.Background = isMinimized ? ThemePalette.DarkWorkspaceBg : ThemePalette.DarkButtonBg;
+                btn.Background = (isMinimized || isHibernated) ? ThemePalette.DarkWorkspaceBg : ThemePalette.DarkButtonBg;
                 btn.BorderBrush = ThemePalette.DarkBorder;
                 btn.Foreground = ThemePalette.DarkTextPrimary;
             }
             else
             {
-                btn.Background = isMinimized ? ThemePalette.LightWorkspaceBg : ThemePalette.LightButtonBg;
+                btn.Background = (isMinimized || isHibernated) ? ThemePalette.LightWorkspaceBg : ThemePalette.LightButtonBg;
                 btn.BorderBrush = ThemePalette.LightBorder;
                 btn.Foreground = ThemePalette.LightTextPrimary;
             }
+            AtualizarContador();
         }
 
         private void AtualizarContador()
         {
             int count = _windowButtons.Count;
-            _lblStatus.Text = count == 1 ? "1 janela ativa" : $"{count} janelas ativas";
+            int hibernated = 0;
+            foreach (var win in _windowButtons.Keys)
+            {
+                if (win.IsMinimized || (win.WindowType == "spreadsheet" && win.IsSheetHibernated))
+                {
+                    hibernated++;
+                }
+            }
+
+            string baseText = count == 1 ? "1 janela" : $"{count} janelas";
+            _lblStatus.Text = hibernated > 0
+                ? $"{baseText} ({hibernated} 💤 hibernada(s))"
+                : baseText;
         }
     }
 }

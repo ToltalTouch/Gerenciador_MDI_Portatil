@@ -15,10 +15,14 @@ namespace AvaloniaMdiApp
         public event Action? OnClosed;
         public event Action<DraggableWindow, ChecklistRowState>? OnRequestOpenRowNotepad;
         public event Action<DraggableWindow>? OnSaveRequested;
+        public event Action<DraggableWindow>? OnBoundsChanged;
+        public event Action<DraggableWindow>? OnConnectRequested;
+        public event Action<DraggableWindow>? OnWindowClicked;
 
         public string WindowId { get; }
         public string WindowTitle { get; private set; }
         public string WindowType { get; }
+        public string CustomColor { get; private set; } = string.Empty;
         public int AccessCount { get; set; }
         public bool IsMinimized => _isMinimized;
         public bool IsMaximized => _isMaximized;
@@ -69,6 +73,8 @@ namespace AvaloniaMdiApp
         private readonly List<ChecklistRowState> _checklistRows = new();
         private readonly Border _contentCard;
         private readonly Panel _contentPanel;
+        private readonly TextBlock _btnColorText;
+        private readonly TextBlock _btnConnectText;
         private readonly TextBlock _btnSaveText;
         private readonly TextBlock _btnMinText;
         private readonly TextBlock _btnMaxText;
@@ -76,6 +82,19 @@ namespace AvaloniaMdiApp
         private readonly TaskBar _taskBar;
 
         public Canvas Workspace { get; }
+
+        public static readonly (string Hex, string Nome)[] PaletaCoresJanela =
+        {
+            ("", "🔵 Padrão do Tema"),
+            ("#2563EB", "🔵 Azul Real"),
+            ("#7C3AED", "🟣 Roxo / Violeta"),
+            ("#059669", "🟢 Verde Esmeralda"),
+            ("#D97706", "🟠 Âmbar / Laranja"),
+            ("#DC2626", "🔴 Vermelho Rubi"),
+            ("#DB2777", "🩷 Rosa / Magenta"),
+            ("#0891B2", "🩵 Ciano / Turquesa"),
+            ("#475569", "⚫ Grafite / Neutro")
+        };
 
         public DraggableWindow(
             Canvas workspace,
@@ -93,13 +112,20 @@ namespace AvaloniaMdiApp
             int accessCount = 1,
             DraggableWindow? parentChecklistWindow = null,
             Action<string, string, TextFormatData>? onLinkedRowSave = null,
-            TextFormatData? initialFormat = null)
+            TextFormatData? initialFormat = null,
+            List<GalleryItemData>? initialGallery = null,
+            string customColor = "",
+            int spreadsheetRows = 12,
+            int spreadsheetCols = 6,
+            List<SpreadsheetCellData>? initialSpreadsheetCells = null,
+            List<ConditionalFormatRuleData>? initialConditionalRules = null)
         {
             Workspace = workspace;
             _taskBar = taskBar;
             WindowId = string.IsNullOrWhiteSpace(windowId) ? Guid.NewGuid().ToString("N") : windowId;
             WindowTitle = title;
             WindowType = string.IsNullOrWhiteSpace(windowType) ? "default" : windowType;
+            CustomColor = customColor ?? string.Empty;
             AccessCount = Math.Max(1, accessCount);
             ParentChecklistWindow = parentChecklistWindow;
             _onLinkedRowSave = onLinkedRowSave;
@@ -237,6 +263,21 @@ namespace AvaloniaMdiApp
             };
             Grid.SetColumn(btnPanel, 2);
 
+            var btnColor = CreateControlButton("🎨", out _btnColorText, (s, e) => { });
+            ToolTip.SetTip(btnColor, "Mudar cor desta janela");
+            var colorFlyout = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedRight };
+            foreach (var cor in PaletaCoresJanela)
+            {
+                var item = new MenuItem { Header = cor.Nome };
+                string hex = cor.Hex;
+                item.Click += (s, e) => DefinirCorJanela(hex);
+                colorFlyout.Items.Add(item);
+            }
+            btnColor.Flyout = colorFlyout;
+
+            var btnConnect = CreateControlButton("🔗", out _btnConnectText, (s, e) => OnConnectRequested?.Invoke(this));
+            ToolTip.SetTip(btnConnect, "Conectar esta janela a outra (Fluxograma)");
+
             var btnSave = CreateControlButton("💾", out _btnSaveText, (s, e) => SalvarJanela());
             ToolTip.SetTip(btnSave, _onLinkedRowSave != null ? "Salvar nota vinculada à linha da lista (Ctrl+S)" : "Salvar janela (Ctrl+S)");
 
@@ -244,6 +285,8 @@ namespace AvaloniaMdiApp
             var btnMax = CreateControlButton("▢", out _btnMaxText, (s, e) => ToggleMaximize());
             var btnClose = CreateControlButton("✕", out _btnCloseText, (s, e) => Fechar());
 
+            btnPanel.Children.Add(btnColor);
+            btnPanel.Children.Add(btnConnect);
             btnPanel.Children.Add(btnSave);
             btnPanel.Children.Add(btnMin);
             btnPanel.Children.Add(btnMax);
@@ -357,6 +400,22 @@ namespace AvaloniaMdiApp
             else if (WindowType == "browser")
             {
                 _contentCard.Child = CriarConteudoNavegador(initialNote);
+            }
+            else if (WindowType == "gallery")
+            {
+                _contentCard.Child = CriarConteudoGaleria(initialGallery);
+            }
+            else if (WindowType == "image")
+            {
+                _contentCard.Child = CriarConteudoImagem(initialNote);
+            }
+            else if (WindowType == "spreadsheet")
+            {
+                _contentCard.Child = CriarConteudoPlanilha(
+                    spreadsheetRows,
+                    spreadsheetCols,
+                    initialSpreadsheetCells,
+                    initialConditionalRules);
             }
             else
             {
@@ -487,14 +546,19 @@ namespace AvaloniaMdiApp
                 Id = WindowId,
                 Title = WindowTitle,
                 WindowType = WindowType,
+                CustomColor = CustomColor,
                 X = bounds.X,
                 Y = bounds.Y,
                 Width = bounds.Width,
                 Height = bounds.Height,
                 NoteContent = WindowType == "browser"
                     ? (_browserHost?.CurrentUrl ?? _txtBrowserUrl?.Text ?? "https://www.google.com")
-                    : (_noteTextBox?.Text ?? string.Empty),
+                    : WindowType == "image"
+                        ? _singleImagePath
+                        : (_noteTextBox?.Text ?? string.Empty),
                 TextFormat = ExportTextFormat(),
+                SpreadsheetRows = _sheetRows,
+                SpreadsheetCols = _sheetCols,
                 AccessCount = AccessCount,
                 LastUsedUtc = DateTime.UtcNow
             };
@@ -516,6 +580,37 @@ namespace AvaloniaMdiApp
                         LinkedNoteContent = row.LinkedNoteContent,
                         LinkedNoteFormat = row.LinkedNoteFormat
                     });
+                }
+            }
+            else if (WindowType == "gallery")
+            {
+                foreach (var card in _galleryCards)
+                {
+                    data.GalleryItems.Add(new GalleryItemData
+                    {
+                        Id = card.Id,
+                        Title = card.Title,
+                        FilePath = card.FilePath
+                    });
+                }
+            }
+            else if (WindowType == "spreadsheet")
+            {
+                foreach (var kvp in _sheetRawValues)
+                {
+                    if (!string.IsNullOrEmpty(kvp.Value))
+                    {
+                        data.SpreadsheetCells.Add(new SpreadsheetCellData
+                        {
+                            CellKey = kvp.Key,
+                            RawValue = kvp.Value
+                        });
+                    }
+                }
+
+                foreach (var rule in _conditionalRules)
+                {
+                    data.ConditionalRules.Add(rule);
                 }
             }
 
@@ -543,6 +638,13 @@ namespace AvaloniaMdiApp
             Height = height;
             _normalRect = new Rect(x, y, width, height);
             AtualizarTextoDimensoes();
+            OnBoundsChanged?.Invoke(this);
+        }
+
+        public void DefinirCorJanela(string hexColor)
+        {
+            CustomColor = hexColor ?? string.Empty;
+            AtualizarCores();
         }
 
         public void AplicarTema(bool isDarkMode)
@@ -555,23 +657,49 @@ namespace AvaloniaMdiApp
         {
             if (_isActive == isActive) return;
             _isActive = isActive;
+            SincronizarEstadoHibernacaoRecursos();
             AtualizarCores();
             _taskBar.AtualizarEstadoAtivo(this, isActive);
         }
 
+        private void SincronizarEstadoHibernacaoRecursos()
+        {
+            bool deveHibernar = !_isActive || _isMinimized;
+
+            _browserHost?.SetHibernated(deveHibernar);
+
+            if (WindowType == "spreadsheet")
+            {
+                AtualizarHibernacaoPlanilha(deveHibernar);
+                _lblTitle.Text = deveHibernar ? $"💤 {WindowTitle}" : WindowTitle;
+            }
+        }
+
         private void AtualizarCores()
         {
+            IBrush? customBrush = null;
+            if (!string.IsNullOrWhiteSpace(CustomColor))
+            {
+                try
+                {
+                    customBrush = SolidColorBrush.Parse(CustomColor);
+                }
+                catch { }
+            }
+
             if (_isDarkMode)
             {
                 Background = ThemePalette.DarkWindowBg;
-                BorderBrush = _isActive ? ThemePalette.DarkBorderActive : ThemePalette.DarkBorder;
-                _titleBar.Background = _isActive ? ThemePalette.DarkWindowHeaderActiveBg : ThemePalette.DarkWindowHeaderBg;
-                _statusDot.Background = _isActive ? Brushes.White : ThemePalette.AccentLight;
+                BorderBrush = customBrush ?? (_isActive ? ThemePalette.DarkBorderActive : ThemePalette.DarkBorder);
+                _titleBar.Background = customBrush ?? (_isActive ? ThemePalette.DarkWindowHeaderActiveBg : ThemePalette.DarkWindowHeaderBg);
+                _statusDot.Background = _isActive ? Brushes.White : (customBrush ?? ThemePalette.AccentLight);
                 _lblTitle.Foreground = ThemePalette.DarkTextPrimary;
                 _btnEditTitle.Foreground = ThemePalette.DarkTextPrimary;
                 _txtTitleEditor.Background = ThemePalette.DarkContentBg;
                 _txtTitleEditor.Foreground = ThemePalette.DarkTextPrimary;
-                _txtTitleEditor.BorderBrush = ThemePalette.DarkBorderActive;
+                _txtTitleEditor.BorderBrush = customBrush ?? ThemePalette.DarkBorderActive;
+                _btnColorText.Foreground = ThemePalette.DarkTextPrimary;
+                _btnConnectText.Foreground = ThemePalette.DarkTextPrimary;
                 _btnSaveText.Foreground = ThemePalette.DarkTextPrimary;
                 _btnMinText.Foreground = ThemePalette.DarkTextPrimary;
                 _btnMaxText.Foreground = ThemePalette.DarkTextPrimary;
@@ -593,15 +721,17 @@ namespace AvaloniaMdiApp
             else
             {
                 Background = ThemePalette.LightWindowBg;
-                BorderBrush = _isActive ? ThemePalette.LightBorderActive : ThemePalette.LightBorder;
-                _titleBar.Background = _isActive ? ThemePalette.LightWindowHeaderActiveBg : ThemePalette.LightWindowHeaderBg;
-                _statusDot.Background = _isActive ? Brushes.White : ThemePalette.Accent;
-                var headerTextBrush = _isActive ? Brushes.White : ThemePalette.LightTextPrimary;
+                BorderBrush = customBrush ?? (_isActive ? ThemePalette.LightBorderActive : ThemePalette.LightBorder);
+                _titleBar.Background = customBrush ?? (_isActive ? ThemePalette.LightWindowHeaderActiveBg : ThemePalette.LightWindowHeaderBg);
+                _statusDot.Background = (_isActive || customBrush != null) ? Brushes.White : ThemePalette.Accent;
+                var headerTextBrush = (_isActive || customBrush != null) ? Brushes.White : ThemePalette.LightTextPrimary;
                 _lblTitle.Foreground = headerTextBrush;
                 _btnEditTitle.Foreground = headerTextBrush;
                 _txtTitleEditor.Background = ThemePalette.LightWindowBg;
                 _txtTitleEditor.Foreground = ThemePalette.LightTextPrimary;
-                _txtTitleEditor.BorderBrush = ThemePalette.LightBorderActive;
+                _txtTitleEditor.BorderBrush = customBrush ?? ThemePalette.LightBorderActive;
+                _btnColorText.Foreground = headerTextBrush;
+                _btnConnectText.Foreground = headerTextBrush;
                 _btnSaveText.Foreground = headerTextBrush;
                 _btnMinText.Foreground = headerTextBrush;
                 _btnMaxText.Foreground = headerTextBrush;
@@ -679,12 +809,17 @@ namespace AvaloniaMdiApp
             }
 
             AtualizarCoresNavegador();
+            AtualizarCoresGaleriaEImagem();
+            AtualizarCoresPlanilha();
         }
 
         public void Fechar()
         {
             SincronizarNotaVinculada();
+            ZIndexManager.ClearActive(this);
             _browserHost?.DisposeBrowser();
+            LiberarRecursosGaleriaEImagem();
+            LiberarRecursosPlanilha();
             Workspace.SizeChanged -= OnWorkspaceSizeChanged;
             _taskBar.RemoverJanela(this);
             Workspace.Children.Remove(this);
@@ -765,6 +900,7 @@ namespace AvaloniaMdiApp
         private void OnWindowPointerPressed(object? sender, PointerPressedEventArgs e)
         {
             ZIndexManager.BringToFront(this);
+            OnWindowClicked?.Invoke(this);
 
             var source = e.Source as Control;
             if (source == _txtTitleEditor || _txtTitleEditor.IsVisible)
@@ -827,6 +963,7 @@ namespace AvaloniaMdiApp
                 {
                     _normalRect = new Rect(newX, newY, _normalRect.Width, _normalRect.Height);
                 }
+                OnBoundsChanged?.Invoke(this);
             }
             else if (_resizeMode != ResizeMode.None)
             {
@@ -846,6 +983,7 @@ namespace AvaloniaMdiApp
                 Width = newWidth;
                 Height = newHeight;
                 AtualizarTextoDimensoes();
+                OnBoundsChanged?.Invoke(this);
             }
         }
 
@@ -904,7 +1042,10 @@ namespace AvaloniaMdiApp
                 _btnMinText.Text = "—";
             }
             _browserHost?.SetBrowserVisible(!_isMinimized);
+            AtualizarHibernacaoGaleriaEImagem(_isMinimized);
+            SincronizarEstadoHibernacaoRecursos();
             _taskBar.AtualizarEstadoMinimizado(this, _isMinimized);
+            OnBoundsChanged?.Invoke(this);
         }
 
         public void ToggleMaximize()
@@ -941,6 +1082,7 @@ namespace AvaloniaMdiApp
                 _btnMaxText.Text = "▢";
             }
             AtualizarTextoDimensoes();
+            OnBoundsChanged?.Invoke(this);
         }
     }
 }

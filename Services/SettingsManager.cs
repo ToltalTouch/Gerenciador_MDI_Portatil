@@ -20,17 +20,53 @@ namespace AvaloniaMdiApp
 
         public static AppSettings Carregar()
         {
+            AppSettings settings;
             if (!File.Exists(FilePath))
-                return new AppSettings();
-
-            try
             {
-                string json = File.ReadAllText(FilePath);
-                return JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+                settings = new AppSettings();
             }
-            catch
+            else
             {
-                return new AppSettings();
+                try
+                {
+                    string json = File.ReadAllText(FilePath);
+                    settings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+                }
+                catch
+                {
+                    settings = new AppSettings();
+                }
+            }
+
+            GarantirWorkspaces(settings);
+            return settings;
+        }
+
+        public static void GarantirWorkspaces(AppSettings settings)
+        {
+            if (settings.Workspaces == null)
+            {
+                settings.Workspaces = new();
+            }
+
+            if (settings.Workspaces.Count == 0)
+            {
+                var ws = new WorkspaceData
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Name = "Workspace 1",
+                    BackgroundImagePath = settings.WorkspaceBackgroundImagePath ?? string.Empty,
+                    SavedWindows = settings.SavedWindows != null ? new(settings.SavedWindows) : new(),
+                    SavedCatalog = settings.SavedCatalog != null ? new(settings.SavedCatalog) : new()
+                };
+                settings.Workspaces.Add(ws);
+                settings.ActiveWorkspaceId = ws.Id;
+            }
+
+            if (string.IsNullOrWhiteSpace(settings.ActiveWorkspaceId) ||
+                !settings.Workspaces.Exists(w => w.Id == settings.ActiveWorkspaceId))
+            {
+                settings.ActiveWorkspaceId = settings.Workspaces[0].Id;
             }
         }
 
