@@ -94,7 +94,7 @@ namespace AvaloniaMdiApp
 
             _btnFormulasMenu = new Button
             {
-                Content = "∑ Fórmulas ▾",
+                Content = AppIcons.WithText(AppIcons.Sigma, "Fórmulas ▾", 11, 5, ThemePalette.IconLightGray),
                 Height = 26,
                 Padding = new Thickness(9, 0),
                 CornerRadius = new CornerRadius(5),
@@ -109,7 +109,7 @@ namespace AvaloniaMdiApp
 
             _btnCondFormatMenu = new Button
             {
-                Content = "🎨 Formatação Condicional ▾",
+                Content = AppIcons.WithText(AppIcons.Palette, "Formatação Condicional ▾", 11, 5, ThemePalette.IconLightGray),
                 Height = 26,
                 Padding = new Thickness(9, 0),
                 CornerRadius = new CornerRadius(5),
@@ -286,7 +286,7 @@ namespace AvaloniaMdiApp
 
             _lblSheetHibernatedTitle = new TextBlock
             {
-                Text = "💤 Planilha Hibernada (Economia de Recursos)",
+                Text = "Planilha Hibernada (Economia de Recursos)",
                 FontSize = 14,
                 FontWeight = FontWeight.Bold,
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -304,7 +304,7 @@ namespace AvaloniaMdiApp
 
             _btnWakeSheet = new Button
             {
-                Content = "⚡ Ativar Planilha Agora",
+                Content = AppIcons.WithText(AppIcons.Bolt, "Ativar Planilha Agora", 11.5, 5, ThemePalette.IconLightGray),
                 Height = 28,
                 Padding = new Thickness(14, 0),
                 Margin = new Thickness(0, 4, 0, 0),
@@ -408,25 +408,29 @@ namespace AvaloniaMdiApp
 
             (string Label, string Template)[] formulas =
             {
-                ("➕ SOMA / SUM — Somar intervalo", "=SOMA(A1:A5)"),
-                ("📊 MEDIA / AVERAGE — Média aritmética", "=MEDIA(A1:A5)"),
-                ("⬇ MINIMO / MIN — Menor valor", "=MINIMO(A1:A5)"),
-                ("⬆ MAXIMO / MAX — Maior valor", "=MAXIMO(A1:A5)"),
-                ("🔢 CONT.NUM / COUNT — Contar números", "=CONT.NUM(A1:A5)"),
-                ("📋 CONT.VALORES / COUNTA — Contar preenchidos", "=CONT.VALORES(A1:A5)"),
-                ("❓ SE / IF — Condição lógica", "=SE(A1>=60; \"Aprovado\"; \"Reprovado\")"),
-                ("🔍 CONT.SE / COUNTIF — Contar com condição", "=CONT.SE(A1:A5; \">10\")"),
-                ("💰 SOMASE / SUMIF — Somar com condição", "=SOMASE(A1:A5; \">10\")"),
-                ("📐 MED / MEDIAN — Mediana", "=MED(A1:A5)"),
-                ("🎯 ARRED / ROUND — Arredondar casas", "=ARRED(A1; 2)"),
-                ("⚡ POTENCIA / POWER — Elevar potência", "=POTENCIA(A1; 2)"),
-                ("√ RAIZ / SQRT — Raiz quadrada", "=RAIZ(A1)"),
-                ("📏 ABS — Valor absoluto", "=ABS(A1)")
+                ("SOMA / SUM — Somar intervalo", "=SOMA(A1:A5)"),
+                ("MEDIA / AVERAGE — Média aritmética", "=MEDIA(A1:A5)"),
+                ("MINIMO / MIN — Menor valor", "=MINIMO(A1:A5)"),
+                ("MAXIMO / MAX — Maior valor", "=MAXIMO(A1:A5)"),
+                ("CONT.NUM / COUNT — Contar números", "=CONT.NUM(A1:A5)"),
+                ("CONT.VALORES / COUNTA — Contar preenchidos", "=CONT.VALORES(A1:A5)"),
+                ("SE / IF — Condição lógica", "=SE(A1>=60; \"Aprovado\"; \"Reprovado\")"),
+                ("CONT.SE / COUNTIF — Contar com condição", "=CONT.SE(A1:A5; \">10\")"),
+                ("SOMASE / SUMIF — Somar com condição", "=SOMASE(A1:A5; \">10\")"),
+                ("MED / MEDIAN — Mediana", "=MED(A1:A5)"),
+                ("ARRED / ROUND — Arredondar casas", "=ARRED(A1; 2)"),
+                ("POTENCIA / POWER — Elevar potência", "=POTENCIA(A1; 2)"),
+                ("RAIZ / SQRT — Raiz quadrada", "=RAIZ(A1)"),
+                ("ABS — Valor absoluto", "=ABS(A1)")
             };
 
             foreach (var f in formulas)
             {
-                var item = new MenuItem { Header = $"{f.Label}   [{f.Template}]" };
+                var item = new MenuItem
+                {
+                    Icon = AppIcons.Create(AppIcons.Sigma, 11, ThemePalette.IconLightGray),
+                    Header = $"{f.Label}   [{f.Template}]"
+                };
                 string tmpl = f.Template;
                 item.Click += (s, e) => InserirFormulaNaCelulaAtiva(tmpl);
                 flyout.Items.Add(item);
@@ -439,7 +443,11 @@ namespace AvaloniaMdiApp
         {
             var flyout = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedLeft };
 
-            var itemPainel = new MenuItem { Header = "⚙ Gerenciar / Criar Regra Condicional..." };
+            var itemPainel = new MenuItem
+            {
+                Icon = AppIcons.Create(AppIcons.Settings, 11.5, ThemePalette.IconLightGray),
+                Header = "Gerenciar / Criar Regra Condicional..."
+            };
             itemPainel.Click += (s, e) =>
             {
                 if (_sheetCondPanel != null)
@@ -451,24 +459,28 @@ namespace AvaloniaMdiApp
             flyout.Items.Add(itemPainel);
             flyout.Items.Add(new Separator());
 
-            var menuRealcar = new MenuItem { Header = "✨ Realçar Regras das Células (Rápido)" };
+            var menuRealcar = new MenuItem
+            {
+                Icon = AppIcons.Create(AppIcons.Sparkle, 11.5, ThemePalette.IconLightGray),
+                Header = "Realçar Regras das Células (Rápido)"
+            };
 
-            var rPositivos = new MenuItem { Header = "🟢 É Maior do que 0 (Preenchimento Verde Claro)" };
+            var rPositivos = new MenuItem { Icon = AppIcons.Create(AppIcons.CircleDot, 10, ThemePalette.IconLightGray), Header = "É Maior do que 0 (Preenchimento Verde Claro)" };
             rPositivos.Click += (s, e) => AdicionarRegraCondicional("*", ">", "0", "", "green");
 
-            var rNegativos = new MenuItem { Header = "🔴 É Menor do que 0 (Preenchimento Vermelho Claro)" };
+            var rNegativos = new MenuItem { Icon = AppIcons.Create(AppIcons.CircleDot, 10, ThemePalette.IconLightGray), Header = "É Menor do que 0 (Preenchimento Vermelho Claro)" };
             rNegativos.Click += (s, e) => AdicionarRegraCondicional("*", "<", "0", "", "red");
 
-            var rZero = new MenuItem { Header = "🟡 É Igual a 0 (Preenchimento Amarelo Claro)" };
+            var rZero = new MenuItem { Icon = AppIcons.Create(AppIcons.CircleDot, 10, ThemePalette.IconLightGray), Header = "É Igual a 0 (Preenchimento Amarelo Claro)" };
             rZero.Click += (s, e) => AdicionarRegraCondicional("*", "=", "0", "", "yellow");
 
-            var rCem = new MenuItem { Header = "🔵 É Maior ou Igual a 100 (Destaque Azul)" };
+            var rCem = new MenuItem { Icon = AppIcons.Create(AppIcons.CircleDot, 10, ThemePalette.IconLightGray), Header = "É Maior ou Igual a 100 (Destaque Azul)" };
             rCem.Click += (s, e) => AdicionarRegraCondicional("*", ">=", "100", "", "blue");
 
-            var rAprovado = new MenuItem { Header = "🟢 Texto que Contém \"Aprovado\" (Verde)" };
+            var rAprovado = new MenuItem { Icon = AppIcons.Create(AppIcons.CircleDot, 10, ThemePalette.IconLightGray), Header = "Texto que Contém \"Aprovado\" (Verde)" };
             rAprovado.Click += (s, e) => AdicionarRegraCondicional("*", "contains", "Aprovado", "", "green");
 
-            var rReprovado = new MenuItem { Header = "🔴 Texto que Contém \"Reprovado\" (Vermelho)" };
+            var rReprovado = new MenuItem { Icon = AppIcons.Create(AppIcons.CircleDot, 10, ThemePalette.IconLightGray), Header = "Texto que Contém \"Reprovado\" (Vermelho)" };
             rReprovado.Click += (s, e) => AdicionarRegraCondicional("*", "contains", "Reprovado", "", "red");
 
             menuRealcar.Items.Add(rPositivos);
@@ -482,7 +494,11 @@ namespace AvaloniaMdiApp
             flyout.Items.Add(menuRealcar);
             flyout.Items.Add(new Separator());
 
-            var itemLimpar = new MenuItem { Header = "🗑 Limpar Todas as Regras Condicionais" };
+            var itemLimpar = new MenuItem
+            {
+                Icon = AppIcons.Create(AppIcons.Trash, 11.5, ThemePalette.IconLightGray),
+                Header = "Limpar Todas as Regras Condicionais"
+            };
             itemLimpar.Click += (s, e) =>
             {
                 _conditionalRules.Clear();
@@ -511,7 +527,7 @@ namespace AvaloniaMdiApp
 
             var lblTitle = new TextBlock
             {
-                Text = "🎨 Regras de Formatação Condicional (Estilo Excel)",
+                Text = "Regras de Formatação Condicional (Estilo Excel)",
                 FontSize = 11.5,
                 FontWeight = FontWeight.Bold,
                 VerticalAlignment = VerticalAlignment.Center
@@ -621,11 +637,11 @@ namespace AvaloniaMdiApp
             };
             (string Key, string Label)[] styles =
             {
-                ("green", "🟢 Verde Claro (Excel)"),
-                ("red", "🔴 Vermelho Claro (Excel)"),
-                ("yellow", "🟡 Amarelo Claro (Excel)"),
-                ("blue", "🔵 Azul Claro (Excel)"),
-                ("purple", "🟣 Roxo Claro")
+                ("green", "Verde Claro (Excel)"),
+                ("red", "Vermelho Claro (Excel)"),
+                ("yellow", "Amarelo Claro (Excel)"),
+                ("blue", "Azul Claro (Excel)"),
+                ("purple", "Roxo Claro")
             };
             foreach (var st in styles) cmbStyle.Items.Add(st.Label);
 

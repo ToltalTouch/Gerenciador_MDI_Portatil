@@ -21,8 +21,9 @@ namespace AvaloniaMdiApp
 
         public string WindowId { get; }
         public string WindowTitle { get; private set; }
-        public string WindowType { get; }
+        public string WindowType { get; private set; }
         public string CustomColor { get; private set; } = string.Empty;
+        public string CriticalityLevel { get; private set; } = "none";
         public int AccessCount { get; set; }
         public bool IsMinimized => _isMinimized;
         public bool IsMaximized => _isMaximized;
@@ -55,6 +56,8 @@ namespace AvaloniaMdiApp
 
         private readonly Border _titleBar;
         private readonly Border _statusDot;
+        private readonly Border _criticalityHeaderBadge;
+        private readonly TextBlock _criticalityHeaderText;
         private readonly TextBlock _lblTitle;
         private readonly TextBox _txtTitleEditor;
         private readonly Button _btnEditTitle;
@@ -67,7 +70,7 @@ namespace AvaloniaMdiApp
         private readonly TextBlock? _lblFontSize;
         private readonly TextBlock? _lblContentTitle;
         private readonly TextBlock? _lblContentInfo;
-        private readonly TextBox? _noteTextBox;
+        private TextBox? _noteTextBox;
         private readonly StackPanel? _checklistContainer;
         private readonly Button? _btnAddChecklistItem;
         private readonly List<ChecklistRowState> _checklistRows = new();
@@ -85,15 +88,15 @@ namespace AvaloniaMdiApp
 
         public static readonly (string Hex, string Nome)[] PaletaCoresJanela =
         {
-            ("", "🔵 Padrão do Tema"),
-            ("#2563EB", "🔵 Azul Real"),
-            ("#7C3AED", "🟣 Roxo / Violeta"),
-            ("#059669", "🟢 Verde Esmeralda"),
-            ("#D97706", "🟠 Âmbar / Laranja"),
-            ("#DC2626", "🔴 Vermelho Rubi"),
-            ("#DB2777", "🩷 Rosa / Magenta"),
-            ("#0891B2", "🩵 Ciano / Turquesa"),
-            ("#475569", "⚫ Grafite / Neutro")
+            ("", "Padrão do Tema"),
+            ("#2563EB", "Azul Real"),
+            ("#7C3AED", "Roxo / Violeta"),
+            ("#059669", "Verde Esmeralda"),
+            ("#D97706", "Âmbar / Laranja"),
+            ("#DC2626", "Vermelho Rubi"),
+            ("#DB2777", "Rosa / Magenta"),
+            ("#0891B2", "Ciano / Turquesa"),
+            ("#475569", "Grafite / Neutro")
         };
 
         public DraggableWindow(
@@ -118,7 +121,8 @@ namespace AvaloniaMdiApp
             int spreadsheetRows = 12,
             int spreadsheetCols = 6,
             List<SpreadsheetCellData>? initialSpreadsheetCells = null,
-            List<ConditionalFormatRuleData>? initialConditionalRules = null)
+            List<ConditionalFormatRuleData>? initialConditionalRules = null,
+            string criticalityLevel = "none")
         {
             Workspace = workspace;
             _taskBar = taskBar;
@@ -126,10 +130,17 @@ namespace AvaloniaMdiApp
             WindowTitle = title;
             WindowType = string.IsNullOrWhiteSpace(windowType) ? "default" : windowType;
             CustomColor = customColor ?? string.Empty;
+            CriticalityLevel = string.IsNullOrWhiteSpace(criticalityLevel) ? "none" : criticalityLevel;
             AccessCount = Math.Max(1, accessCount);
             ParentChecklistWindow = parentChecklistWindow;
             _onLinkedRowSave = onLinkedRowSave;
             _isDarkMode = isDarkMode;
+
+            if (IsFlowchartShape && initialFormat == null)
+            {
+                _alignment = "center";
+                _isBold = true;
+            }
 
             if (initialFormat != null)
             {
@@ -140,24 +151,26 @@ namespace AvaloniaMdiApp
                 _fontFamilyName = string.IsNullOrWhiteSpace(initialFormat.FontFamilyName) ? "default" : initialFormat.FontFamilyName;
             }
 
-            Width = Math.Max(220, width);
-            Height = Math.Max(140, height);
+            double minW = IsFlowchartShape ? 140 : 220;
+            double minH = IsFlowchartShape ? 95 : 140;
+            Width = Math.Max(minW, width);
+            Height = Math.Max(minH, height);
             _normalRect = new Rect(x, y, Width, Height);
 
             Canvas.SetLeft(this, x);
             Canvas.SetTop(this, y);
 
-            BorderThickness = new Thickness(1);
+            BorderThickness = IsFlowchartShape ? new Thickness(0) : new Thickness(1);
             CornerRadius = new CornerRadius(8);
-            ClipToBounds = true;
+            ClipToBounds = !IsFlowchartShape;
 
             var rootLayout = new DockPanel();
 
             _titleBar = new Border
             {
                 Name = "TitleBar",
-                Height = 34,
-                CornerRadius = new CornerRadius(7, 7, 0, 0),
+                Height = IsFlowchartShape ? 28 : 34,
+                CornerRadius = IsFlowchartShape ? new CornerRadius(6) : new CornerRadius(7, 7, 0, 0),
                 Child = new Grid()
             };
 
@@ -193,7 +206,7 @@ namespace AvaloniaMdiApp
 
             _btnEditTitle = new Button
             {
-                Content = "✎",
+                Content = AppIcons.Create(AppIcons.Edit, 10.5, ThemePalette.IconLightGray),
                 Width = 22,
                 Height = 22,
                 Padding = new Thickness(0),
@@ -202,17 +215,35 @@ namespace AvaloniaMdiApp
                 VerticalContentAlignment = VerticalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 CornerRadius = new CornerRadius(4),
-                FontSize = 11,
-                Opacity = 0.75
+                Opacity = 0.80
             };
             ToolTip.SetTip(_btnEditTitle, "Renomear janela");
             _btnEditTitle.Click += (s, e) => IniciarEdicaoTitulo();
+
+            _criticalityHeaderText = new TextBlock
+            {
+                FontSize = 9.5,
+                FontWeight = FontWeight.Bold,
+                Foreground = Brushes.White,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _criticalityHeaderBadge = new Border
+            {
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(5, 1),
+                Margin = new Thickness(6, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                IsVisible = false,
+                IsHitTestVisible = false,
+                Child = _criticalityHeaderText
+            };
 
             var titleDisplayStack = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 VerticalAlignment = VerticalAlignment.Center
             };
+            titleDisplayStack.Children.Add(_criticalityHeaderBadge);
             titleDisplayStack.Children.Add(_lblTitle);
             titleDisplayStack.Children.Add(_btnEditTitle);
 
@@ -263,33 +294,76 @@ namespace AvaloniaMdiApp
             };
             Grid.SetColumn(btnPanel, 2);
 
-            var btnColor = CreateControlButton("🎨", out _btnColorText, (s, e) => { });
+            var btnCriticality = CreateControlButton("", out _, (s, e) => { });
+            btnCriticality.Content = AppIcons.Create(AppIcons.Warning, 11.5, ThemePalette.IconLightGray);
+            ToolTip.SetTip(btnCriticality, "Definir aviso de criticidade");
+            var critFlyout = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedRight };
+            foreach (var crit in NiveisCriticidade)
+            {
+                var item = new MenuItem
+                {
+                    Icon = AppIcons.Create(crit.Key == "none" ? AppIcons.Minus : AppIcons.Warning, 10.5, ThemePalette.IconLightGray),
+                    Header = crit.Label
+                };
+                string key = crit.Key;
+                item.Click += (s, e) => DefinirCriticidade(key);
+                critFlyout.Items.Add(item);
+            }
+            btnCriticality.Flyout = critFlyout;
+
+            var btnColor = CreateControlButton("", out _btnColorText, (s, e) => { });
+            btnColor.Content = AppIcons.Create(AppIcons.Palette, 12, ThemePalette.IconLightGray);
             ToolTip.SetTip(btnColor, "Mudar cor desta janela");
             var colorFlyout = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedRight };
             foreach (var cor in PaletaCoresJanela)
             {
-                var item = new MenuItem { Header = cor.Nome };
+                var item = new MenuItem
+                {
+                    Icon = AppIcons.Create(AppIcons.CircleDot, 10, ThemePalette.IconLightGray),
+                    Header = cor.Nome
+                };
                 string hex = cor.Hex;
                 item.Click += (s, e) => DefinirCorJanela(hex);
                 colorFlyout.Items.Add(item);
             }
+
+            if (IsFlowchartShape)
+            {
+                colorFlyout.Items.Add(new Separator());
+                var miRect = new MenuItem { Icon = AppIcons.Create(AppIcons.ShapeRect, 11), Header = "Formato: Retângulo" };
+                miRect.Click += (s, e) => AlterarFormatoGeometrico("shape_rect");
+                var miDiamond = new MenuItem { Icon = AppIcons.Create(AppIcons.ShapeDiamond, 11), Header = "Formato: Losango" };
+                miDiamond.Click += (s, e) => AlterarFormatoGeometrico("shape_diamond");
+                var miCircle = new MenuItem { Icon = AppIcons.Create(AppIcons.ShapeCircle, 11), Header = "Formato: Círculo" };
+                miCircle.Click += (s, e) => AlterarFormatoGeometrico("shape_circle");
+                colorFlyout.Items.Add(miRect);
+                colorFlyout.Items.Add(miDiamond);
+                colorFlyout.Items.Add(miCircle);
+            }
+
             btnColor.Flyout = colorFlyout;
 
-            var btnConnect = CreateControlButton("🔗", out _btnConnectText, (s, e) => OnConnectRequested?.Invoke(this));
+            var btnConnect = CreateControlButton("", out _btnConnectText, (s, e) => OnConnectRequested?.Invoke(this));
+            btnConnect.Content = AppIcons.Create(AppIcons.Link, 12, ThemePalette.IconLightGray);
             ToolTip.SetTip(btnConnect, "Conectar esta janela a outra (Fluxograma)");
 
-            var btnSave = CreateControlButton("💾", out _btnSaveText, (s, e) => SalvarJanela());
+            var btnSave = CreateControlButton("", out _btnSaveText, (s, e) => SalvarJanela());
+            btnSave.Content = AppIcons.Create(AppIcons.Save, 12, ThemePalette.IconLightGray);
             ToolTip.SetTip(btnSave, _onLinkedRowSave != null ? "Salvar nota vinculada à linha da lista (Ctrl+S)" : "Salvar janela (Ctrl+S)");
 
             var btnMin = CreateControlButton("—", out _btnMinText, (s, e) => ToggleMinimize());
             var btnMax = CreateControlButton("▢", out _btnMaxText, (s, e) => ToggleMaximize());
             var btnClose = CreateControlButton("✕", out _btnCloseText, (s, e) => Fechar());
 
+            btnPanel.Children.Add(btnCriticality);
             btnPanel.Children.Add(btnColor);
             btnPanel.Children.Add(btnConnect);
             btnPanel.Children.Add(btnSave);
-            btnPanel.Children.Add(btnMin);
-            btnPanel.Children.Add(btnMax);
+            if (!IsFlowchartShape)
+            {
+                btnPanel.Children.Add(btnMin);
+                btnPanel.Children.Add(btnMax);
+            }
             btnPanel.Children.Add(btnClose);
             grid.Children.Add(btnPanel);
 
@@ -300,16 +374,20 @@ namespace AvaloniaMdiApp
 
             _contentCard = new Border
             {
-                Margin = new Thickness(10),
+                Margin = IsFlowchartShape ? new Thickness(2, 4, 2, 2) : new Thickness(10),
                 Padding = new Thickness(0),
                 CornerRadius = new CornerRadius(6),
-                BorderThickness = new Thickness(1),
-                ClipToBounds = true,
+                BorderThickness = IsFlowchartShape ? new Thickness(0) : new Thickness(1),
+                ClipToBounds = !IsFlowchartShape,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch
             };
 
-            if (WindowType == "notepad" || WindowType == "checklist")
+            if (IsFlowchartShape)
+            {
+                _contentCard.Child = CriarConteudoFormaFluxograma(initialNote);
+            }
+            else if (WindowType == "notepad" || WindowType == "checklist")
             {
                 var cardDock = new DockPanel();
 
@@ -547,6 +625,7 @@ namespace AvaloniaMdiApp
                 Title = WindowTitle,
                 WindowType = WindowType,
                 CustomColor = CustomColor,
+                CriticalityLevel = CriticalityLevel,
                 X = bounds.X,
                 Y = bounds.Y,
                 Width = bounds.Width,
@@ -647,6 +726,23 @@ namespace AvaloniaMdiApp
             AtualizarCores();
         }
 
+        public void DefinirCriticidade(string level)
+        {
+            CriticalityLevel = string.IsNullOrWhiteSpace(level) ? "none" : level.Trim().ToLowerInvariant();
+            AtualizarCores();
+        }
+
+        public void AlterarFormatoGeometrico(string novoWindowType)
+        {
+            if (!EhTipoFormaFluxograma(novoWindowType)) return;
+            WindowType = novoWindowType;
+            if (_contentCard.Child is Control c && c.Bounds.Width > 0 && c.Bounds.Height > 0)
+            {
+                AtualizarGeometriaFormaFluxograma(c.Bounds.Width, c.Bounds.Height);
+            }
+            AtualizarCores();
+        }
+
         public void AplicarTema(bool isDarkMode)
         {
             _isDarkMode = isDarkMode;
@@ -671,26 +767,47 @@ namespace AvaloniaMdiApp
             if (WindowType == "spreadsheet")
             {
                 AtualizarHibernacaoPlanilha(deveHibernar);
-                _lblTitle.Text = deveHibernar ? $"💤 {WindowTitle}" : WindowTitle;
+                _lblTitle.Text = deveHibernar ? $"◦ {WindowTitle}" : WindowTitle;
             }
         }
 
         private void AtualizarCores()
         {
+            var (critBadgeText, critColorHex) = ObterInfoCriticidade(CriticalityLevel);
+
+            if (!string.IsNullOrEmpty(critBadgeText) && !string.IsNullOrEmpty(critColorHex))
+            {
+                _criticalityHeaderText.Text = critBadgeText;
+                try
+                {
+                    _criticalityHeaderBadge.Background = SolidColorBrush.Parse(critColorHex);
+                }
+                catch
+                {
+                    _criticalityHeaderBadge.Background = ThemePalette.Danger;
+                }
+                _criticalityHeaderBadge.IsVisible = !IsFlowchartShape;
+            }
+            else
+            {
+                _criticalityHeaderBadge.IsVisible = false;
+            }
+
             IBrush? customBrush = null;
-            if (!string.IsNullOrWhiteSpace(CustomColor))
+            string effectiveColorHex = !string.IsNullOrWhiteSpace(CustomColor) ? CustomColor : critColorHex;
+            if (!string.IsNullOrWhiteSpace(effectiveColorHex))
             {
                 try
                 {
-                    customBrush = SolidColorBrush.Parse(CustomColor);
+                    customBrush = SolidColorBrush.Parse(effectiveColorHex);
                 }
                 catch { }
             }
 
             if (_isDarkMode)
             {
-                Background = ThemePalette.DarkWindowBg;
-                BorderBrush = customBrush ?? (_isActive ? ThemePalette.DarkBorderActive : ThemePalette.DarkBorder);
+                Background = IsFlowchartShape ? Brushes.Transparent : ThemePalette.DarkWindowBg;
+                BorderBrush = IsFlowchartShape ? Brushes.Transparent : (customBrush ?? (_isActive ? ThemePalette.DarkBorderActive : ThemePalette.DarkBorder));
                 _titleBar.Background = customBrush ?? (_isActive ? ThemePalette.DarkWindowHeaderActiveBg : ThemePalette.DarkWindowHeaderBg);
                 _statusDot.Background = _isActive ? Brushes.White : (customBrush ?? ThemePalette.AccentLight);
                 _lblTitle.Foreground = ThemePalette.DarkTextPrimary;
@@ -704,9 +821,9 @@ namespace AvaloniaMdiApp
                 _btnMinText.Foreground = ThemePalette.DarkTextPrimary;
                 _btnMaxText.Foreground = ThemePalette.DarkTextPrimary;
                 _btnCloseText.Foreground = ThemePalette.DarkTextPrimary;
-                _contentPanel.Background = ThemePalette.DarkContentBg;
-                _contentCard.Background = ThemePalette.DarkWindowBg;
-                _contentCard.BorderBrush = ThemePalette.DarkBorder;
+                _contentPanel.Background = IsFlowchartShape ? Brushes.Transparent : ThemePalette.DarkContentBg;
+                _contentCard.Background = IsFlowchartShape ? Brushes.Transparent : ThemePalette.DarkWindowBg;
+                _contentCard.BorderBrush = IsFlowchartShape ? Brushes.Transparent : ThemePalette.DarkBorder;
 
                 if (_lblContentTitle != null) _lblContentTitle.Foreground = ThemePalette.DarkTextPrimary;
                 if (_lblContentInfo != null) _lblContentInfo.Foreground = ThemePalette.DarkTextSecondary;
@@ -720,8 +837,8 @@ namespace AvaloniaMdiApp
             }
             else
             {
-                Background = ThemePalette.LightWindowBg;
-                BorderBrush = customBrush ?? (_isActive ? ThemePalette.LightBorderActive : ThemePalette.LightBorder);
+                Background = IsFlowchartShape ? Brushes.Transparent : ThemePalette.LightWindowBg;
+                BorderBrush = IsFlowchartShape ? Brushes.Transparent : (customBrush ?? (_isActive ? ThemePalette.LightBorderActive : ThemePalette.LightBorder));
                 _titleBar.Background = customBrush ?? (_isActive ? ThemePalette.LightWindowHeaderActiveBg : ThemePalette.LightWindowHeaderBg);
                 _statusDot.Background = (_isActive || customBrush != null) ? Brushes.White : ThemePalette.Accent;
                 var headerTextBrush = (_isActive || customBrush != null) ? Brushes.White : ThemePalette.LightTextPrimary;
@@ -736,9 +853,9 @@ namespace AvaloniaMdiApp
                 _btnMinText.Foreground = headerTextBrush;
                 _btnMaxText.Foreground = headerTextBrush;
                 _btnCloseText.Foreground = headerTextBrush;
-                _contentPanel.Background = ThemePalette.LightContentBg;
-                _contentCard.Background = ThemePalette.LightWindowBg;
-                _contentCard.BorderBrush = ThemePalette.LightBorder;
+                _contentPanel.Background = IsFlowchartShape ? Brushes.Transparent : ThemePalette.LightContentBg;
+                _contentCard.Background = IsFlowchartShape ? Brushes.Transparent : ThemePalette.LightWindowBg;
+                _contentCard.BorderBrush = IsFlowchartShape ? Brushes.Transparent : ThemePalette.LightBorder;
 
                 if (_lblContentTitle != null) _lblContentTitle.Foreground = ThemePalette.LightTextPrimary;
                 if (_lblContentInfo != null) _lblContentInfo.Foreground = ThemePalette.LightTextSecondary;
@@ -808,6 +925,7 @@ namespace AvaloniaMdiApp
                 }
             }
 
+            AtualizarCoresFormaFluxograma(customBrush);
             AtualizarCoresNavegador();
             AtualizarCoresGaleriaEImagem();
             AtualizarCoresPlanilha();
@@ -971,13 +1089,16 @@ namespace AvaloniaMdiApp
                 double newWidth = _rectStart.Width;
                 double newHeight = _rectStart.Height;
 
+                double minW = IsFlowchartShape ? 140 : 220;
+                double minH = IsFlowchartShape ? 95 : 140;
+
                 if (_resizeMode == ResizeMode.Right || _resizeMode == ResizeMode.BottomRight)
                 {
-                    newWidth = Math.Max(220, _rectStart.Width + diff.X);
+                    newWidth = Math.Max(minW, _rectStart.Width + diff.X);
                 }
                 if (_resizeMode == ResizeMode.Bottom || _resizeMode == ResizeMode.BottomRight)
                 {
-                    newHeight = Math.Max(140, _rectStart.Height + diff.Y);
+                    newHeight = Math.Max(minH, _rectStart.Height + diff.Y);
                 }
 
                 Width = newWidth;

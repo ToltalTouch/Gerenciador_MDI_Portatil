@@ -41,7 +41,7 @@ namespace AvaloniaMdiApp
 
             var btnNote = new Button
             {
-                Content = "📝",
+                Content = AppIcons.Create(AppIcons.Note, 11.5, ThemePalette.IconLightGray),
                 Width = 26,
                 Height = 24,
                 Padding = new Thickness(0),
@@ -50,7 +50,6 @@ namespace AvaloniaMdiApp
                 HorizontalContentAlignment = HorizontalAlignment.Center,
                 VerticalContentAlignment = VerticalAlignment.Center,
                 CornerRadius = new CornerRadius(4),
-                FontSize = 11.5,
                 Opacity = string.IsNullOrWhiteSpace(notaVinculada) ? 0.65 : 1.0
             };
             ToolTip.SetTip(btnNote, "Abrir Bloco de Notas atrelado a esta linha");

@@ -36,14 +36,14 @@ namespace AvaloniaMdiApp
 
         public static readonly (string Hex, string Nome)[] PaletaCoresLinha =
         {
-            ("#3B82F6", "🔵 Azul"),
-            ("#10B981", "🟢 Verde Esmeralda"),
-            ("#F59E0B", "🟠 Laranja / Âmbar"),
-            ("#EF4444", "🔴 Vermelho"),
-            ("#8B5CF6", "🟣 Roxo / Violeta"),
-            ("#EC4899", "🩷 Rosa / Magenta"),
-            ("#06B6D4", "🩵 Ciano"),
-            ("#94A3B8", "⚪ Cinza / Neutro")
+            ("#3B82F6", "Azul"),
+            ("#10B981", "Verde Esmeralda"),
+            ("#F59E0B", "Laranja / Âmbar"),
+            ("#EF4444", "Vermelho"),
+            ("#8B5CF6", "Roxo / Violeta"),
+            ("#EC4899", "Rosa / Magenta"),
+            ("#06B6D4", "Ciano"),
+            ("#94A3B8", "Cinza / Neutro")
         };
 
         public FlowchartConnectionVisual(
@@ -90,7 +90,11 @@ namespace AvaloniaMdiApp
             var colorFlyout = new MenuFlyout { Placement = PlacementMode.Bottom };
             foreach (var cor in PaletaCoresLinha)
             {
-                var item = new MenuItem { Header = cor.Nome };
+                var item = new MenuItem
+                {
+                    Icon = AppIcons.Create(AppIcons.CircleDot, 10, ThemePalette.IconLightGray),
+                    Header = cor.Nome
+                };
                 string hex = cor.Hex;
                 item.Click += (s, e) =>
                 {
@@ -102,7 +106,7 @@ namespace AvaloniaMdiApp
 
             _btnColor = new Button
             {
-                Content = "🎨",
+                Content = AppIcons.Create(AppIcons.Palette, 10.5, ThemePalette.IconLightGray),
                 Padding = new Thickness(4, 1),
                 MinWidth = 22,
                 MinHeight = 20,
@@ -110,7 +114,6 @@ namespace AvaloniaMdiApp
                 CornerRadius = new CornerRadius(10, 0, 0, 10),
                 BorderThickness = new Thickness(0),
                 Background = Brushes.Transparent,
-                FontSize = 10,
                 HorizontalContentAlignment = HorizontalAlignment.Center,
                 VerticalContentAlignment = VerticalAlignment.Center,
                 Cursor = new Cursor(StandardCursorType.Hand),

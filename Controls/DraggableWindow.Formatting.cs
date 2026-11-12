@@ -68,25 +68,25 @@ namespace AvaloniaMdiApp
 
             var flyout = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedLeft };
 
-            var miBold = new MenuItem { Header = "𝐁 Alternar Negrito (Ctrl+B)" };
+            var miBold = new MenuItem { Header = "Alternar Negrito (Ctrl+B)" };
             miBold.Click += (s, e) => AlternarNegrito();
 
-            var miItalic = new MenuItem { Header = "𝐼 Alternar Itálico (Ctrl+I)" };
+            var miItalic = new MenuItem { Header = "Alternar Itálico (Ctrl+I)" };
             miItalic.Click += (s, e) => AlternarItalico();
 
-            var miFontInc = new MenuItem { Header = "A+ Aumentar Fonte" };
+            var miFontInc = new MenuItem { Icon = AppIcons.Create(AppIcons.Plus, 10), Header = "Aumentar Fonte" };
             miFontInc.Click += (s, e) => AlterarTamanhoFonte(2);
 
-            var miFontDec = new MenuItem { Header = "A- Diminuir Fonte" };
+            var miFontDec = new MenuItem { Icon = AppIcons.Create(AppIcons.Minus, 10), Header = "Diminuir Fonte" };
             miFontDec.Click += (s, e) => AlterarTamanhoFonte(-2);
 
-            var miAlignLeft = new MenuItem { Header = "⯇ Alinhar à Esquerda" };
+            var miAlignLeft = new MenuItem { Icon = AppIcons.Create(AppIcons.AlignLeft, 11), Header = "Alinhar à Esquerda" };
             miAlignLeft.Click += (s, e) => DefinirAlinhamento("left");
 
-            var miAlignCenter = new MenuItem { Header = "⯌ Centralizar Texto" };
+            var miAlignCenter = new MenuItem { Icon = AppIcons.Create(AppIcons.AlignCenter, 11), Header = "Centralizar Texto" };
             miAlignCenter.Click += (s, e) => DefinirAlinhamento("center");
 
-            var miAlignRight = new MenuItem { Header = "⯈ Alinhar à Direita" };
+            var miAlignRight = new MenuItem { Icon = AppIcons.Create(AppIcons.AlignRight, 11), Header = "Alinhar à Direita" };
             miAlignRight.Click += (s, e) => DefinirAlinhamento("right");
 
             var miFontDefault = new MenuItem { Header = "Fonte Padrão (Sans-Serif)" };
@@ -98,7 +98,7 @@ namespace AvaloniaMdiApp
             var miFontSerif = new MenuItem { Header = "Fonte Serifada (Leitura)" };
             miFontSerif.Click += (s, e) => DefinirFamiliaFonte("serif");
 
-            var miReset = new MenuItem { Header = "↺ Restaurar Formatação Padrão" };
+            var miReset = new MenuItem { Icon = AppIcons.Create(AppIcons.Refresh, 11), Header = "Restaurar Formatação Padrão" };
             miReset.Click += (s, e) => RestaurarFormatacaoPadrao();
 
             flyout.Items.Add(miBold);

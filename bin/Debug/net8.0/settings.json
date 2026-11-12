@@ -1,12 +1,367 @@
 {
   "IsDarkMode": true,
   "EnableNotifications": true,
-  "SavedWindows": [],
+  "LayoutScale": 0.85,
+  "MainWindowSizePreset": "maximized",
+  "WidgetSizePreset": "large",
+  "DefaultFlowchartLineColor": "#3B82F6",
+  "AutoCheckUpdatesOnStartup": true,
+  "GitHubRepository": "ToltalTouch/Janela_multitarefa",
+  "LastInstalledTag": "v1.0.0",
+  "ActiveWorkspaceId": "433e88fa15154b7c9069b47c0effbdc4",
+  "Workspaces": [
+    {
+      "Id": "433e88fa15154b7c9069b47c0effbdc4",
+      "Name": "Workspace 1",
+      "BackgroundImagePath": "",
+      "WorkspaceZoom": 1,
+      "SavedWindows": [
+        {
+          "Id": "265f9f73574a447d99558463b0fb0126",
+          "Title": "Bloco de Notas #1",
+          "WindowType": "notepad",
+          "CustomColor": "",
+          "CriticalityLevel": "none",
+          "X": 522.3529411764707,
+          "Y": 454.7058823529412,
+          "Width": 432,
+          "Height": 312,
+          "NoteContent": "",
+          "TextFormat": {
+            "IsBold": false,
+            "IsItalic": false,
+            "FontSize": 13,
+            "Alignment": "left",
+            "FontFamilyName": "default"
+          },
+          "ChecklistItems": [],
+          "GalleryItems": [],
+          "SpreadsheetRows": 12,
+          "SpreadsheetCols": 6,
+          "SpreadsheetCells": [],
+          "ConditionalRules": [],
+          "AccessCount": 1,
+          "LastUsedUtc": "2026-11-12T15:09:35.7839047Z"
+        },
+        {
+          "Id": "fecaed12a8074a6aa4a70ba52315ad8c",
+          "Title": "Navegador #1",
+          "WindowType": "browser",
+          "CustomColor": "",
+          "CriticalityLevel": "none",
+          "X": 1445.2941176470588,
+          "Y": 24.705882352941188,
+          "Width": 792,
+          "Height": 540,
+          "NoteContent": "https://www.google.com/",
+          "TextFormat": {
+            "IsBold": false,
+            "IsItalic": false,
+            "FontSize": 13,
+            "Alignment": "left",
+            "FontFamilyName": "default"
+          },
+          "ChecklistItems": [],
+          "GalleryItems": [],
+          "SpreadsheetRows": 12,
+          "SpreadsheetCols": 6,
+          "SpreadsheetCells": [],
+          "ConditionalRules": [],
+          "AccessCount": 1,
+          "LastUsedUtc": "2026-11-12T15:09:35.7839216Z"
+        },
+        {
+          "Id": "966ff49fb5394643824eb6caea703b34",
+          "Title": "Etapa #1",
+          "WindowType": "shape_rect",
+          "CustomColor": "#7C3AED",
+          "CriticalityLevel": "none",
+          "X": 102.94117647058823,
+          "Y": 533.5294117647059,
+          "Width": 264,
+          "Height": 156,
+          "NoteContent": "Atualiza\u00E7\u00E3o PC Secund\u00E1rio",
+          "TextFormat": {
+            "IsBold": true,
+            "IsItalic": false,
+            "FontSize": 13,
+            "Alignment": "center",
+            "FontFamilyName": "default"
+          },
+          "ChecklistItems": [],
+          "GalleryItems": [],
+          "SpreadsheetRows": 12,
+          "SpreadsheetCols": 6,
+          "SpreadsheetCells": [],
+          "ConditionalRules": [],
+          "AccessCount": 1,
+          "LastUsedUtc": "2026-11-12T15:09:35.7839254Z"
+        }
+      ],
+      "SavedCatalog": [
+        {
+          "Id": "e356dc7a1f004458ae4f703a700e0cde",
+          "Title": "abacate",
+          "WindowType": "notepad",
+          "CustomColor": "",
+          "CriticalityLevel": "none",
+          "X": 499,
+          "Y": 133,
+          "Width": 360,
+          "Height": 260,
+          "NoteContent": "abacte",
+          "TextFormat": {
+            "IsBold": false,
+            "IsItalic": false,
+            "FontSize": 13,
+            "Alignment": "left",
+            "FontFamilyName": "default"
+          },
+          "ChecklistItems": [],
+          "GalleryItems": [],
+          "SpreadsheetRows": 12,
+          "SpreadsheetCols": 6,
+          "SpreadsheetCells": [],
+          "ConditionalRules": [],
+          "AccessCount": 1,
+          "LastUsedUtc": "2026-11-11T19:09:02.4062739Z"
+        },
+        {
+          "Id": "0d297c9377c54ac3812eaa274a3c1955",
+          "Title": "Leitin",
+          "WindowType": "checklist",
+          "CustomColor": "",
+          "CriticalityLevel": "none",
+          "X": 83,
+          "Y": 82,
+          "Width": 380,
+          "Height": 290,
+          "NoteContent": "",
+          "TextFormat": {
+            "IsBold": false,
+            "IsItalic": false,
+            "FontSize": 13,
+            "Alignment": "left",
+            "FontFamilyName": "default"
+          },
+          "ChecklistItems": [
+            {
+              "Text": "abacate",
+              "IsChecked": true,
+              "LinkedNoteContent": "abacte",
+              "LinkedNoteFormat": {
+                "IsBold": false,
+                "IsItalic": false,
+                "FontSize": 13,
+                "Alignment": "left",
+                "FontFamilyName": "default"
+              }
+            },
+            {
+              "Text": "lepra",
+              "IsChecked": true,
+              "LinkedNoteContent": "asdasd",
+              "LinkedNoteFormat": {
+                "IsBold": false,
+                "IsItalic": false,
+                "FontSize": 13,
+                "Alignment": "left",
+                "FontFamilyName": "default"
+              }
+            }
+          ],
+          "GalleryItems": [],
+          "SpreadsheetRows": 12,
+          "SpreadsheetCols": 6,
+          "SpreadsheetCells": [],
+          "ConditionalRules": [],
+          "AccessCount": 1,
+          "LastUsedUtc": "2026-11-11T19:09:02.406051Z"
+        },
+        {
+          "Id": "ed31046ec0ba4390b279dc17febeccbe",
+          "Title": "lepra",
+          "WindowType": "notepad",
+          "CustomColor": "",
+          "CriticalityLevel": "none",
+          "X": 552,
+          "Y": 51,
+          "Width": 360,
+          "Height": 260,
+          "NoteContent": "asdasd",
+          "TextFormat": {
+            "IsBold": false,
+            "IsItalic": false,
+            "FontSize": 13,
+            "Alignment": "left",
+            "FontFamilyName": "default"
+          },
+          "ChecklistItems": [],
+          "GalleryItems": [],
+          "SpreadsheetRows": 12,
+          "SpreadsheetCols": 6,
+          "SpreadsheetCells": [],
+          "ConditionalRules": [],
+          "AccessCount": 1,
+          "LastUsedUtc": "2026-11-11T19:09:02.4062816Z"
+        },
+        {
+          "Id": "cb6386b8427740198039a5f8761bd851",
+          "Title": "trejeitos estranhos",
+          "WindowType": "notepad",
+          "CustomColor": "",
+          "CriticalityLevel": "none",
+          "X": 123,
+          "Y": 110,
+          "Width": 360,
+          "Height": 260,
+          "NoteContent": "Trigliseridos",
+          "TextFormat": {
+            "IsBold": true,
+            "IsItalic": false,
+            "FontSize": 13,
+            "Alignment": "left",
+            "FontFamilyName": "default"
+          },
+          "ChecklistItems": [],
+          "GalleryItems": [],
+          "SpreadsheetRows": 12,
+          "SpreadsheetCols": 6,
+          "SpreadsheetCells": [],
+          "ConditionalRules": [],
+          "AccessCount": 1,
+          "LastUsedUtc": "2026-11-11T19:09:02.406284Z"
+        },
+        {
+          "Id": "265f9f73574a447d99558463b0fb0126",
+          "Title": "Bloco de Notas #1",
+          "WindowType": "notepad",
+          "CustomColor": "",
+          "CriticalityLevel": "none",
+          "X": 522.3529411764707,
+          "Y": 454.7058823529412,
+          "Width": 432,
+          "Height": 312,
+          "NoteContent": "",
+          "TextFormat": {
+            "IsBold": false,
+            "IsItalic": false,
+            "FontSize": 13,
+            "Alignment": "left",
+            "FontFamilyName": "default"
+          },
+          "ChecklistItems": [],
+          "GalleryItems": [],
+          "SpreadsheetRows": 12,
+          "SpreadsheetCols": 6,
+          "SpreadsheetCells": [],
+          "ConditionalRules": [],
+          "AccessCount": 1,
+          "LastUsedUtc": "2026-11-12T15:09:35.7839047Z"
+        }
+      ],
+      "Connections": [
+        {
+          "Id": "6dac80a33bac4882b9c230fba4fbaa25",
+          "FromWindowId": "966ff49fb5394643824eb6caea703b34",
+          "ToWindowId": "265f9f73574a447d99558463b0fb0126",
+          "Label": "",
+          "ColorHex": "#3B82F6"
+        }
+      ]
+    }
+  ],
+  "WorkspaceBackgroundImagePath": "",
+  "SavedWindows": [
+    {
+      "Id": "265f9f73574a447d99558463b0fb0126",
+      "Title": "Bloco de Notas #1",
+      "WindowType": "notepad",
+      "CustomColor": "",
+      "CriticalityLevel": "none",
+      "X": 522.3529411764707,
+      "Y": 454.7058823529412,
+      "Width": 432,
+      "Height": 312,
+      "NoteContent": "",
+      "TextFormat": {
+        "IsBold": false,
+        "IsItalic": false,
+        "FontSize": 13,
+        "Alignment": "left",
+        "FontFamilyName": "default"
+      },
+      "ChecklistItems": [],
+      "GalleryItems": [],
+      "SpreadsheetRows": 12,
+      "SpreadsheetCols": 6,
+      "SpreadsheetCells": [],
+      "ConditionalRules": [],
+      "AccessCount": 1,
+      "LastUsedUtc": "2026-11-12T15:09:35.7839047Z"
+    },
+    {
+      "Id": "fecaed12a8074a6aa4a70ba52315ad8c",
+      "Title": "Navegador #1",
+      "WindowType": "browser",
+      "CustomColor": "",
+      "CriticalityLevel": "none",
+      "X": 1445.2941176470588,
+      "Y": 24.705882352941188,
+      "Width": 792,
+      "Height": 540,
+      "NoteContent": "https://www.google.com/",
+      "TextFormat": {
+        "IsBold": false,
+        "IsItalic": false,
+        "FontSize": 13,
+        "Alignment": "left",
+        "FontFamilyName": "default"
+      },
+      "ChecklistItems": [],
+      "GalleryItems": [],
+      "SpreadsheetRows": 12,
+      "SpreadsheetCols": 6,
+      "SpreadsheetCells": [],
+      "ConditionalRules": [],
+      "AccessCount": 1,
+      "LastUsedUtc": "2026-11-12T15:09:35.7839216Z"
+    },
+    {
+      "Id": "966ff49fb5394643824eb6caea703b34",
+      "Title": "Etapa #1",
+      "WindowType": "shape_rect",
+      "CustomColor": "#7C3AED",
+      "CriticalityLevel": "none",
+      "X": 102.94117647058823,
+      "Y": 533.5294117647059,
+      "Width": 264,
+      "Height": 156,
+      "NoteContent": "Atualiza\u00E7\u00E3o PC Secund\u00E1rio",
+      "TextFormat": {
+        "IsBold": true,
+        "IsItalic": false,
+        "FontSize": 13,
+        "Alignment": "center",
+        "FontFamilyName": "default"
+      },
+      "ChecklistItems": [],
+      "GalleryItems": [],
+      "SpreadsheetRows": 12,
+      "SpreadsheetCols": 6,
+      "SpreadsheetCells": [],
+      "ConditionalRules": [],
+      "AccessCount": 1,
+      "LastUsedUtc": "2026-11-12T15:09:35.7839254Z"
+    }
+  ],
   "SavedCatalog": [
     {
       "Id": "e356dc7a1f004458ae4f703a700e0cde",
       "Title": "abacate",
       "WindowType": "notepad",
+      "CustomColor": "",
+      "CriticalityLevel": "none",
       "X": 499,
       "Y": 133,
       "Width": 360,
@@ -20,6 +375,11 @@
         "FontFamilyName": "default"
       },
       "ChecklistItems": [],
+      "GalleryItems": [],
+      "SpreadsheetRows": 12,
+      "SpreadsheetCols": 6,
+      "SpreadsheetCells": [],
+      "ConditionalRules": [],
       "AccessCount": 1,
       "LastUsedUtc": "2026-11-11T19:09:02.4062739Z"
     },
@@ -27,6 +387,8 @@
       "Id": "0d297c9377c54ac3812eaa274a3c1955",
       "Title": "Leitin",
       "WindowType": "checklist",
+      "CustomColor": "",
+      "CriticalityLevel": "none",
       "X": 83,
       "Y": 82,
       "Width": 380,
@@ -65,6 +427,11 @@
           }
         }
       ],
+      "GalleryItems": [],
+      "SpreadsheetRows": 12,
+      "SpreadsheetCols": 6,
+      "SpreadsheetCells": [],
+      "ConditionalRules": [],
       "AccessCount": 1,
       "LastUsedUtc": "2026-11-11T19:09:02.406051Z"
     },
@@ -72,6 +439,8 @@
       "Id": "ed31046ec0ba4390b279dc17febeccbe",
       "Title": "lepra",
       "WindowType": "notepad",
+      "CustomColor": "",
+      "CriticalityLevel": "none",
       "X": 552,
       "Y": 51,
       "Width": 360,
@@ -85,6 +454,11 @@
         "FontFamilyName": "default"
       },
       "ChecklistItems": [],
+      "GalleryItems": [],
+      "SpreadsheetRows": 12,
+      "SpreadsheetCols": 6,
+      "SpreadsheetCells": [],
+      "ConditionalRules": [],
       "AccessCount": 1,
       "LastUsedUtc": "2026-11-11T19:09:02.4062816Z"
     },
@@ -92,6 +466,8 @@
       "Id": "cb6386b8427740198039a5f8761bd851",
       "Title": "trejeitos estranhos",
       "WindowType": "notepad",
+      "CustomColor": "",
+      "CriticalityLevel": "none",
       "X": 123,
       "Y": 110,
       "Width": 360,
@@ -105,8 +481,40 @@
         "FontFamilyName": "default"
       },
       "ChecklistItems": [],
+      "GalleryItems": [],
+      "SpreadsheetRows": 12,
+      "SpreadsheetCols": 6,
+      "SpreadsheetCells": [],
+      "ConditionalRules": [],
       "AccessCount": 1,
       "LastUsedUtc": "2026-11-11T19:09:02.406284Z"
+    },
+    {
+      "Id": "265f9f73574a447d99558463b0fb0126",
+      "Title": "Bloco de Notas #1",
+      "WindowType": "notepad",
+      "CustomColor": "",
+      "CriticalityLevel": "none",
+      "X": 522.3529411764707,
+      "Y": 454.7058823529412,
+      "Width": 432,
+      "Height": 312,
+      "NoteContent": "",
+      "TextFormat": {
+        "IsBold": false,
+        "IsItalic": false,
+        "FontSize": 13,
+        "Alignment": "left",
+        "FontFamilyName": "default"
+      },
+      "ChecklistItems": [],
+      "GalleryItems": [],
+      "SpreadsheetRows": 12,
+      "SpreadsheetCols": 6,
+      "SpreadsheetCells": [],
+      "ConditionalRules": [],
+      "AccessCount": 1,
+      "LastUsedUtc": "2026-11-12T15:09:35.7839047Z"
     }
   ]
 }

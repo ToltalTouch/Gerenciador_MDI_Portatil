@@ -7,7 +7,15 @@
         Width="1024" Height="680"
         MinWidth="640" MinHeight="420"
         WindowStartupLocation="CenterScreen">
-  
+
+  <Window.Styles>
+    <Style Selector="MenuItem > PathIcon">
+      <Setter Property="Width" Value="12"/>
+      <Setter Property="Height" Value="12"/>
+      <Setter Property="Foreground" Value="#CBD5E1"/>
+    </Style>
+  </Window.Styles>
+
   <LayoutTransformControl Name="RootScaleHost">
     <Grid>
       <DockPanel Name="RootDock" Background="#0F172A">
@@ -24,90 +32,215 @@
               <Image Source="avares://AvaloniaMdiApp/Assets/app-icon.png" Width="24" Height="24" VerticalAlignment="Center" Margin="0,0,4,0"/>
               <Menu Name="MainMenu" Background="Transparent" VerticalAlignment="Center">
                 <MenuItem Name="MenuTopWorkspaces" Header="Workspaces" SubmenuOpened="MenuWorkspaces_SubmenuOpened">
-                  <MenuItem Header="➕ Novo Workspace..." Click="NovoWorkspace_Click"/>
-                  <MenuItem Header="✏ Renomear Workspace Atual..." Click="RenomearWorkspaceAtual_Click"/>
-                  <MenuItem Name="MenuExcluirWorkspace" Header="🗑 Excluir Workspace Atual" Click="ExcluirWorkspaceAtual_Click"/>
+                  <MenuItem Header="Novo Workspace..." Click="NovoWorkspace_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Plus}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Renomear Workspace Atual..." Click="RenomearWorkspaceAtual_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Edit}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Name="MenuExcluirWorkspace" Header="Excluir Workspace Atual" Click="ExcluirWorkspaceAtual_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Trash}"/></MenuItem.Icon>
+                  </MenuItem>
                   <Separator/>
-                  <MenuItem Name="MenuListaWorkspaces" Header="🗂 Alternar Workspace"/>
+                  <MenuItem Name="MenuListaWorkspaces" Header="Alternar Workspace">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Workspace}"/></MenuItem.Icon>
+                  </MenuItem>
                   <Separator/>
-                  <MenuItem Header="💾 Salvar Estado do Workspace" Click="SalvarTodasJanelas_Click"/>
+                  <MenuItem Header="Salvar Estado do Workspace" Click="SalvarTodasJanelas_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Save}"/></MenuItem.Icon>
+                  </MenuItem>
                 </MenuItem>
 
                 <MenuItem Name="MenuTopNotas" Header="Bloco de Notas" SubmenuOpened="MenuModulo_SubmenuOpened">
-                  <MenuItem Header="📝 Novo Bloco de Notas" Click="AbrirBlocoDeNotas_Click"/>
-                  <MenuItem Header="💾 Salvar Nota Ativa" Click="SalvarJanelaAtiva_Click"/>
+                  <MenuItem Header="Novo Bloco de Notas" Click="AbrirBlocoDeNotas_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Note}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Salvar Nota Ativa" Click="SalvarJanelaAtiva_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Save}"/></MenuItem.Icon>
+                  </MenuItem>
                   <Separator/>
-                  <MenuItem Name="MenuNotasMaisUsadas" Header="⭐ Mais Usadas"/>
-                  <MenuItem Name="MenuNotasSalvas" Header="📂 Notas Salvas"/>
+                  <MenuItem Name="MenuNotasMaisUsadas" Header="Mais Usadas">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Star}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Name="MenuNotasSalvas" Header="Notas Salvas">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Folder}"/></MenuItem.Icon>
+                  </MenuItem>
                 </MenuItem>
 
                 <MenuItem Name="MenuTopListas" Header="Lista de Marcação" SubmenuOpened="MenuModulo_SubmenuOpened">
-                  <MenuItem Header="☑ Nova Lista de Marcação" Click="AbrirChecklist_Click"/>
-                  <MenuItem Header="💾 Salvar Lista Ativa" Click="SalvarJanelaAtiva_Click"/>
+                  <MenuItem Header="Nova Lista de Marcação" Click="AbrirChecklist_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Checklist}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Salvar Lista Ativa" Click="SalvarJanelaAtiva_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Save}"/></MenuItem.Icon>
+                  </MenuItem>
                   <Separator/>
-                  <MenuItem Name="MenuListasMaisUsadas" Header="⭐ Mais Usadas"/>
-                  <MenuItem Name="MenuListasSalvas" Header="📂 Listas Salvas"/>
+                  <MenuItem Name="MenuListasMaisUsadas" Header="Mais Usadas">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Star}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Name="MenuListasSalvas" Header="Listas Salvas">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Folder}"/></MenuItem.Icon>
+                  </MenuItem>
                 </MenuItem>
 
                 <MenuItem Name="MenuTopPlanilhas" Header="Planilhas" SubmenuOpened="MenuModulo_SubmenuOpened">
-                  <MenuItem Header="📊 Nova Planilha em Branco" Click="AbrirPlanilha_Click"/>
-                  <MenuItem Header="📈 Nova Planilha com Exemplo (Fórmulas)" Click="AbrirPlanilhaExemplo_Click"/>
-                  <MenuItem Header="💾 Salvar Planilha Ativa" Click="SalvarJanelaAtiva_Click"/>
+                  <MenuItem Header="Nova Planilha em Branco" Click="AbrirPlanilha_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Spreadsheet}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Nova Planilha com Exemplo (Fórmulas)" Click="AbrirPlanilhaExemplo_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Chart}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Salvar Planilha Ativa" Click="SalvarJanelaAtiva_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Save}"/></MenuItem.Icon>
+                  </MenuItem>
                   <Separator/>
-                  <MenuItem Name="MenuPlanilhasMaisUsadas" Header="⭐ Mais Usadas"/>
-                  <MenuItem Name="MenuPlanilhasSalvas" Header="📂 Planilhas Salvas"/>
+                  <MenuItem Name="MenuPlanilhasMaisUsadas" Header="Mais Usadas">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Star}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Name="MenuPlanilhasSalvas" Header="Planilhas Salvas">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Folder}"/></MenuItem.Icon>
+                  </MenuItem>
                 </MenuItem>
 
                 <MenuItem Name="MenuTopGaleria" Header="Galeria" SubmenuOpened="MenuModulo_SubmenuOpened">
-                  <MenuItem Header="🖼 Nova Galeria de Imagens" Click="AbrirGaleria_Click"/>
-                  <MenuItem Header="🌄 Abrir Imagem em Janela..." Click="AbrirImagemAvulsa_Click"/>
-                  <MenuItem Header="🧹 Restaurar Fundo do Workspace" Click="RestaurarFundoWorkspace_Click"/>
+                  <MenuItem Header="Nova Galeria de Imagens" Click="AbrirGaleria_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Image}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Abrir Imagem em Janela..." Click="AbrirImagemAvulsa_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Plus}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Restaurar Fundo do Workspace" Click="RestaurarFundoWorkspace_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Trash}"/></MenuItem.Icon>
+                  </MenuItem>
                   <Separator/>
-                  <MenuItem Name="MenuGaleriaMaisUsadas" Header="⭐ Mais Usadas"/>
-                  <MenuItem Name="MenuGaleriaSalvas" Header="📂 Galerias e Imagens Salvas"/>
+                  <MenuItem Name="MenuGaleriaMaisUsadas" Header="Mais Usadas">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Star}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Name="MenuGaleriaSalvas" Header="Galerias e Imagens Salvas">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Folder}"/></MenuItem.Icon>
+                  </MenuItem>
                 </MenuItem>
 
                 <MenuItem Name="MenuTopNavegador" Header="Navegador" SubmenuOpened="MenuModulo_SubmenuOpened">
-                  <MenuItem Header="🌐 Novo Navegador Web" Click="AbrirNavegador_Click"/>
+                  <MenuItem Header="Novo Navegador Web" Click="AbrirNavegador_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Globe}"/></MenuItem.Icon>
+                  </MenuItem>
                   <Separator/>
-                  <MenuItem Header="🔍 Abrir Google" Click="AbrirNavegadorGoogle_Click"/>
-                  <MenuItem Header="▶ Abrir YouTube" Click="AbrirNavegadorYouTube_Click"/>
-                  <MenuItem Header="💻 Abrir GitHub" Click="AbrirNavegadorGitHub_Click"/>
-                  <MenuItem Header="📚 Abrir Wikipédia" Click="AbrirNavegadorWikipedia_Click"/>
+                  <MenuItem Header="Abrir Google" Click="AbrirNavegadorGoogle_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Search}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Abrir YouTube" Click="AbrirNavegadorYouTube_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Play}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Abrir GitHub" Click="AbrirNavegadorGitHub_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Code}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Abrir Wikipédia" Click="AbrirNavegadorWikipedia_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Book}"/></MenuItem.Icon>
+                  </MenuItem>
                   <Separator/>
-                  <MenuItem Name="MenuNavegadorMaisUsadas" Header="⭐ Mais Usados"/>
-                  <MenuItem Name="MenuNavegadorSalvos" Header="📂 Navegadores Salvos"/>
+                  <MenuItem Name="MenuNavegadorMaisUsadas" Header="Mais Usados">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Star}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Name="MenuNavegadorSalvos" Header="Navegadores Salvos">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Folder}"/></MenuItem.Icon>
+                  </MenuItem>
                 </MenuItem>
 
                 <MenuItem Name="MenuTopFluxograma" Header="Fluxograma" SubmenuOpened="MenuFluxograma_SubmenuOpened">
-                  <MenuItem Header="🔗 Conectar Janelas (Modo Ligação)" Click="AlternarModoConexao_Click"/>
-                  <MenuItem Name="MenuCorLinhasFluxograma" Header="🎨 Cor das Linhas do Fluxograma"/>
-                  <MenuItem Header="🗑 Remover Todas as Ligações" Click="LimparConexoesWorkspace_Click"/>
+                  <MenuItem Header="Adicionar Retângulo (Etapa / Processo)" Click="AdicionarFormaRetangulo_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.ShapeRect}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Adicionar Losango (Decisão / Condição)" Click="AdicionarFormaLosango_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.ShapeDiamond}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Adicionar Círculo (Início / Fim)" Click="AdicionarFormaCirculo_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.ShapeCircle}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Adicionar Aviso de Criticidade">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Warning}"/></MenuItem.Icon>
+                    <MenuItem Header="Aviso Crítico (Urgente)" Click="AdicionarAvisoCritico_Click">
+                      <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Warning}"/></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="Aviso de Alta Criticidade" Click="AdicionarAvisoAlto_Click">
+                      <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Warning}"/></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="Aviso de Média Criticidade (Atenção)" Click="AdicionarAvisoMedio_Click">
+                      <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Warning}"/></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="Aviso de Baixa Criticidade (Informativo)" Click="AdicionarAvisoBaixo_Click">
+                      <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Warning}"/></MenuItem.Icon>
+                    </MenuItem>
+                  </MenuItem>
                   <Separator/>
-                  <MenuItem Header="➕ Zoom In no Workspace (Ctrl + Scroll)" Click="WorkspaceZoomIn_Click"/>
-                  <MenuItem Header="➖ Zoom Out no Workspace (Ctrl + Scroll)" Click="WorkspaceZoomOut_Click"/>
-                  <MenuItem Header="🎯 Redefinir Zoom (100%)" Click="WorkspaceZoomReset_Click"/>
+                  <MenuItem Header="Conectar Janelas / Formas (Modo Ligação)" Click="AlternarModoConexao_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Link}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Name="MenuCriticidadeJanelaAtiva" Header="Criticidade da Janela / Forma Ativa">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Warning}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Name="MenuCorLinhasFluxograma" Header="Cor das Linhas do Fluxograma">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Palette}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Remover Todas as Ligações" Click="LimparConexoesWorkspace_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Trash}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <Separator/>
+                  <MenuItem Header="Zoom In no Workspace (Ctrl + Scroll)" Click="WorkspaceZoomIn_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Plus}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Zoom Out no Workspace (Ctrl + Scroll)" Click="WorkspaceZoomOut_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Minus}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Redefinir Zoom (100%)" Click="WorkspaceZoomReset_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Target}"/></MenuItem.Icon>
+                  </MenuItem>
                 </MenuItem>
 
                 <MenuItem Name="MenuTopJanelas" Header="Janelas" SubmenuOpened="MenuModulo_SubmenuOpened">
-                  <MenuItem Header="❐ Organizar em Cascata" Click="OrganizarCascata_Click"/>
-                  <MenuItem Header="⊞ Organizar em Grade" Click="OrganizarGrade_Click"/>
-                  <MenuItem Name="MenuCorJanelaAtiva" Header="🎨 Cor da Janela Ativa"/>
+                  <MenuItem Header="Organizar em Cascata" Click="OrganizarCascata_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Cascade}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Organizar em Grade" Click="OrganizarGrade_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Workspace}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Name="MenuCorJanelaAtiva" Header="Cor da Janela Ativa">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Palette}"/></MenuItem.Icon>
+                  </MenuItem>
                   <Separator/>
-                  <MenuItem Header="💾 Salvar Janela Ativa" Click="SalvarJanelaAtiva_Click"/>
-                  <MenuItem Header="💾 Salvar Todas as Janelas" Click="SalvarTodasJanelas_Click"/>
+                  <MenuItem Header="Salvar Janela Ativa" Click="SalvarJanelaAtiva_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Save}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Salvar Todas as Janelas" Click="SalvarTodasJanelas_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Save}"/></MenuItem.Icon>
+                  </MenuItem>
                   <Separator/>
-                  <MenuItem Name="MenuMaisUsadas" Header="⭐ Todas as Mais Usadas"/>
-                  <MenuItem Name="MenuJanelasSalvas" Header="📂 Todas as Janelas Salvas"/>
+                  <MenuItem Name="MenuMaisUsadas" Header="Todas as Mais Usadas">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Star}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Name="MenuJanelasSalvas" Header="Todas as Janelas Salvas">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Folder}"/></MenuItem.Icon>
+                  </MenuItem>
                   <Separator/>
-                  <MenuItem Header="✕ Fechar Todas as Janelas" Click="FecharTodasJanelas_Click"/>
+                  <MenuItem Header="Fechar Todas as Janelas" Click="FecharTodasJanelas_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Trash}"/></MenuItem.Icon>
+                  </MenuItem>
                 </MenuItem>
 
                 <MenuItem Name="MenuTopPreferencias" Header="Preferências">
-                  <MenuItem Header="⚙ Configurar Preferências e Layout..." Click="AbrirConfiguracoes_Click"/>
-                  <MenuItem Header="🌗 Alternar Tema (Claro / Escuro)" Click="AlternarTemaRapido_Click"/>
+                  <MenuItem Header="Configurar Preferências e Layout..." Click="AbrirConfiguracoes_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Settings}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Alternar Tema (Claro / Escuro)" Click="AlternarTemaRapido_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Theme}"/></MenuItem.Icon>
+                  </MenuItem>
                   <Separator/>
-                  <MenuItem Header="📌 Criar Atalho com Ícone na Área de Trabalho" Click="CriarAtalhoAreaDeTrabalho_Click"/>
+                  <MenuItem Header="Verificar Atualizações (GitHub Releases)..." Click="VerificarAtualizacoes_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Download}"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Criar Atalho com Ícone na Área de Trabalho" Click="CriarAtalhoAreaDeTrabalho_Click">
+                    <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Pin}"/></MenuItem.Icon>
+                  </MenuItem>
                 </MenuItem>
               </Menu>
             </StackPanel>
@@ -118,22 +251,136 @@
                 <StackPanel Name="WorkspaceTabsPanel" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center"/>
               </ScrollViewer>
               <Button Name="BtnAddWorkspace"
-                      Content="+"
                       Width="26"
                       Height="26"
                       Padding="0"
                       CornerRadius="5"
-                      FontSize="14"
-                      FontWeight="Bold"
                       HorizontalContentAlignment="Center"
                       VerticalContentAlignment="Center"
                       ToolTip.Tip="Criar novo Workspace"
-                      Click="NovoWorkspace_Click"/>
+                      Click="NovoWorkspace_Click">
+                <PathIcon Data="{x:Static local:AppIcons.Plus}" Width="11" Height="11" Foreground="#CBD5E1"/>
+              </Button>
             </StackPanel>
           </Grid>
         </Border>
 
-        <local:TaskBar x:Name="AppTaskBar" DockPanel.Dock="Bottom"/>
+        <!-- Barra Inferior Unificada: Barra de Tarefas + Menu de Fluxograma e Zoom -->
+        <Border Name="BottomBar" DockPanel.Dock="Bottom" Height="42" BorderThickness="0,1,0,0">
+          <Grid ColumnDefinitions="*,Auto">
+            <local:TaskBar x:Name="AppTaskBar" Grid.Column="0" BorderThickness="0"/>
+
+            <Border Name="WorkspaceHud"
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    Margin="0,0,12,0"
+                    Padding="5,3"
+                    CornerRadius="6"
+                    BorderThickness="1"
+                    Background="#1E293B"
+                    BorderBrush="#334155">
+              <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                <Button Name="BtnHudShapeRect"
+                        Width="26"
+                        Height="26"
+                        Padding="0"
+                        CornerRadius="5"
+                        BorderThickness="1"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        ToolTip.Tip="Adicionar Retângulo ao Fluxograma (Etapa / Processo)"
+                        Click="AdicionarFormaRetangulo_Click">
+                  <PathIcon Data="{x:Static local:AppIcons.ShapeRect}" Width="12" Height="12" Foreground="#CBD5E1"/>
+                </Button>
+                <Button Name="BtnHudShapeDiamond"
+                        Width="26"
+                        Height="26"
+                        Padding="0"
+                        CornerRadius="5"
+                        BorderThickness="1"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        ToolTip.Tip="Adicionar Losango ao Fluxograma (Decisão / Condição)"
+                        Click="AdicionarFormaLosango_Click">
+                  <PathIcon Data="{x:Static local:AppIcons.ShapeDiamond}" Width="12" Height="12" Foreground="#CBD5E1"/>
+                </Button>
+                <Button Name="BtnHudShapeCircle"
+                        Width="26"
+                        Height="26"
+                        Padding="0"
+                        CornerRadius="5"
+                        BorderThickness="1"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        ToolTip.Tip="Adicionar Círculo ao Fluxograma (Início / Fim)"
+                        Click="AdicionarFormaCirculo_Click">
+                  <PathIcon Data="{x:Static local:AppIcons.ShapeCircle}" Width="12" Height="12" Foreground="#CBD5E1"/>
+                </Button>
+                <Button Name="BtnHudWarning"
+                        Width="26"
+                        Height="26"
+                        Padding="0"
+                        CornerRadius="5"
+                        BorderThickness="1"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        ToolTip.Tip="Adicionar Aviso de Criticidade ao Fluxograma"
+                        Click="AdicionarAvisoCritico_Click">
+                  <PathIcon Data="{x:Static local:AppIcons.Warning}" Width="12" Height="12" Foreground="#CBD5E1"/>
+                </Button>
+                <Border Name="HudDividerShapes" Width="1" Height="18" Background="#334155" Margin="2,0"/>
+                <Button Name="BtnHudConnect"
+                        Height="26"
+                        Padding="10,0"
+                        CornerRadius="5"
+                        BorderThickness="1"
+                        FontSize="11.5"
+                        FontWeight="SemiBold"
+                        VerticalContentAlignment="Center"
+                        ToolTip.Tip="Ligar duas janelas ou formas com uma linha de fluxograma"
+                        Click="AlternarModoConexao_Click"/>
+                <Border Name="HudDivider" Width="1" Height="18" Background="#334155" Margin="2,0"/>
+                <Button Name="BtnHudZoomOut"
+                        Width="26"
+                        Height="26"
+                        Padding="0"
+                        CornerRadius="5"
+                        BorderThickness="1"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        ToolTip.Tip="Diminuir Zoom do Workspace (Zoom Out para caber mais janelas)"
+                        Click="WorkspaceZoomOut_Click">
+                  <PathIcon Data="{x:Static local:AppIcons.Minus}" Width="11" Height="11" Foreground="#CBD5E1"/>
+                </Button>
+                <Button Name="BtnHudZoomReset"
+                        Content="100%"
+                        MinWidth="52"
+                        Height="26"
+                        Padding="6,0"
+                        CornerRadius="5"
+                        BorderThickness="1"
+                        FontSize="11.5"
+                        FontWeight="SemiBold"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        ToolTip.Tip="Clique para redefinir o zoom do Workspace para 100%"
+                        Click="WorkspaceZoomReset_Click"/>
+                <Button Name="BtnHudZoomIn"
+                        Width="26"
+                        Height="26"
+                        Padding="0"
+                        CornerRadius="5"
+                        BorderThickness="1"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        ToolTip.Tip="Aumentar Zoom do Workspace (Zoom In)"
+                        Click="WorkspaceZoomIn_Click">
+                  <PathIcon Data="{x:Static local:AppIcons.Plus}" Width="11" Height="11" Foreground="#CBD5E1"/>
+                </Button>
+              </StackPanel>
+            </Border>
+          </Grid>
+        </Border>
 
         <!-- Área Principal do Workspace com Suporte a Zoom Out/In e Fluxograma -->
         <Grid Name="WorkspaceViewport" ClipToBounds="True">
@@ -146,72 +393,6 @@
               <Canvas Name="Workspace" Background="#0F172A" ClipToBounds="True"/>
             </LayoutTransformControl>
           </ScrollViewer>
-
-          <!-- Barra Flutuante (HUD) de Fluxograma e Zoom do Workspace -->
-          <Border Name="WorkspaceHud"
-                  HorizontalAlignment="Right"
-                  VerticalAlignment="Bottom"
-                  Margin="0,0,18,16"
-                  Padding="6,5"
-                  CornerRadius="8"
-                  BorderThickness="1"
-                  Background="#E61E293B"
-                  BorderBrush="#334155"
-                  ZIndex="500">
-            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-              <Button Name="BtnHudConnect"
-                      Content="🔗 Conectar"
-                      Height="26"
-                      Padding="10,0"
-                      CornerRadius="5"
-                      BorderThickness="1"
-                      FontSize="11.5"
-                      FontWeight="SemiBold"
-                      VerticalContentAlignment="Center"
-                      ToolTip.Tip="Ligar duas janelas com uma linha de fluxograma (ou clique no ícone 🔗 no topo de uma janela)"
-                      Click="AlternarModoConexao_Click"/>
-              <Border Name="HudDivider" Width="1" Height="18" Background="#334155" Margin="3,0"/>
-              <Button Name="BtnHudZoomOut"
-                      Content="➖"
-                      Width="26"
-                      Height="26"
-                      Padding="0"
-                      CornerRadius="5"
-                      BorderThickness="1"
-                      FontSize="11"
-                      FontWeight="Bold"
-                      HorizontalContentAlignment="Center"
-                      VerticalContentAlignment="Center"
-                      ToolTip.Tip="Diminuir Zoom do Workspace (Zoom Out para caber mais janelas)"
-                      Click="WorkspaceZoomOut_Click"/>
-              <Button Name="BtnHudZoomReset"
-                      Content="100%"
-                      MinWidth="52"
-                      Height="26"
-                      Padding="6,0"
-                      CornerRadius="5"
-                      BorderThickness="1"
-                      FontSize="11.5"
-                      FontWeight="SemiBold"
-                      HorizontalContentAlignment="Center"
-                      VerticalContentAlignment="Center"
-                      ToolTip.Tip="Clique para redefinir o zoom do Workspace para 100%"
-                      Click="WorkspaceZoomReset_Click"/>
-              <Button Name="BtnHudZoomIn"
-                      Content="➕"
-                      Width="26"
-                      Height="26"
-                      Padding="0"
-                      CornerRadius="5"
-                      BorderThickness="1"
-                      FontSize="11"
-                      FontWeight="Bold"
-                      HorizontalContentAlignment="Center"
-                      VerticalContentAlignment="Center"
-                      ToolTip.Tip="Aumentar Zoom do Workspace (Zoom In)"
-                      Click="WorkspaceZoomIn_Click"/>
-            </StackPanel>
-          </Border>
         </Grid>
       </DockPanel>
 

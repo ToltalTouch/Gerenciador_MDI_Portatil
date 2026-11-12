@@ -79,7 +79,7 @@ namespace AvaloniaMdiApp
 
             _btnGalleryAddFiles = new Button
             {
-                Content = "➕ Adicionar Imagens...",
+                Content = AppIcons.WithText(AppIcons.Plus, "Adicionar Imagens...", 10.5, 5, ThemePalette.IconLightGray),
                 Height = 28,
                 Padding = new Thickness(10, 0),
                 Margin = new Thickness(0, 0, 6, 0),
@@ -220,7 +220,7 @@ namespace AvaloniaMdiApp
 
             _lblGalleryEmptyTitle = new TextBlock
             {
-                Text = "🖼 Sua galeria está vazia",
+                Text = "Sua galeria está vazia",
                 FontSize = 14,
                 FontWeight = FontWeight.SemiBold,
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -229,7 +229,7 @@ namespace AvaloniaMdiApp
 
             _lblGalleryEmptySub = new TextBlock
             {
-                Text = "Clique em \"+ Adicionar Imagens...\", cole um caminho acima\nou arraste arquivos de imagem para cá.\nDepois, clique em \"🪟 Janela\" para abrir a imagem na janela principal!",
+                Text = "Clique em \"+ Adicionar Imagens...\", cole um caminho acima\nou arraste arquivos de imagem para cá.\nDepois, clique em \"Janela\" para abrir a imagem na janela principal!",
                 FontSize = 11.5,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 TextAlignment = TextAlignment.Center,
@@ -361,7 +361,7 @@ namespace AvaloniaMdiApp
 
             var btnOpenWin = new Button
             {
-                Content = "🪟 Janela",
+                Content = AppIcons.WithText(AppIcons.Window, "Janela", 10.5, 4, ThemePalette.IconLightGray),
                 Height = 24,
                 Padding = new Thickness(6, 0),
                 Margin = new Thickness(0, 0, 4, 0),
@@ -378,14 +378,13 @@ namespace AvaloniaMdiApp
 
             var btnSetBg = new Button
             {
-                Content = "🖼",
+                Content = AppIcons.Create(AppIcons.Image, 11, ThemePalette.IconLightGray),
                 Width = 26,
                 Height = 24,
                 Padding = new Thickness(0),
                 Margin = new Thickness(0, 0, 4, 0),
                 CornerRadius = new CornerRadius(4),
                 BorderThickness = new Thickness(1),
-                FontSize = 11,
                 HorizontalContentAlignment = HorizontalAlignment.Center,
                 VerticalContentAlignment = VerticalAlignment.Center
             };
@@ -533,9 +532,11 @@ namespace AvaloniaMdiApp
             };
 
             _btnImageFit = CriarBotaoFormatacao("Ajustar", "Alternar modo de ajuste (Ajustar / Preencher / Original)", FontWeight.SemiBold, FontStyle.Normal, width: 64);
-            _btnImageZoomOut = CriarBotaoFormatacao("➖", "Diminuir zoom", FontWeight.Bold, FontStyle.Normal, width: 26);
+            _btnImageZoomOut = CriarBotaoFormatacao("", "Diminuir zoom", FontWeight.Bold, FontStyle.Normal, width: 26);
+            _btnImageZoomOut.Content = AppIcons.Create(AppIcons.Minus, 10, ThemePalette.IconLightGray);
             _btnImageZoomReset = CriarBotaoFormatacao("100%", "Redefinir zoom para 100%", FontWeight.SemiBold, FontStyle.Normal, width: 48);
-            _btnImageZoomIn = CriarBotaoFormatacao("➕", "Aumentar zoom", FontWeight.Bold, FontStyle.Normal, width: 26);
+            _btnImageZoomIn = CriarBotaoFormatacao("", "Aumentar zoom", FontWeight.Bold, FontStyle.Normal, width: 26);
+            _btnImageZoomIn.Content = AppIcons.Create(AppIcons.Plus, 10, ThemePalette.IconLightGray);
 
             leftControls.Children.Add(_btnImageFit);
             leftControls.Children.Add(_btnImageZoomOut);
@@ -553,7 +554,7 @@ namespace AvaloniaMdiApp
 
             _btnImageSetBg = new Button
             {
-                Content = "🖼 Fundo da Janela Principal",
+                Content = AppIcons.WithText(AppIcons.Image, "Fundo da Janela Principal", 11, 5, ThemePalette.IconLightGray),
                 Height = 25,
                 Padding = new Thickness(8, 0),
                 CornerRadius = new CornerRadius(4),

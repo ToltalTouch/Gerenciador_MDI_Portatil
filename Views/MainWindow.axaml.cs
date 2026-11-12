@@ -26,6 +26,7 @@ namespace AvaloniaMdiApp
         private int _contadorGalerias = 0;
         private int _contadorImagens = 0;
         private int _contadorPlanilhas = 0;
+        private int _contadorFormas = 0;
 
         private bool _isDarkMode = true;
         private string _widgetSizePreset = "normal";
@@ -65,6 +66,18 @@ namespace AvaloniaMdiApp
 
             ConfigurarEventosWorkspaceZoomEPan();
 
+            ModalOverlay.PropertyChanged += (s, e) =>
+            {
+                if (e.Property == Visual.IsVisibleProperty)
+                {
+                    bool modalAtivo = ModalOverlay.IsVisible;
+                    foreach (var win in _ativasJanelas)
+                    {
+                        win.SetModalOverlaySuspended(modalAtivo);
+                    }
+                }
+            };
+
             Loaded += (s, e) =>
             {
                 _settings = SettingsManager.Carregar();
@@ -80,6 +93,11 @@ namespace AvaloniaMdiApp
                 AtualizarAbasWorkspaces();
                 CarregarJanelasDoWorkspace(wsAtual);
                 AplicarZoomWorkspace(_workspaceZoom);
+
+                if (_settings.AutoCheckUpdatesOnStartup)
+                {
+                    _ = VerificarAtualizacaoGitHubAsync(silenciosoSeAtualizado: true);
+                }
             };
 
             Closing += OnMainWindowClosing;
@@ -336,7 +354,7 @@ namespace AvaloniaMdiApp
 
             if (mostrarToast && _settings.EnableNotifications)
             {
-                ToastNotification.Mostrar(Workspace, $"🔗 \"{origem.WindowTitle}\" conectado a \"{destino.WindowTitle}\"!", "success");
+                ToastNotification.Mostrar(Workspace, $"\"{origem.WindowTitle}\" conectado a \"{destino.WindowTitle}\"!", "success");
             }
 
             return visual;
@@ -404,7 +422,7 @@ namespace AvaloniaMdiApp
             }
             else
             {
-                BtnHudConnect.Content = "🔗 Conectar";
+                BtnHudConnect.Content = AppIcons.WithText(AppIcons.Link, "Conectar", 11, 5, ThemePalette.IconLightGray);
                 BtnHudConnect.Background = _isDarkMode ? ThemePalette.DarkButtonBg : ThemePalette.LightButtonBg;
                 BtnHudConnect.Foreground = _isDarkMode ? ThemePalette.DarkTextPrimary : ThemePalette.LightTextPrimary;
                 BtnHudConnect.BorderBrush = _isDarkMode ? ThemePalette.DarkBorder : ThemePalette.LightBorder;
@@ -469,7 +487,7 @@ namespace AvaloniaMdiApp
 
         private void MostrarModalConfirmacaoSaida()
         {
-            ModalTitle.Text = "💾 Salvar antes de fechar?";
+            ModalTitle.Text = "Salvar antes de fechar?";
             ModalMessage.Text = "Deseja salvar as janelas abertas, fluxogramas e informações dos seus Workspaces antes de encerrar o aplicativo?";
             ModalInputBox.IsVisible = false;
             ModalButtonsPanel.Children.Clear();
@@ -477,7 +495,7 @@ namespace AvaloniaMdiApp
             var btnCancelar = CriarBotaoModal("Cancelar", isPrimary: false, isDanger: false);
             btnCancelar.Click += (s, e) => ModalOverlay.IsVisible = false;
 
-            var btnSairSemSalvar = CriarBotaoModal("🚪 Sair sem Salvar", isPrimary: false, isDanger: true);
+            var btnSairSemSalvar = CriarBotaoModal("Sair sem Salvar", isPrimary: false, isDanger: true, AppIcons.Exit);
             btnSairSemSalvar.Click += (s, e) =>
             {
                 ModalOverlay.IsVisible = false;
@@ -485,7 +503,7 @@ namespace AvaloniaMdiApp
                 Close();
             };
 
-            var btnSalvarESair = CriarBotaoModal("💾 Salvar e Sair", isPrimary: true, isDanger: false);
+            var btnSalvarESair = CriarBotaoModal("Salvar e Sair", isPrimary: true, isDanger: false, AppIcons.Save);
             btnSalvarESair.Click += (s, e) =>
             {
                 ModalOverlay.IsVisible = false;
@@ -502,7 +520,7 @@ namespace AvaloniaMdiApp
             ModalOverlay.IsVisible = true;
         }
 
-        private Button CriarBotaoModal(string texto, bool isPrimary, bool isDanger)
+        private Button CriarBotaoModal(string texto, bool isPrimary, bool isDanger, StreamGeometry? icon = null)
         {
             IBrush bg = isPrimary
                 ? ThemePalette.Accent
@@ -516,7 +534,7 @@ namespace AvaloniaMdiApp
 
             return new Button
             {
-                Content = texto,
+                Content = icon != null ? AppIcons.WithText(icon, texto, 12, 6, ThemePalette.IconLightGray) : texto,
                 Padding = new Thickness(14, 7),
                 CornerRadius = new CornerRadius(6),
                 Background = bg,
@@ -640,11 +658,14 @@ namespace AvaloniaMdiApp
             BtnAddWorkspace.Background = btnBg;
             BtnAddWorkspace.Foreground = textPrimary;
 
-            WorkspaceHud.Background = barBg;
+            BottomBar.Background = barBg;
+            BottomBar.BorderBrush = borderBrush;
+            WorkspaceHud.Background = workspaceBg;
             WorkspaceHud.BorderBrush = borderBrush;
+            HudDividerShapes.Background = borderBrush;
             HudDivider.Background = borderBrush;
 
-            foreach (var btn in new[] { BtnHudZoomOut, BtnHudZoomReset, BtnHudZoomIn })
+            foreach (var btn in new[] { BtnHudShapeRect, BtnHudShapeDiamond, BtnHudShapeCircle, BtnHudWarning, BtnHudZoomOut, BtnHudZoomReset, BtnHudZoomIn })
             {
                 btn.Background = btnBg;
                 btn.Foreground = textPrimary;
@@ -680,7 +701,12 @@ namespace AvaloniaMdiApp
                 bool ativo = ws.Id == wsAtual.Id;
                 var btn = new Button
                 {
-                    Content = ativo ? $"🗂 {ws.Name}" : $"💤 {ws.Name}",
+                    Content = AppIcons.WithText(
+                        ativo ? AppIcons.Workspace : AppIcons.Sleep,
+                        ws.Name,
+                        11,
+                        5,
+                        ativo ? ThemePalette.IconLightGray : ThemePalette.IconMutedGray),
                     Height = 26,
                     Padding = new Thickness(10, 0),
                     CornerRadius = new CornerRadius(5),
@@ -702,7 +728,7 @@ namespace AvaloniaMdiApp
                 };
                 ToolTip.SetTip(btn, ativo
                     ? $"Workspace ativo: {ws.Name}"
-                    : $"💤 {ws.Name} (Hibernado — 0 recursos visuais na RAM. Clique para ativar)");
+                    : $"{ws.Name} (Hibernado — 0 recursos visuais na RAM. Clique para ativar)");
 
                 string targetId = ws.Id;
                 btn.Click += (s, e) => AlternarParaWorkspace(targetId);
@@ -740,7 +766,7 @@ namespace AvaloniaMdiApp
             {
                 ToastNotification.Mostrar(
                     Workspace,
-                    $"Ativado \"{destino.Name}\" • \"{nomeAnterior}\" entrou em hibernação profunda (💤)",
+                    $"Ativado \"{destino.Name}\" • \"{nomeAnterior}\" entrou em hibernação profunda",
                     "info");
             }
         }
@@ -791,6 +817,7 @@ namespace AvaloniaMdiApp
             _contadorGalerias = 0;
             _contadorImagens = 0;
             _contadorPlanilhas = 0;
+            _contadorFormas = 0;
 
             if (ws.SavedWindows != null && ws.SavedWindows.Count > 0)
             {
@@ -802,6 +829,7 @@ namespace AvaloniaMdiApp
                     else if (winData.WindowType == "gallery") _contadorGalerias++;
                     else if (winData.WindowType == "image") _contadorImagens++;
                     else if (winData.WindowType == "spreadsheet") _contadorPlanilhas++;
+                    else if (DraggableWindow.EhTipoFormaFluxograma(winData.WindowType)) _contadorFormas++;
                     else _contadorJanelas++;
 
                     CriarJanelaInterna(
@@ -823,7 +851,8 @@ namespace AvaloniaMdiApp
                         winData.SpreadsheetRows,
                         winData.SpreadsheetCols,
                         winData.SpreadsheetCells,
-                        winData.ConditionalRules);
+                        winData.ConditionalRules,
+                        winData.CriticalityLevel);
                 }
             }
 
@@ -893,7 +922,7 @@ namespace AvaloniaMdiApp
         private void NovoWorkspace_Click(object? sender, RoutedEventArgs e)
         {
             string nomeSugerido = $"Workspace {_settings.Workspaces.Count + 1}";
-            ModalTitle.Text = "➕ Criar Novo Workspace";
+            ModalTitle.Text = "Criar Novo Workspace";
             ModalMessage.Text = "Cada Workspace possui suas próprias janelas, fluxograma, galerias e plano de fundo. Digite o nome:";
             ModalInputBox.Text = nomeSugerido;
             ModalInputBox.IsVisible = true;
@@ -954,7 +983,7 @@ namespace AvaloniaMdiApp
         private void RenomearWorkspaceAtual_Click(object? sender, RoutedEventArgs e)
         {
             var wsAtual = ObterWorkspaceAtual();
-            ModalTitle.Text = "✏ Renomear Workspace";
+            ModalTitle.Text = "Renomear Workspace";
             ModalMessage.Text = $"Digite o novo nome para \"{wsAtual.Name}\":";
             ModalInputBox.Text = wsAtual.Name;
             ModalInputBox.IsVisible = true;
@@ -993,7 +1022,7 @@ namespace AvaloniaMdiApp
             }
 
             var wsAtual = ObterWorkspaceAtual();
-            ModalTitle.Text = "🗑 Excluir Workspace";
+            ModalTitle.Text = "Excluir Workspace";
             ModalMessage.Text = $"Tem certeza de que deseja excluir o workspace \"{wsAtual.Name}\" e todas as janelas dele?";
             ModalInputBox.IsVisible = false;
             ModalButtonsPanel.Children.Clear();
@@ -1045,9 +1074,10 @@ namespace AvaloniaMdiApp
                 int qtdJanelas = isCurrent ? _ativasJanelas.Count : (ws.SavedWindows?.Count ?? 0);
                 var item = new MenuItem
                 {
+                    Icon = AppIcons.Create(isCurrent ? AppIcons.Workspace : AppIcons.Sleep, 12, isCurrent ? ThemePalette.IconLightGray : ThemePalette.IconMutedGray),
                     Header = isCurrent
-                        ? $"✓ 🗂 {ws.Name} (Ativo — {qtdJanelas} janela(s))"
-                        : $"   💤 {ws.Name} (Hibernado — {qtdJanelas} janela(s) salvas)"
+                        ? $"✓ {ws.Name} (Ativo — {qtdJanelas} janela(s))"
+                        : $"{ws.Name} (Hibernado — {qtdJanelas} janela(s) salvas)"
                 };
                 string id = ws.Id;
                 item.Click += (s, ev) => AlternarParaWorkspace(id);
@@ -1147,7 +1177,8 @@ namespace AvaloniaMdiApp
                 bool isDefault = string.Equals(_settings.DefaultFlowchartLineColor, cor.Hex, StringComparison.OrdinalIgnoreCase);
                 var item = new MenuItem
                 {
-                    Header = isDefault ? $"✓ {cor.Nome} (Padrão)" : $"   {cor.Nome}"
+                    Icon = AppIcons.Create(AppIcons.CircleDot, 10, ThemePalette.IconLightGray),
+                    Header = isDefault ? $"✓ {cor.Nome} (Padrão)" : cor.Nome
                 };
                 string hex = cor.Hex;
                 item.Click += (s, ev) =>
@@ -1160,6 +1191,29 @@ namespace AvaloniaMdiApp
                     SalvarTodosWorkspacesNoDisco();
                 };
                 MenuCorLinhasFluxograma.Items.Add(item);
+            }
+
+            MenuCriticidadeJanelaAtiva.Items.Clear();
+            var ativa = ZIndexManager.ActiveWindow ?? (_ativasJanelas.Count > 0 ? _ativasJanelas[^1] : null);
+            MenuCriticidadeJanelaAtiva.IsEnabled = ativa != null;
+            if (ativa != null)
+            {
+                foreach (var crit in DraggableWindow.NiveisCriticidade)
+                {
+                    bool selecionado = string.Equals(ativa.CriticalityLevel, crit.Key, StringComparison.OrdinalIgnoreCase);
+                    var item = new MenuItem
+                    {
+                        Icon = AppIcons.Create(crit.Key == "none" ? AppIcons.CircleDot : AppIcons.Warning, 11, ThemePalette.IconLightGray),
+                        Header = selecionado ? $"✓ {crit.Label}" : crit.Label
+                    };
+                    string key = crit.Key;
+                    item.Click += (s, ev) =>
+                    {
+                        ativa.DefinirCriticidade(key);
+                        SalvarTodosWorkspacesNoDisco();
+                    };
+                    MenuCriticidadeJanelaAtiva.Items.Add(item);
+                }
             }
         }
 
@@ -1181,7 +1235,11 @@ namespace AvaloniaMdiApp
             {
                 foreach (var cor in DraggableWindow.PaletaCoresJanela)
                 {
-                    var item = new MenuItem { Header = cor.Nome };
+                    var item = new MenuItem
+                    {
+                        Icon = AppIcons.Create(AppIcons.CircleDot, 10, ThemePalette.IconLightGray),
+                        Header = cor.Nome
+                    };
                     string hex = cor.Hex;
                     item.Click += (s, ev) =>
                     {
@@ -1222,8 +1280,11 @@ namespace AvaloniaMdiApp
             {
                 foreach (var item in maisUsadas)
                 {
-                    string icone = ObterIconeTipo(item.WindowType);
-                    var mi = new MenuItem { Header = $"{icone} {item.Title} ({item.AccessCount}x)" };
+                    var mi = new MenuItem
+                    {
+                        Icon = AppIcons.Create(AppIcons.FromWindowType(item.WindowType)),
+                        Header = $"{item.Title} ({item.AccessCount}x)"
+                    };
                     string id = item.Id;
                     mi.Click += (s, ev) => AbrirJanelaDoCatalogo(id);
                     menuMaisUsadas.Items.Add(mi);
@@ -1243,19 +1304,29 @@ namespace AvaloniaMdiApp
             {
                 foreach (var item in salvas)
                 {
-                    string icone = ObterIconeTipo(item.WindowType);
-                    var mi = new MenuItem { Header = $"{icone} {item.Title}" };
+                    var mi = new MenuItem
+                    {
+                        Icon = AppIcons.Create(AppIcons.FromWindowType(item.WindowType)),
+                        Header = item.Title
+                    };
                     string id = item.Id;
                     mi.Click += (s, ev) => AbrirJanelaDoCatalogo(id);
                     menuSalvas.Items.Add(mi);
                 }
 
                 menuSalvas.Items.Add(new Separator());
-                var menuRemover = new MenuItem { Header = "🗑 Excluir dos Salvos" };
+                var menuRemover = new MenuItem
+                {
+                    Icon = AppIcons.Create(AppIcons.Trash),
+                    Header = "Excluir dos Salvos"
+                };
                 foreach (var item in salvas)
                 {
-                    string icone = ObterIconeTipo(item.WindowType);
-                    var delItem = new MenuItem { Header = $"✕ {icone} {item.Title}" };
+                    var delItem = new MenuItem
+                    {
+                        Icon = AppIcons.Create(AppIcons.FromWindowType(item.WindowType)),
+                        Header = $"✕ {item.Title}"
+                    };
                     string id = item.Id;
                     delItem.Click += (s, ev) => RemoverJanelaDoCatalogo(id);
                     menuRemover.Items.Add(delItem);
@@ -1263,16 +1334,6 @@ namespace AvaloniaMdiApp
                 menuSalvas.Items.Add(menuRemover);
             }
         }
-
-        private static string ObterIconeTipo(string windowType) => windowType switch
-        {
-            "checklist" => "☑",
-            "spreadsheet" => "📊",
-            "browser" => "🌐",
-            "gallery" => "🖼",
-            "image" => "🌄",
-            _ => "📝"
-        };
 
         private void AbrirJanelaDoCatalogo(string id)
         {
@@ -1319,7 +1380,8 @@ namespace AvaloniaMdiApp
                 saved.SpreadsheetRows,
                 saved.SpreadsheetCols,
                 saved.SpreadsheetCells,
-                saved.ConditionalRules);
+                saved.ConditionalRules,
+                saved.CriticalityLevel);
         }
 
         private void RemoverJanelaDoCatalogo(string id)
@@ -1338,6 +1400,70 @@ namespace AvaloniaMdiApp
         }
 
         // ==================== AÇÕES DOS MÓDULOS ====================
+
+        private DraggableWindow CriarFormaFluxograma(
+            string shapeType,
+            string prefixoTitulo,
+            double larguraBase,
+            double alturaBase,
+            string textoInicial = "",
+            string criticalityLevel = "none")
+        {
+            _contadorFormas++;
+            double f = ObterFatorTamanhoWidget();
+            double offsetX = 90 + ((_contadorFormas - 1) * 34) % 320;
+            double offsetY = 70 + ((_contadorFormas - 1) * 34) % 210;
+
+            string titulo = $"{prefixoTitulo} #{_contadorFormas}";
+            var win = CriarJanelaInterna(
+                titulo,
+                offsetX,
+                offsetY,
+                Math.Round(larguraBase * f),
+                Math.Round(alturaBase * f),
+                shapeType,
+                textoInicial,
+                null,
+                null,
+                1,
+                null,
+                null,
+                null,
+                null,
+                "",
+                12,
+                6,
+                null,
+                null,
+                criticalityLevel);
+
+            if (_settings.EnableNotifications)
+            {
+                ToastNotification.Mostrar(Workspace, $"{titulo} adicionado ao fluxograma!", "info");
+            }
+            return win;
+        }
+
+        private void AdicionarFormaRetangulo_Click(object? sender, RoutedEventArgs e)
+            => CriarFormaFluxograma("shape_rect", "Etapa", 220, 130, "Descreva a etapa...");
+
+        private void AdicionarFormaLosango_Click(object? sender, RoutedEventArgs e)
+            => CriarFormaFluxograma("shape_diamond", "Decisão", 230, 155, "Condição / Decisão?");
+
+        private void AdicionarFormaCirculo_Click(object? sender, RoutedEventArgs e)
+            => CriarFormaFluxograma("shape_circle", "Início / Fim", 180, 145, "Início / Fim");
+
+        private void AdicionarAvisoCritico_Click(object? sender, RoutedEventArgs e)
+            => CriarFormaFluxograma("shape_rect", "Aviso Crítico", 235, 135, "Atenção: Ponto Crítico!", "critical");
+
+        private void AdicionarAvisoAlto_Click(object? sender, RoutedEventArgs e)
+            => CriarFormaFluxograma("shape_rect", "Aviso Alta Prioridade", 235, 135, "Alta Criticidade", "high");
+
+        private void AdicionarAvisoMedio_Click(object? sender, RoutedEventArgs e)
+            => CriarFormaFluxograma("shape_rect", "Aviso de Atenção", 235, 135, "Ponto de Atenção", "medium");
+
+        private void AdicionarAvisoBaixo_Click(object? sender, RoutedEventArgs e)
+            => CriarFormaFluxograma("shape_rect", "Aviso Informativo", 235, 135, "Observação / Baixa Criticidade", "low");
 
         private void AbrirBlocoDeNotas_Click(object? sender, RoutedEventArgs e)
         {
@@ -1580,7 +1706,7 @@ namespace AvaloniaMdiApp
                     double offsetX = 75 + ((_contadorImagens - 1) * 30) % 260;
                     double offsetY = 55 + ((_contadorImagens - 1) * 30) % 180;
                     string nome = Path.GetFileNameWithoutExtension(localPath);
-                    CriarJanelaInterna($"🌄 {nome}", offsetX, offsetY, Math.Round(440 * f), Math.Round(340 * f), "image", localPath);
+                    CriarJanelaInterna(nome, offsetX, offsetY, Math.Round(440 * f), Math.Round(340 * f), "image", localPath);
                 }
             }
         }
@@ -1640,7 +1766,7 @@ namespace AvaloniaMdiApp
             double offsetY = Math.Max(40, Canvas.GetTop(galleryWin));
 
             var imgWin = CriarJanelaInterna(
-                $"🌄 {tituloImagem}",
+                tituloImagem,
                 offsetX,
                 offsetY,
                 Math.Round(440 * f),
@@ -1836,6 +1962,154 @@ namespace AvaloniaMdiApp
             }
         }
 
+        private async void VerificarAtualizacoes_Click(object? sender, RoutedEventArgs e)
+        {
+            await VerificarAtualizacaoGitHubAsync(silenciosoSeAtualizado: false);
+        }
+
+        private async System.Threading.Tasks.Task VerificarAtualizacaoGitHubAsync(bool silenciosoSeAtualizado)
+        {
+            try
+            {
+                if (!silenciosoSeAtualizado)
+                {
+                    ToastNotification.Mostrar(Workspace, "Consultando última tag de Release no GitHub...", "info");
+                }
+
+                string repo = GitHubUpdateService.NormalizarRepositorio(_settings.GitHubRepository);
+                var release = await GitHubUpdateService.VerificarUltimaReleaseAsync(repo, _settings.LastInstalledTag);
+
+                if (release == null)
+                {
+                    if (!silenciosoSeAtualizado)
+                    {
+                        MostrarModalConfigurarRepoUpdate(repo, "Nenhuma tag ou release encontrada neste repositório ainda.");
+                    }
+                    return;
+                }
+
+                if (release.IsNewer || !silenciosoSeAtualizado)
+                {
+                    MostrarModalAtualizacaoGitHub(release, repo);
+                }
+            }
+            catch
+            {
+                if (!silenciosoSeAtualizado)
+                {
+                    ToastNotification.Mostrar(Workspace, "Não foi possível conectar ao GitHub Releases.", "warning");
+                }
+            }
+        }
+
+        private void MostrarModalConfigurarRepoUpdate(string repoAtual, string motivo)
+        {
+            ModalTitle.Text = "Atualização Automática via GitHub";
+            ModalMessage.Text = $"{motivo}\nInforme o repositório GitHub (formato usuario/repositorio) para verificar as tags de Release:";
+            ModalInputBox.Text = repoAtual;
+            ModalInputBox.IsVisible = true;
+            ModalButtonsPanel.Children.Clear();
+
+            var btnFechar = CriarBotaoModal("Fechar", isPrimary: false, isDanger: false);
+            btnFechar.Click += (s, e) => ModalOverlay.IsVisible = false;
+
+            var btnVerificar = CriarBotaoModal("Salvar e Verificar", isPrimary: true, isDanger: false, AppIcons.Download);
+            btnVerificar.Click += async (s, e) =>
+            {
+                string novoRepo = GitHubUpdateService.NormalizarRepositorio(ModalInputBox.Text);
+                _settings.GitHubRepository = novoRepo;
+                SalvarTodosWorkspacesNoDisco();
+                ModalOverlay.IsVisible = false;
+                await VerificarAtualizacaoGitHubAsync(silenciosoSeAtualizado: false);
+            };
+
+            ModalButtonsPanel.Children.Add(btnFechar);
+            ModalButtonsPanel.Children.Add(btnVerificar);
+            AplicarEstiloModal();
+            ModalOverlay.IsVisible = true;
+        }
+
+        private void MostrarModalAtualizacaoGitHub(GitHubReleaseInfo release, string repo)
+        {
+            string statusVersao = release.IsNewer
+                ? $"Nova versão disponível no GitHub! (Atual: {release.CurrentVersion} → Nova Tag: {release.TagName})"
+                : $"Você já está na versão/tag mais recente ({release.TagName}).";
+
+            string resumoNotas = string.IsNullOrWhiteSpace(release.Notes)
+                ? string.Empty
+                : $"\n\nNotas da versão:\n{(release.Notes.Length > 220 ? release.Notes[..220] + "..." : release.Notes)}";
+
+            ModalTitle.Text = release.IsNewer
+                ? $"Nova Release Encontrada: {release.TagName}"
+                : $"GitHub Release: {release.TagName}";
+
+            ModalMessage.Text =
+                $"{statusVersao}\n" +
+                $"Repositório: {repo}\n" +
+                $"Pacote: {release.AssetName}" +
+                resumoNotas;
+
+            ModalInputBox.Text = repo;
+            ModalInputBox.IsVisible = false;
+            ModalButtonsPanel.Children.Clear();
+
+            var btnFechar = CriarBotaoModal("Depois", isPrimary: false, isDanger: false);
+            btnFechar.Click += (s, e) => ModalOverlay.IsVisible = false;
+
+            string labelDownload = release.IsNewer ? "Baixar e Atualizar Agora" : "Baixar Novamente";
+            var btnBaixar = CriarBotaoModal(labelDownload, isPrimary: true, isDanger: false, AppIcons.Download);
+            btnBaixar.Click += async (s, e) =>
+            {
+                btnBaixar.IsEnabled = false;
+                btnFechar.IsEnabled = false;
+
+                var progress = new Progress<int>(pct =>
+                {
+                    ModalMessage.Text = $"Baixando pacote {release.AssetName} da tag {release.TagName}... {pct}%";
+                });
+
+                var resultado = await GitHubUpdateService.BaixarAtualizacaoAsync(release, progress);
+                if (resultado.Success)
+                {
+                    _settings.LastInstalledTag = release.TagName;
+                    SalvarTodosWorkspacesNoDisco();
+
+                    ModalTitle.Text = $"Download Concluído ({release.TagName})";
+                    ModalMessage.Text = $"{resultado.Message}\n\nDeseja aplicar e abrir a nova versão agora?";
+                    ModalButtonsPanel.Children.Clear();
+
+                    var btnAbrirPasta = CriarBotaoModal("Apenas Fechar", isPrimary: false, isDanger: false);
+                    btnAbrirPasta.Click += (_, _) => ModalOverlay.IsVisible = false;
+
+                    var btnInstalar = CriarBotaoModal("Aplicar e Reiniciar", isPrimary: true, isDanger: false, AppIcons.Download);
+                    btnInstalar.Click += (_, _) =>
+                    {
+                        ModalOverlay.IsVisible = false;
+                        bool iniciou = GitHubUpdateService.IniciarInstalacaoAutomatica(resultado);
+                        if (iniciou)
+                        {
+                            _saidaConfirmada = true;
+                            Close();
+                        }
+                    };
+
+                    ModalButtonsPanel.Children.Add(btnAbrirPasta);
+                    ModalButtonsPanel.Children.Add(btnInstalar);
+                }
+                else
+                {
+                    btnBaixar.IsEnabled = true;
+                    btnFechar.IsEnabled = true;
+                    ModalMessage.Text = resultado.Message;
+                }
+            };
+
+            ModalButtonsPanel.Children.Add(btnFechar);
+            ModalButtonsPanel.Children.Add(btnBaixar);
+            AplicarEstiloModal();
+            ModalOverlay.IsVisible = true;
+        }
+
         private void AbrirConfiguracoes_Click(object? sender, RoutedEventArgs e)
         {
             if (_settingsWindow != null)
@@ -1859,6 +2133,17 @@ namespace AvaloniaMdiApp
                 AplicarTamanhoJanelaPrincipal(mainWinPreset);
                 AplicarPresetJanelasInternas(widgetPreset);
                 SalvarTodosWorkspacesNoDisco();
+            };
+
+            _settingsWindow.OnAutoUpdateChanged += (autoCheck) =>
+            {
+                _settings.AutoCheckUpdatesOnStartup = autoCheck;
+                SalvarTodosWorkspacesNoDisco();
+            };
+
+            _settingsWindow.OnCheckUpdatesRequested += async () =>
+            {
+                await VerificarAtualizacaoGitHubAsync(silenciosoSeAtualizado: false);
             };
 
             _settingsWindow.OnClosed += () => _settingsWindow = null;
@@ -1885,7 +2170,8 @@ namespace AvaloniaMdiApp
             int spreadsheetRows = 12,
             int spreadsheetCols = 6,
             List<SpreadsheetCellData>? initialSpreadsheetCells = null,
-            List<ConditionalFormatRuleData>? initialConditionalRules = null)
+            List<ConditionalFormatRuleData>? initialConditionalRules = null,
+            string criticalityLevel = "none")
         {
             var win = new DraggableWindow(
                 Workspace,
@@ -1909,7 +2195,8 @@ namespace AvaloniaMdiApp
                 spreadsheetRows,
                 spreadsheetCols,
                 initialSpreadsheetCells,
-                initialConditionalRules);
+                initialConditionalRules,
+                criticalityLevel);
 
             _ativasJanelas.Add(win);
             win.OnClosed += () =>

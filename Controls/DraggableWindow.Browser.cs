@@ -47,10 +47,14 @@ namespace AvaloniaMdiApp
                 Margin = new Thickness(0, 0, 6, 0)
             };
 
-            _btnBrowserBack = CriarBotaoFormatacao("◀", "Voltar", FontWeight.Bold, FontStyle.Normal, width: 26);
-            _btnBrowserForward = CriarBotaoFormatacao("▶", "Avançar", FontWeight.Bold, FontStyle.Normal, width: 26);
-            _btnBrowserReload = CriarBotaoFormatacao("↻", "Recarregar página", FontWeight.Bold, FontStyle.Normal, width: 26);
-            _btnBrowserHome = CriarBotaoFormatacao("🏠", "Página inicial (Google)", FontWeight.Normal, FontStyle.Normal, width: 26);
+            _btnBrowserBack = CriarBotaoFormatacao("", "Voltar", FontWeight.Bold, FontStyle.Normal, width: 26);
+            _btnBrowserBack.Content = AppIcons.Create(AppIcons.ArrowLeft, 11, ThemePalette.IconLightGray);
+            _btnBrowserForward = CriarBotaoFormatacao("", "Avançar", FontWeight.Bold, FontStyle.Normal, width: 26);
+            _btnBrowserForward.Content = AppIcons.Create(AppIcons.ArrowRight, 11, ThemePalette.IconLightGray);
+            _btnBrowserReload = CriarBotaoFormatacao("", "Recarregar página", FontWeight.Bold, FontStyle.Normal, width: 26);
+            _btnBrowserReload.Content = AppIcons.Create(AppIcons.Refresh, 11, ThemePalette.IconLightGray);
+            _btnBrowserHome = CriarBotaoFormatacao("", "Página inicial (Google)", FontWeight.Normal, FontStyle.Normal, width: 26);
+            _btnBrowserHome.Content = AppIcons.Create(AppIcons.Home, 11.5, ThemePalette.IconLightGray);
 
             leftBtns.Children.Add(_btnBrowserBack);
             leftBtns.Children.Add(_btnBrowserForward);
@@ -84,9 +88,10 @@ namespace AvaloniaMdiApp
                 VerticalContentAlignment = VerticalAlignment.Center
             };
 
-            _btnBrowserExternal = CriarBotaoFormatacao("↗", "Abrir página no navegador externo do sistema", FontWeight.Bold, FontStyle.Normal, width: 26);
+            _btnBrowserExternal = CriarBotaoFormatacao("", "Abrir página no navegador externo do sistema", FontWeight.Bold, FontStyle.Normal, width: 26);
+            _btnBrowserExternal.Content = AppIcons.Create(AppIcons.ExternalLink, 11.5, ThemePalette.IconLightGray);
 
-            _browserHost = new ChromiumWebViewHost(urlInicial)
+            _browserHost = new ChromiumWebViewHost(urlInicial, this)
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch
@@ -128,10 +133,30 @@ namespace AvaloniaMdiApp
             _browserToolbar.Child = navGrid;
             DockPanel.SetDock(_browserToolbar, Dock.Top);
 
+            var browserBodyHost = new Grid
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch
+            };
+            browserBodyHost.Children.Add(new TextBlock
+            {
+                Text = "Página Web ativa",
+                FontSize = 12,
+                Foreground = ThemePalette.IconMutedGray,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            browserBodyHost.Children.Add(_browserHost);
+
             browserDock.Children.Add(_browserToolbar);
-            browserDock.Children.Add(_browserHost);
+            browserDock.Children.Add(browserBodyHost);
 
             return browserDock;
+        }
+
+        public void SetModalOverlaySuspended(bool suspended)
+        {
+            _browserHost?.SetModalOverlaySuspended(suspended);
         }
 
         private void AtualizarCoresNavegador()

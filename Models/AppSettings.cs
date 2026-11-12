@@ -49,6 +49,7 @@ namespace AvaloniaMdiApp
         public string Title { get; set; } = string.Empty;
         public string WindowType { get; set; } = "default";
         public string CustomColor { get; set; } = string.Empty;
+        public string CriticalityLevel { get; set; } = "none"; // "none", "low", "medium", "high", "critical"
         public double X { get; set; }
         public double Y { get; set; }
         public double Width { get; set; }
@@ -93,6 +94,9 @@ namespace AvaloniaMdiApp
         public string MainWindowSizePreset { get; set; } = "1024x680";
         public string WidgetSizePreset { get; set; } = "normal";
         public string DefaultFlowchartLineColor { get; set; } = "#3B82F6";
+        public bool AutoCheckUpdatesOnStartup { get; set; } = true;
+        public string GitHubRepository { get; set; } = "ToltalTouch/Janela_multitarefa";
+        public string LastInstalledTag { get; set; } = "v1.0.0";
         public string ActiveWorkspaceId { get; set; } = string.Empty;
         public List<WorkspaceData> Workspaces { get; set; } = new();
 

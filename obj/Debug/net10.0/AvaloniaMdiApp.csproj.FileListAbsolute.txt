@@ -65,3 +65,6 @@
 /home/micael/Documentos/Gerenciador_MDI_Portatil/obj/Debug/net10.0/Avalonia.6A3A3975.Up2Date
 /home/micael/Documentos/Gerenciador_MDI_Portatil/obj/Debug/net10.0/AvaloniaMdiApp.genruntimeconfig.cache
 /home/micael/Documentos/Gerenciador_MDI_Portatil/obj/Debug/net10.0/ref/AvaloniaMdiApp.dll
+C:\C#\Gerenciador MDI Portátil\obj\Debug\net10.0\AvaloniaMdiApp.dll
+C:\C#\Gerenciador MDI Portátil\obj\Debug\net10.0\refint\AvaloniaMdiApp.dll
+C:\C#\Gerenciador MDI Portátil\obj\Debug\net10.0\AvaloniaMdiApp.pdb

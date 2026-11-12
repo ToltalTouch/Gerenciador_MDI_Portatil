@@ -11,10 +11,14 @@ namespace AvaloniaMdiApp
     public class SettingsWindow : Border
     {
         public event Action<bool, bool, double, string, string>? OnSettingsChanged;
+        public event Action<bool>? OnAutoUpdateChanged;
+        public event Action? OnCheckUpdatesRequested;
         public event Action? OnClosed;
 
         private readonly ToggleSwitch _themeToggle;
         private readonly ToggleSwitch _notifToggle;
+        private readonly ToggleSwitch _autoUpdateToggle;
+        private readonly Button _btnCheckUpdateNow;
         private readonly ComboBox _cmbLayoutScale;
         private readonly ComboBox _cmbMainWindowSize;
         private readonly ComboBox _cmbWidgetSize;
@@ -24,11 +28,13 @@ namespace AvaloniaMdiApp
         private readonly Button _btnClose;
         private readonly Border _rowTheme;
         private readonly Border _rowNotif;
+        private readonly Border _rowAutoUpdate;
         private readonly Border _rowLayoutScale;
         private readonly Border _rowMainWindowSize;
         private readonly Border _rowWidgetSize;
         private readonly TextBlock _lblTheme;
         private readonly TextBlock _lblNotif;
+        private readonly TextBlock _lblAutoUpdate;
         private readonly TextBlock _lblSectionLayout;
         private readonly TextBlock _lblLayoutScale;
         private readonly TextBlock _lblMainWindowSize;
@@ -69,7 +75,7 @@ namespace AvaloniaMdiApp
             _suppressEvents = true;
 
             Width = 390;
-            Height = 395;
+            Height = 450;
             double initialX = (workspace.Bounds.Width - Width) / 2 > 0 ? (workspace.Bounds.Width - Width) / 2 : 120;
             Canvas.SetLeft(this, initialX);
             Canvas.SetTop(this, 50);
@@ -93,15 +99,24 @@ namespace AvaloniaMdiApp
 
             _lblTitle = new TextBlock
             {
-                Text = "⚙ Preferências do Sistema",
+                Text = "Preferências do Sistema",
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(12, 0, 0, 0),
                 FontWeight = FontWeight.SemiBold,
                 FontSize = 13,
                 IsHitTestVisible = false
             };
-            Grid.SetColumn(_lblTitle, 0);
-            grid.Children.Add(_lblTitle);
+            var titleStack = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 7,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(12, 0, 0, 0),
+                IsHitTestVisible = false
+            };
+            titleStack.Children.Add(AppIcons.Create(AppIcons.Settings, 13, ThemePalette.IconLightGray));
+            titleStack.Children.Add(_lblTitle);
+            Grid.SetColumn(titleStack, 0);
+            grid.Children.Add(titleStack);
 
             _btnClose = new Button
             {
@@ -162,9 +177,55 @@ namespace AvaloniaMdiApp
             _notifToggle.IsCheckedChanged += (s, e) => SalvarEAtualizar();
             _rowNotif = CriarLinhaControle(_lblNotif, _notifToggle);
 
+            _lblAutoUpdate = new TextBlock
+            {
+                Text = "Atualização via GitHub Release",
+                FontSize = 12.5,
+                FontWeight = FontWeight.Medium,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _autoUpdateToggle = new ToggleSwitch
+            {
+                IsChecked = settings.AutoCheckUpdatesOnStartup,
+                OnContent = "Auto",
+                OffContent = "Manual",
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _autoUpdateToggle.IsCheckedChanged += (s, e) =>
+            {
+                if (_suppressEvents) return;
+                OnAutoUpdateChanged?.Invoke(_autoUpdateToggle.IsChecked ?? true);
+            };
+            _btnCheckUpdateNow = new Button
+            {
+                Content = AppIcons.WithText(AppIcons.Download, "Buscar", 10.5, 4, ThemePalette.IconLightGray),
+                Height = 26,
+                Padding = new Thickness(8, 0),
+                CornerRadius = new CornerRadius(5),
+                Background = ThemePalette.Accent,
+                Foreground = Brushes.White,
+                FontSize = 11,
+                FontWeight = FontWeight.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+            ToolTip.SetTip(_btnCheckUpdateNow, "Verificar nova tag de Release no GitHub agora");
+            _btnCheckUpdateNow.Click += (s, e) => OnCheckUpdatesRequested?.Invoke();
+
+            var updateRightStack = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 6,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            updateRightStack.Children.Add(_autoUpdateToggle);
+            updateRightStack.Children.Add(_btnCheckUpdateNow);
+            _rowAutoUpdate = CriarLinhaControle(_lblAutoUpdate, updateRightStack);
+
             _lblSectionLayout = new TextBlock
             {
-                Text = "📐 AJUSTE DO TAMANHO DO LAYOUT",
+                Text = "AJUSTE DO TAMANHO DO LAYOUT",
                 FontSize = 11,
                 FontWeight = FontWeight.Bold,
                 Margin = new Thickness(2, 6, 0, 2)
@@ -259,6 +320,7 @@ namespace AvaloniaMdiApp
 
             contentPanel.Children.Add(_rowTheme);
             contentPanel.Children.Add(_rowNotif);
+            contentPanel.Children.Add(_rowAutoUpdate);
             contentPanel.Children.Add(_lblSectionLayout);
             contentPanel.Children.Add(_rowLayoutScale);
             contentPanel.Children.Add(_rowMainWindowSize);
@@ -308,13 +370,13 @@ namespace AvaloniaMdiApp
             var textBrush = isDark ? ThemePalette.DarkTextPrimary : ThemePalette.LightTextPrimary;
             var subTextBrush = isDark ? ThemePalette.DarkTextSecondary : ThemePalette.LightTextSecondary;
 
-            foreach (var row in new[] { _rowTheme, _rowNotif, _rowLayoutScale, _rowMainWindowSize, _rowWidgetSize })
+            foreach (var row in new[] { _rowTheme, _rowNotif, _rowAutoUpdate, _rowLayoutScale, _rowMainWindowSize, _rowWidgetSize })
             {
                 row.Background = rowBg;
                 row.BorderBrush = rowBorder;
             }
 
-            foreach (var lbl in new[] { _lblTheme, _lblNotif, _lblLayoutScale, _lblMainWindowSize, _lblWidgetSize })
+            foreach (var lbl in new[] { _lblTheme, _lblNotif, _lblAutoUpdate, _lblLayoutScale, _lblMainWindowSize, _lblWidgetSize })
             {
                 lbl.Foreground = textBrush;
             }

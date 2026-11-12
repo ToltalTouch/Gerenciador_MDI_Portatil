@@ -31,10 +31,29 @@ namespace AvaloniaMdiApp
             IBrush accentBrush = tipo == "success" ? SuccessBorder : tipo == "warning" ? WarningBorder : InfoBorder;
             BorderBrush = accentBrush;
 
-            double posX = workspace.Bounds.Width - Width - 20;
-            double posY = workspace.Bounds.Height - Height - 20;
-            Canvas.SetLeft(this, posX > 0 ? posX : 20);
-            Canvas.SetTop(this, posY > 0 ? posY : 20);
+            double viewWidth = workspace.Bounds.Width;
+            double viewHeight = workspace.Bounds.Height;
+            double offsetX = 0;
+            double offsetY = 0;
+
+            if (workspace.Parent is LayoutTransformControl zoomHost &&
+                zoomHost.Parent is ScrollViewer scroller &&
+                scroller.Viewport.Width > 0 &&
+                scroller.Viewport.Height > 0)
+            {
+                double scale = (zoomHost.LayoutTransform as ScaleTransform)?.ScaleX ?? 1.0;
+                if (scale <= 0.01) scale = 1.0;
+                offsetX = scroller.Offset.X / scale;
+                offsetY = scroller.Offset.Y / scale;
+                viewWidth = scroller.Viewport.Width / scale;
+                viewHeight = scroller.Viewport.Height / scale;
+            }
+
+            double posX = offsetX + viewWidth - Width - 20;
+            double posY = offsetY + viewHeight - Height - 16;
+            Canvas.SetLeft(this, Math.Max(16, posX));
+            Canvas.SetTop(this, Math.Max(16, posY));
+            ZIndex = 9500;
 
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));

@@ -26,6 +26,10 @@ namespace AvaloniaMdiApp
         public static readonly IBrush DarkTextSecondary = SolidColorBrush.Parse("#94A3B8").ToImmutable();
         public static readonly IBrush DarkButtonBg = SolidColorBrush.Parse("#334155").ToImmutable();
 
+        // Ícones minimalistas em tons de cinza claro
+        public static readonly IBrush IconLightGray = SolidColorBrush.Parse("#CBD5E1").ToImmutable();
+        public static readonly IBrush IconMutedGray = SolidColorBrush.Parse("#94A3B8").ToImmutable();
+
         // Tema Claro (Light)
         public static readonly IBrush LightWorkspaceBg = SolidColorBrush.Parse("#F1F5F9").ToImmutable();
         public static readonly IBrush LightBarBg = SolidColorBrush.Parse("#FFFFFF").ToImmutable();

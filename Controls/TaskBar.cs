@@ -170,7 +170,7 @@ namespace AvaloniaMdiApp
 
             if (_windowLabels.TryGetValue(window, out var lbl))
             {
-                lbl.Text = isHibernated ? $"💤 {window.WindowTitle}" : window.WindowTitle;
+                lbl.Text = isHibernated ? $"◦ {window.WindowTitle}" : window.WindowTitle;
             }
 
             if (_isDarkMode)
@@ -202,7 +202,7 @@ namespace AvaloniaMdiApp
 
             string baseText = count == 1 ? "1 janela" : $"{count} janelas";
             _lblStatus.Text = hibernated > 0
-                ? $"{baseText} ({hibernated} 💤 hibernada(s))"
+                ? $"{baseText} ({hibernated} hibernada(s))"
                 : baseText;
         }
     }

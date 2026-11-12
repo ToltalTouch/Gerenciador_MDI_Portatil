@@ -28,7 +28,19 @@ namespace AvaloniaMdiApp
 
         // Windows handles
         private IntPtr _hwnd;
+        private IntPtr _parentHwnd;
+        private IntPtr _oldParentWndProc;
+        private WndProcDelegate? _parentWndProcDelegate;
         private CoreWebView2Controller? _controller;
+        private TopLevel? _attachedTopLevel;
+        private readonly DraggableWindow? _ownerWindow;
+        private bool _userVisible = true;
+        private bool _isModalSuspended;
+        private int _lastPhysX = -1;
+        private int _lastPhysY = -1;
+        private int _lastPhysW = -1;
+        private int _lastPhysH = -1;
+        private long _lastRegionHash;
 
         // Linux GTK + WebKit2 handles
         private IntPtr _gtkPlug;
@@ -48,8 +60,9 @@ namespace AvaloniaMdiApp
             RegistrarResolverLinux();
         }
 
-        public ChromiumWebViewHost(string initialUrl = "https://www.google.com")
+        public ChromiumWebViewHost(string initialUrl = "https://www.google.com", DraggableWindow? ownerWindow = null)
         {
+            _ownerWindow = ownerWindow;
             if (!string.IsNullOrWhiteSpace(initialUrl))
             {
                 _pendingUrl = NormalizarUrlOuBusca(initialUrl);
@@ -136,10 +149,45 @@ namespace AvaloniaMdiApp
             return _linuxGtkAvailable;
         }
 
+        protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            base.OnAttachedToVisualTree(e);
+
+            if (_attachedTopLevel != null)
+            {
+                _attachedTopLevel.LayoutUpdated -= OnTopLevelLayoutUpdated;
+            }
+
+            _attachedTopLevel = TopLevel.GetTopLevel(this);
+            if (_attachedTopLevel != null)
+            {
+                _attachedTopLevel.LayoutUpdated += OnTopLevelLayoutUpdated;
+            }
+        }
+
+        protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            if (_attachedTopLevel != null)
+            {
+                _attachedTopLevel.LayoutUpdated -= OnTopLevelLayoutUpdated;
+                _attachedTopLevel = null;
+            }
+
+            base.OnDetachedFromVisualTree(e);
+        }
+
+        private void OnTopLevelLayoutUpdated(object? sender, EventArgs e)
+        {
+            AtualizarLimitesNativos();
+        }
+
         protected override IPlatformHandle CreateNativeControlCore(IPlatformHandle parent)
         {
             if (OperatingSystem.IsWindows())
             {
+                _parentHwnd = parent.Handle;
+                InstalarFiltroParentHwnd(_parentHwnd);
+
                 _hwnd = CreateWindowExW(
                     0,
                     "Static",
@@ -237,6 +285,7 @@ namespace AvaloniaMdiApp
 
         protected override void DestroyNativeControlCore(IPlatformHandle control)
         {
+            RemoverFiltroParentHwnd();
             DisposeBrowser();
 
             if (OperatingSystem.IsWindows() && _hwnd != IntPtr.Zero)
@@ -244,8 +293,63 @@ namespace AvaloniaMdiApp
                 DestroyWindow(_hwnd);
                 _hwnd = IntPtr.Zero;
             }
+            _parentHwnd = IntPtr.Zero;
 
             base.DestroyNativeControlCore(control);
+        }
+
+        private void InstalarFiltroParentHwnd(IntPtr parentHwnd)
+        {
+            if (!OperatingSystem.IsWindows() || parentHwnd == IntPtr.Zero || _oldParentWndProc != IntPtr.Zero)
+                return;
+
+            try
+            {
+                _parentWndProcDelegate = ParentHwndWndProc;
+                IntPtr fnPtr = Marshal.GetFunctionPointerForDelegate(_parentWndProcDelegate);
+                _oldParentWndProc = SetWindowLongPtrW(parentHwnd, GWLP_WNDPROC, fnPtr);
+            }
+            catch { }
+        }
+
+        private void RemoverFiltroParentHwnd()
+        {
+            if (!OperatingSystem.IsWindows() || _parentHwnd == IntPtr.Zero || _oldParentWndProc == IntPtr.Zero)
+                return;
+
+            try
+            {
+                SetWindowLongPtrW(_parentHwnd, GWLP_WNDPROC, _oldParentWndProc);
+            }
+            catch { }
+            _oldParentWndProc = IntPtr.Zero;
+            _parentWndProcDelegate = null;
+        }
+
+        private IntPtr ParentHwndWndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
+        {
+            if (msg == WM_WINDOWPOSCHANGING && lParam != IntPtr.Zero && _lastPhysW > 0 && _lastPhysH > 0)
+            {
+                try
+                {
+                    var wp = Marshal.PtrToStructure<WINDOWPOS>(lParam);
+                    if (wp.cx != _lastPhysW || wp.cy != _lastPhysH)
+                    {
+                        wp.cx = _lastPhysW;
+                        wp.cy = _lastPhysH;
+                        Marshal.StructureToPtr(wp, lParam, false);
+                    }
+                }
+                catch { }
+            }
+            else if (msg == WM_ERASEBKGND)
+            {
+                return new IntPtr(1);
+            }
+
+            return _oldParentWndProc != IntPtr.Zero
+                ? CallWindowProcW(_oldParentWndProc, hWnd, msg, wParam, lParam)
+                : DefWindowProcW(hWnd, msg, wParam, lParam);
         }
 
         private static Task<CoreWebView2Environment> ObterAmbienteCompartilhadoAsync()
@@ -328,14 +432,103 @@ namespace AvaloniaMdiApp
 
             if (OperatingSystem.IsWindows())
             {
-                if (_controller == null || _hwnd == IntPtr.Zero) return;
+                if (_hwnd == IntPtr.Zero) return;
 
+                IntPtr parentHandle = _parentHwnd != IntPtr.Zero ? _parentHwnd : GetParent(_hwnd);
+                if (parentHandle != IntPtr.Zero && _oldParentWndProc == IntPtr.Zero)
+                {
+                    _parentHwnd = parentHandle;
+                    InstalarFiltroParentHwnd(parentHandle);
+                }
+
+                if (!_userVisible || _isModalSuspended)
+                {
+                    return;
+                }
+
+                var topLevel = _attachedTopLevel ?? TopLevel.GetTopLevel(this);
+                if (topLevel == null || Bounds.Width <= 0 || Bounds.Height <= 0) return;
+
+                Point? topLeft = this.TranslatePoint(new Point(0, 0), topLevel);
+                Point? bottomRight = this.TranslatePoint(new Point(Bounds.Width, Bounds.Height), topLevel);
+                if (topLeft == null || bottomRight == null) return;
+
+                double scaling = topLevel.RenderScaling > 0 ? topLevel.RenderScaling : 1.0;
+                double dipX = topLeft.Value.X;
+                double dipY = topLeft.Value.Y;
+                double dipW = Math.Max(1, bottomRight.Value.X - topLeft.Value.X);
+                double dipH = Math.Max(1, bottomRight.Value.Y - topLeft.Value.Y);
+
+                int physX = (int)Math.Round(dipX * scaling);
+                int physY = (int)Math.Round(dipY * scaling);
+                int physW = Math.Max(1, (int)Math.Round(dipW * scaling));
+                int physH = Math.Max(1, (int)Math.Round(dipH * scaling));
+
+                bool clientMismatch = false;
                 if (GetClientRect(_hwnd, out RECT rc))
                 {
-                    int w = Math.Max(0, rc.Right - rc.Left);
-                    int h = Math.Max(0, rc.Bottom - rc.Top);
-                    _controller.Bounds = new System.Drawing.Rectangle(0, 0, w, h);
-                    _controller.NotifyParentWindowPositionChanged();
+                    int curW = rc.Right - rc.Left;
+                    int curH = rc.Bottom - rc.Top;
+                    if (Math.Abs(curW - physW) > 1 || Math.Abs(curH - physH) > 1)
+                    {
+                        clientMismatch = true;
+                    }
+                }
+
+                if (!clientMismatch && parentHandle != IntPtr.Zero && GetClientRect(parentHandle, out RECT prc))
+                {
+                    int pW = prc.Right - prc.Left;
+                    int pH = prc.Bottom - prc.Top;
+                    if (Math.Abs(pW - physW) > 1 || Math.Abs(pH - physH) > 1)
+                    {
+                        clientMismatch = true;
+                    }
+                }
+
+                bool posOrSizeChanged =
+                    clientMismatch ||
+                    physX != _lastPhysX ||
+                    physY != _lastPhysY ||
+                    physW != _lastPhysW ||
+                    physH != _lastPhysH;
+
+                if (posOrSizeChanged)
+                {
+                    _lastPhysX = physX;
+                    _lastPhysY = physY;
+                    _lastPhysW = physW;
+                    _lastPhysH = physH;
+
+                    if (parentHandle != IntPtr.Zero)
+                    {
+                        SetWindowPos(parentHandle, IntPtr.Zero, physX, physY, physW, physH, SWP_NOZORDER | SWP_NOACTIVATE);
+                    }
+                    SetWindowPos(_hwnd, IntPtr.Zero, 0, 0, physW, physH, SWP_NOZORDER | SWP_NOACTIVATE);
+                }
+
+                if (parentHandle != IntPtr.Zero)
+                {
+                    AtualizarRegiaoRecorteWin32(parentHandle, topLevel, scaling, physX, physY, physW, physH, posOrSizeChanged);
+                }
+
+                if (_controller != null)
+                {
+                    var currentBounds = _controller.Bounds;
+                    if (posOrSizeChanged || currentBounds.Width != physW || currentBounds.Height != physH)
+                    {
+                        _controller.Bounds = new System.Drawing.Rectangle(0, 0, physW, physH);
+                        _controller.NotifyParentWindowPositionChanged();
+                    }
+
+                    double visualScale = Bounds.Width > 1 ? Math.Clamp(dipW / Bounds.Width, 0.25, 3.0) : 1.0;
+                    if (Math.Abs(_controller.ZoomFactor - visualScale) > 0.02)
+                    {
+                        try
+                        {
+                            _controller.ZoomFactor = visualScale;
+                        }
+                        catch { }
+                    }
                 }
             }
             else if (OperatingSystem.IsLinux())
@@ -354,18 +547,153 @@ namespace AvaloniaMdiApp
             }
         }
 
+        private void AtualizarRegiaoRecorteWin32(
+            IntPtr parentHandle,
+            TopLevel topLevel,
+            double scaling,
+            int physX,
+            int physY,
+            int physW,
+            int physH,
+            bool forceUpdate)
+        {
+            long hash = HashCode.Combine(physX, physY, physW, physH);
+            var workspace = _ownerWindow?.Workspace;
+
+            if (workspace != null && _ownerWindow != null)
+            {
+                int ownerIdx = workspace.Children.IndexOf(_ownerWindow);
+                int ownerZ = _ownerWindow.ZIndex;
+
+                for (int i = 0; i < workspace.Children.Count; i++)
+                {
+                    var child = workspace.Children[i];
+                    if (child == _ownerWindow || !child.IsVisible || child is Avalonia.Controls.Shapes.Path)
+                        continue;
+
+                    bool isAbove = child.ZIndex > ownerZ || (child.ZIndex == ownerZ && i > ownerIdx);
+                    if (!isAbove)
+                        continue;
+
+                    Point? cTL = child.TranslatePoint(new Point(0, 0), topLevel);
+                    Point? cBR = child.TranslatePoint(new Point(child.Bounds.Width, child.Bounds.Height), topLevel);
+                    if (cTL == null || cBR == null)
+                        continue;
+
+                    int cx1 = (int)Math.Floor(cTL.Value.X * scaling) - physX;
+                    int cy1 = (int)Math.Floor(cTL.Value.Y * scaling) - physY;
+                    int cx2 = (int)Math.Ceiling(cBR.Value.X * scaling) - physX;
+                    int cy2 = (int)Math.Ceiling(cBR.Value.Y * scaling) - physY;
+
+                    if (cx2 > 0 && cy2 > 0 && cx1 < physW && cy1 < physH)
+                    {
+                        hash = HashCode.Combine(hash, cx1, cy1, cx2, cy2);
+                    }
+                }
+            }
+
+            if (!forceUpdate && hash == _lastRegionHash)
+                return;
+
+            _lastRegionHash = hash;
+
+            IntPtr finalRgn = CreateRectRgn(0, 0, physW, physH);
+            if (finalRgn == IntPtr.Zero)
+                return;
+
+            if (workspace != null && _ownerWindow != null)
+            {
+                int ownerIdx = workspace.Children.IndexOf(_ownerWindow);
+                int ownerZ = _ownerWindow.ZIndex;
+
+                for (int i = 0; i < workspace.Children.Count; i++)
+                {
+                    var child = workspace.Children[i];
+                    if (child == _ownerWindow || !child.IsVisible || child is Avalonia.Controls.Shapes.Path)
+                        continue;
+
+                    bool isAbove = child.ZIndex > ownerZ || (child.ZIndex == ownerZ && i > ownerIdx);
+                    if (!isAbove)
+                        continue;
+
+                    Point? cTL = child.TranslatePoint(new Point(0, 0), topLevel);
+                    Point? cBR = child.TranslatePoint(new Point(child.Bounds.Width, child.Bounds.Height), topLevel);
+                    if (cTL == null || cBR == null)
+                        continue;
+
+                    int cx1 = (int)Math.Floor(cTL.Value.X * scaling) - physX;
+                    int cy1 = (int)Math.Floor(cTL.Value.Y * scaling) - physY;
+                    int cx2 = (int)Math.Ceiling(cBR.Value.X * scaling) - physX;
+                    int cy2 = (int)Math.Ceiling(cBR.Value.Y * scaling) - physY;
+
+                    if (cx2 > 0 && cy2 > 0 && cx1 < physW && cy1 < physH)
+                    {
+                        IntPtr occRgn = CreateRectRgn(cx1, cy1, cx2, cy2);
+                        if (occRgn != IntPtr.Zero)
+                        {
+                            CombineRgn(finalRgn, finalRgn, occRgn, RGN_DIFF);
+                            DeleteObject(occRgn);
+                        }
+                    }
+                }
+            }
+
+            if (SetWindowRgn(parentHandle, finalRgn, true) == 0)
+            {
+                DeleteObject(finalRgn);
+            }
+        }
+
         public void SetBrowserVisible(bool visible)
         {
-            IsVisible = visible;
-            if (OperatingSystem.IsWindows() && _controller != null && !_isDisposed)
+            _userVisible = visible;
+            AplicarVisibilidadeEfetiva();
+        }
+
+        public void SetModalOverlaySuspended(bool suspended)
+        {
+            if (_isModalSuspended == suspended) return;
+            _isModalSuspended = suspended;
+            AplicarVisibilidadeEfetiva();
+        }
+
+        private void AplicarVisibilidadeEfetiva()
+        {
+            bool effectiveVisible = _userVisible && !_isModalSuspended;
+            IsVisible = effectiveVisible;
+
+            if (OperatingSystem.IsWindows() && !_isDisposed)
             {
-                _controller.IsVisible = visible;
+                if (_controller != null)
+                {
+                    try
+                    {
+                        _controller.IsVisible = effectiveVisible;
+                    }
+                    catch { }
+                }
+
+                IntPtr parentHandle = _parentHwnd != IntPtr.Zero ? _parentHwnd : (_hwnd != IntPtr.Zero ? GetParent(_hwnd) : IntPtr.Zero);
+                if (parentHandle != IntPtr.Zero)
+                {
+                    ShowWindow(parentHandle, effectiveVisible ? SW_SHOWNOACTIVATE : SW_HIDE);
+                }
+                if (_hwnd != IntPtr.Zero)
+                {
+                    ShowWindow(_hwnd, effectiveVisible ? SW_SHOWNOACTIVATE : SW_HIDE);
+                }
+
+                if (effectiveVisible)
+                {
+                    _lastRegionHash = 0;
+                    AtualizarLimitesNativos();
+                }
             }
             else if (OperatingSystem.IsLinux() && _gtkPlug != IntPtr.Zero && !_isDisposed)
             {
                 try
                 {
-                    if (visible)
+                    if (effectiveVisible)
                     {
                         gtk_widget_show_all(_gtkPlug);
                         _linuxUrlPollTimer?.Start();
@@ -546,6 +874,28 @@ namespace AvaloniaMdiApp
         private const int WS_CHILD = 0x40000000;
         private const int WS_VISIBLE = 0x10000000;
         private const int WS_CLIPCHILDREN = 0x02000000;
+        private const uint SWP_NOZORDER = 0x0004;
+        private const uint SWP_NOACTIVATE = 0x0010;
+        private const int GWLP_WNDPROC = -4;
+        private const uint WM_WINDOWPOSCHANGING = 0x0046;
+        private const uint WM_ERASEBKGND = 0x0014;
+        private const int SW_HIDE = 0;
+        private const int SW_SHOWNOACTIVATE = 4;
+        private const int RGN_DIFF = 4;
+
+        private delegate IntPtr WndProcDelegate(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct WINDOWPOS
+        {
+            public IntPtr hwnd;
+            public IntPtr hwndInsertAfter;
+            public int x;
+            public int y;
+            public int cx;
+            public int cy;
+            public uint flags;
+        }
 
         [StructLayout(LayoutKind.Sequential)]
         private struct RECT
@@ -576,6 +926,43 @@ namespace AvaloniaMdiApp
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr GetParent(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool SetWindowPos(
+            IntPtr hWnd,
+            IntPtr hWndInsertAfter,
+            int X,
+            int Y,
+            int cx,
+            int cy,
+            uint uFlags);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern IntPtr SetWindowLongPtrW(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr CallWindowProcW(IntPtr lpPrevWndFunc, IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr DefWindowProcW(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, bool bRedraw);
+
+        [DllImport("gdi32.dll", SetLastError = true)]
+        private static extern IntPtr CreateRectRgn(int x1, int y1, int x2, int y2);
+
+        [DllImport("gdi32.dll", SetLastError = true)]
+        private static extern int CombineRgn(IntPtr hrgnDest, IntPtr hrgnSrc1, IntPtr hrgnSrc2, int iMode);
+
+        [DllImport("gdi32.dll", SetLastError = true)]
+        private static extern bool DeleteObject(IntPtr hObject);
 
         // Linux GTK3 / GDK / WebKit2GTK P/Invoke
         [DllImport("libgdk-3.so.0", CallingConvention = CallingConvention.Cdecl)]
