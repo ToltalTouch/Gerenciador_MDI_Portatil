@@ -12,12 +12,11 @@ mkdir -p dist/windows
 mkdir -p dist/release
 
 echo "[1/3] Compilando executável portátil Single-File para Linux (x64)..."
-XDG_RUNTIME_DIR=/tmp dotnet publish -c Release -r ubuntu.26.04-x64 --self-contained true \
+XDG_RUNTIME_DIR=/tmp dotnet publish -c Release -r linux-x64 --self-contained true \
   -p:PublishSingleFile=true \
   -p:IncludeNativeLibrariesForSelfExtract=true \
   -p:DebugType=None \
   -p:DebugSymbols=false \
-  --source /home/micael/.nuget/packages \
   -o dist/linux
 
 cp Assets/app-icon.png dist/linux/app-icon.png
