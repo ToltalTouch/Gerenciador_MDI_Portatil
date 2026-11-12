@@ -12,6 +12,8 @@
 
 ---
 
+#### ![GitHub release (latest by date)](https://shields.io)
+
 ## 📌 Visão Geral
 
 O **Gerenciador MDI Portátil** é uma aplicação desktop multiplataforma (**Linux** e **Windows**) desenvolvida em **C# (.NET 10)** com **Avalonia UI**. Ele oferece um **Workspace visual infinito com Zoom e Pan**, onde o usuário pode abrir múltiplas janelas internas independentes, conectá-las visualmente como um **fluxograma interativo**, organizar múltiplos **Workspaces isolados** e utilizar **Widgets integrados** (Bloco de Notas, Lista de Marcação, Planilhas estilo Excel, Galeria de Imagens e Navegador Web).
