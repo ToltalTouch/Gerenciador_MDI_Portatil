@@ -12,7 +12,8 @@
 
 ---
 
-#### ![GitHub release (latest by date)](https://shields.io)
+### Ultima versão! [![GitHub release](https://shields.io)](https://github.com/ToltalTouch/Gerenciador_MDI_Portatil/releases)
+
 
 ## 📌 Visão Geral
 
