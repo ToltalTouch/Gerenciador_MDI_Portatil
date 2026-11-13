@@ -1,3 +1,0 @@
-C:\C#\Gerenciador MDI Portátil\dist\linux\runtimes\win-x64\native\WebView2Loader.dll
-C:\C#\Gerenciador MDI Portátil\dist\linux\Microsoft.Web.WebView2.Core.xml
-C:\C#\Gerenciador MDI Portátil\dist\linux\AvaloniaMdiApp

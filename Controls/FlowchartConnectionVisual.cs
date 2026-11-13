@@ -212,6 +212,15 @@ namespace AvaloniaMdiApp
             AtualizarGeometria();
         }
 
+        public void DefinirDestaqueFiltro(bool destacado)
+        {
+            double op = destacado ? 1.0 : 0.16;
+            CurvePath.Opacity = op;
+            ArrowPath.Opacity = op;
+            OriginDot.Opacity = op;
+            MidpointBadge.Opacity = op;
+        }
+
         public void DefinirCor(string colorHex)
         {
             if (string.IsNullOrWhiteSpace(colorHex)) return;

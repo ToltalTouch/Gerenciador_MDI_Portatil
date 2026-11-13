@@ -1,3 +1,0 @@
-/home/micael/Documentos/Gerenciador_MDI_Portatil/dist/linux/runtimes/win-x64/native/WebView2Loader.dll
-/home/micael/Documentos/Gerenciador_MDI_Portatil/dist/linux/Microsoft.Web.WebView2.Core.xml
-/home/micael/Documentos/Gerenciador_MDI_Portatil/dist/linux/AvaloniaMdiApp

@@ -112,7 +112,8 @@ namespace AvaloniaMdiApp
                 FontSize = 11.5,
                 FontWeight = FontWeight.SemiBold,
                 VerticalAlignment = VerticalAlignment.Center,
-                VerticalContentAlignment = VerticalAlignment.Center
+                VerticalContentAlignment = VerticalAlignment.Center,
+                IsVisible = false
             };
             ToolTip.SetTip(_btnGalleryAddFiles, "Selecionar imagens ou vídeos do computador para a galeria");
             _btnGalleryAddFiles.Click += async (s, e) =>
@@ -181,7 +182,8 @@ namespace AvaloniaMdiApp
                 FontSize = 11.5,
                 FontWeight = FontWeight.SemiBold,
                 VerticalAlignment = VerticalAlignment.Center,
-                VerticalContentAlignment = VerticalAlignment.Center
+                VerticalContentAlignment = VerticalAlignment.Center,
+                IsVisible = false
             };
             ToolTip.SetTip(_btnGalleryAddPath, "Adicionar imagem pelo caminho digitado");
 
@@ -474,7 +476,7 @@ namespace AvaloniaMdiApp
                 BorderThickness = new Thickness(1),
                 HorizontalContentAlignment = HorizontalAlignment.Center,
                 VerticalContentAlignment = VerticalAlignment.Center,
-                IsVisible = !isVideo
+                IsVisible = false
             };
             ToolTip.SetTip(btnSetBg, "Aplicar/remover imagem como plano de fundo da janela principal");
 
@@ -661,7 +663,8 @@ namespace AvaloniaMdiApp
                 FontSize = 11,
                 FontWeight = FontWeight.SemiBold,
                 VerticalAlignment = VerticalAlignment.Center,
-                VerticalContentAlignment = VerticalAlignment.Center
+                VerticalContentAlignment = VerticalAlignment.Center,
+                IsVisible = false
             };
             ToolTip.SetTip(_btnImageSetBg, "Aplicar/remover esta imagem como fundo da janela principal");
             _btnImageSetBg.Click += (s, e) =>
@@ -819,7 +822,8 @@ namespace AvaloniaMdiApp
                 FontSize = 11,
                 FontWeight = FontWeight.SemiBold,
                 VerticalAlignment = VerticalAlignment.Center,
-                VerticalContentAlignment = VerticalAlignment.Center
+                VerticalContentAlignment = VerticalAlignment.Center,
+                IsVisible = false
             };
             ToolTip.SetTip(_btnVideoExternal, "Abrir vídeo no reprodutor padrão do sistema");
             _btnVideoExternal.Click += (s, e) =>

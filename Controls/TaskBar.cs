@@ -123,7 +123,6 @@ namespace AvaloniaMdiApp
             _taskContainer.Children.Add(btn);
 
             AtualizarVisualBotao(window);
-            AtualizarContador();
         }
 
         public void AtualizarTituloJanela(DraggableWindow window, string novoTitulo)
@@ -146,6 +145,22 @@ namespace AvaloniaMdiApp
             }
         }
 
+        private string? _activeColorFilterHex;
+
+        public void AtualizarCorJanela(DraggableWindow window)
+        {
+            AtualizarVisualBotao(window);
+        }
+
+        public void AplicarFiltroCor(string? hexFilter)
+        {
+            _activeColorFilterHex = hexFilter;
+            foreach (var win in _windowButtons.Keys)
+            {
+                AtualizarVisualBotao(win);
+            }
+        }
+
         public void AtualizarEstadoMinimizado(DraggableWindow window, bool isMinimized)
         {
             AtualizarVisualBotao(window);
@@ -153,10 +168,6 @@ namespace AvaloniaMdiApp
 
         public void AtualizarEstadoAtivo(DraggableWindow window, bool isActive)
         {
-            if (_windowIndicators.TryGetValue(window, out var indicator))
-            {
-                indicator.Background = isActive ? ThemePalette.AccentLight : (_isDarkMode ? ThemePalette.DarkTextSecondary : ThemePalette.LightTextSecondary);
-            }
             AtualizarVisualBotao(window);
         }
 
@@ -166,14 +177,35 @@ namespace AvaloniaMdiApp
 
             bool isMinimized = window.IsMinimized;
             bool isHibernated = window.WindowType == "spreadsheet" && window.IsSheetHibernated;
-            btn.Opacity = (isMinimized || isHibernated) ? 0.70 : 1.0;
+            bool matchesFilter = DraggableWindow.CorCombinaComFiltro(window.CustomColor, _activeColorFilterHex);
+
+            double baseOpacity = (isMinimized || isHibernated) ? 0.70 : 1.0;
+            btn.Opacity = matchesFilter ? baseOpacity : 0.25;
 
             if (_windowLabels.TryGetValue(window, out var lbl))
             {
                 lbl.Text = isHibernated ? $"◦ {window.WindowTitle}" : window.WindowTitle;
             }
 
-            if (_isDarkMode)
+            Color customColor = default;
+            bool hasCustomColor = !string.IsNullOrWhiteSpace(window.CustomColor) && Color.TryParse(window.CustomColor, out customColor);
+            if (_windowIndicators.TryGetValue(window, out var indicator))
+            {
+                indicator.Background = hasCustomColor
+                    ? new SolidColorBrush(customColor)
+                    : (_isDarkMode ? ThemePalette.DarkTextSecondary : ThemePalette.LightTextSecondary);
+            }
+
+            if (hasCustomColor)
+            {
+                byte bgAlpha = (isMinimized || isHibernated)
+                    ? (_isDarkMode ? (byte)42 : (byte)30)
+                    : (_isDarkMode ? (byte)85 : (byte)60);
+                btn.Background = new SolidColorBrush(Color.FromArgb(bgAlpha, customColor.R, customColor.G, customColor.B));
+                btn.BorderBrush = new SolidColorBrush(Color.FromArgb(190, customColor.R, customColor.G, customColor.B));
+                btn.Foreground = _isDarkMode ? ThemePalette.DarkTextPrimary : ThemePalette.LightTextPrimary;
+            }
+            else if (_isDarkMode)
             {
                 btn.Background = (isMinimized || isHibernated) ? ThemePalette.DarkWorkspaceBg : ThemePalette.DarkButtonBg;
                 btn.BorderBrush = ThemePalette.DarkBorder;

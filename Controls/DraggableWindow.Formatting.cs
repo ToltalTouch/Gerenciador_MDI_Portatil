@@ -153,6 +153,13 @@ namespace AvaloniaMdiApp
 
         private void AlternarNegrito()
         {
+            if (WindowType == "notepad" && _richLines.Count > 0)
+            {
+                bool targetBold = !_isBold;
+                AplicarFormatacaoNaLinhaOuSelecao(sp => sp.IsBold = targetBold);
+                AtualizarCores();
+                return;
+            }
             _isBold = !_isBold;
             AplicarFormatacaoTexto();
             AtualizarCores();
@@ -160,6 +167,13 @@ namespace AvaloniaMdiApp
 
         private void AlternarItalico()
         {
+            if (WindowType == "notepad" && _richLines.Count > 0)
+            {
+                bool targetItalic = !_isItalic;
+                AplicarFormatacaoNaLinhaOuSelecao(sp => sp.IsItalic = targetItalic);
+                AtualizarCores();
+                return;
+            }
             _isItalic = !_isItalic;
             AplicarFormatacaoTexto();
             AtualizarCores();
@@ -167,6 +181,11 @@ namespace AvaloniaMdiApp
 
         private void AlterarTamanhoFonte(double delta)
         {
+            if (WindowType == "notepad" && _richLines.Count > 0)
+            {
+                AplicarFormatacaoNaLinhaOuSelecao(sp => sp.FontSize = Math.Clamp((sp.FontSize > 0 ? sp.FontSize : 13) + delta, 9, 32));
+                return;
+            }
             _fontSize = Math.Clamp(_fontSize + delta, 9, 32);
             if (_lblFontSize != null)
             {
@@ -177,18 +196,40 @@ namespace AvaloniaMdiApp
 
         private void DefinirAlinhamento(string alignment)
         {
+            if (WindowType == "notepad" && _richLines.Count > 0)
+            {
+                AplicarFormatacaoNaLinhaOuSelecao(_ => { }, newAlignment: alignment);
+                return;
+            }
             _alignment = alignment;
             AplicarFormatacaoTexto();
         }
 
         private void DefinirFamiliaFonte(string familyName)
         {
+            if (WindowType == "notepad" && _richLines.Count > 0)
+            {
+                AplicarFormatacaoNaLinhaOuSelecao(sp => sp.FontFamilyName = familyName);
+                return;
+            }
             _fontFamilyName = familyName;
             AplicarFormatacaoTexto();
         }
 
         private void RestaurarFormatacaoPadrao()
         {
+            if (WindowType == "notepad" && _richLines.Count > 0)
+            {
+                AplicarFormatacaoNaLinhaOuSelecao(sp =>
+                {
+                    sp.IsBold = false;
+                    sp.IsItalic = false;
+                    sp.FontSize = 13;
+                    sp.FontFamilyName = "default";
+                }, newAlignment: "left");
+                AtualizarCores();
+                return;
+            }
             _isBold = false;
             _isItalic = false;
             _fontSize = 13;
@@ -227,15 +268,6 @@ namespace AvaloniaMdiApp
                 _noteTextBox.FontSize = _fontSize;
                 _noteTextBox.TextAlignment = align;
                 _noteTextBox.FontFamily = family;
-            }
-
-            foreach (var row in _checklistRows)
-            {
-                row.Input.FontWeight = weight;
-                row.Input.FontStyle = style;
-                row.Input.FontSize = _fontSize;
-                row.Input.TextAlignment = align;
-                row.Input.FontFamily = family;
             }
         }
 

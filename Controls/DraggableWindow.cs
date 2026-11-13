@@ -14,10 +14,13 @@ namespace AvaloniaMdiApp
     {
         public event Action? OnClosed;
         public event Action<DraggableWindow, ChecklistRowState>? OnRequestOpenRowNotepad;
+        public event Action<DraggableWindow, ChecklistRowState>? OnRequestLinkRowWindow;
         public event Action<DraggableWindow>? OnSaveRequested;
         public event Action<DraggableWindow>? OnBoundsChanged;
         public event Action<DraggableWindow>? OnConnectRequested;
         public event Action<DraggableWindow>? OnWindowClicked;
+        public event Action<DraggableWindow, ChecklistRowState>? OnChecklistRowClicked;
+        public event Action<DraggableWindow>? OnInteractionCompleted;
 
         public string WindowId { get; }
         public string WindowTitle { get; private set; }
@@ -31,7 +34,7 @@ namespace AvaloniaMdiApp
         private readonly Action<string, string, TextFormatData>? _onLinkedRowSave;
         public DraggableWindow? ParentChecklistWindow { get; }
 
-        private enum ResizeMode { None, Bottom, Right, BottomRight }
+        private enum ResizeMode { None, Top, Bottom, Left, Right, TopLeft, TopRight, BottomLeft, BottomRight }
 
         private bool _isDragging;
         private bool _pressedOnTitleText;
@@ -124,7 +127,8 @@ namespace AvaloniaMdiApp
             int spreadsheetCols = 6,
             List<SpreadsheetCellData>? initialSpreadsheetCells = null,
             List<ConditionalFormatRuleData>? initialConditionalRules = null,
-            string criticalityLevel = "none")
+            string criticalityLevel = "none",
+            List<RichTextLineData>? initialRichLines = null)
         {
             Workspace = workspace;
             _taskBar = taskBar;
@@ -346,7 +350,7 @@ namespace AvaloniaMdiApp
             {
                 _contentCard.Child = CriarConteudoFormaFluxograma(initialNote);
             }
-            else if (WindowType == "notepad" || WindowType == "checklist")
+            else if (WindowType == "notepad")
             {
                 var cardDock = new DockPanel();
 
@@ -361,78 +365,62 @@ namespace AvaloniaMdiApp
                 DockPanel.SetDock(_formatToolbar, Dock.Top);
                 cardDock.Children.Add(_formatToolbar);
 
-                if (WindowType == "notepad")
+                cardDock.Children.Add(CriarConteudoBlocoNotas(initialNote, initialRichLines, initialFormat));
+
+                _contentCard.Child = cardDock;
+            }
+            else if (WindowType == "checklist")
+            {
+                _checklistContainer = new StackPanel
                 {
-                    _noteTextBox = new TextBox
+                    Orientation = Orientation.Vertical,
+                    Spacing = 6
+                };
+
+                _btnAddChecklistItem = new Button
+                {
+                    Content = "+",
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    HorizontalContentAlignment = HorizontalAlignment.Center,
+                    Padding = new Thickness(8, 4),
+                    Margin = new Thickness(0, 2, 0, 0),
+                    CornerRadius = new CornerRadius(6),
+                    BorderThickness = new Thickness(1),
+                    FontSize = 16,
+                    FontWeight = FontWeight.Bold
+                };
+                ToolTip.SetTip(_btnAddChecklistItem, "Adicionar nova linha");
+                _btnAddChecklistItem.Click += (s, e) => AdicionarLinhaChecklist("", false, "", null, focusInput: true);
+
+                var outerListStack = new StackPanel
+                {
+                    Orientation = Orientation.Vertical,
+                    Spacing = 6,
+                    Margin = new Thickness(10)
+                };
+                outerListStack.Children.Add(_checklistContainer);
+                outerListStack.Children.Add(_btnAddChecklistItem);
+
+                var scrollViewer = new ScrollViewer
+                {
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                    Content = outerListStack
+                };
+
+                if (initialChecklist != null && initialChecklist.Count > 0)
+                {
+                    foreach (var item in initialChecklist)
                     {
-                        Text = initialNote,
-                        Watermark = "Digite suas anotações aqui...",
-                        AcceptsReturn = true,
-                        TextWrapping = TextWrapping.Wrap,
-                        BorderThickness = new Thickness(0),
-                        Background = Brushes.Transparent,
-                        Padding = new Thickness(12),
-                        FontSize = _fontSize,
-                        HorizontalAlignment = HorizontalAlignment.Stretch,
-                        VerticalAlignment = VerticalAlignment.Stretch
-                    };
-                    cardDock.Children.Add(_noteTextBox);
+                        AdicionarLinhaChecklist(item.Text, item.IsChecked, item.LinkedNoteContent, item.LinkedNoteFormat, focusInput: false, item.ColorHex, item.LinkedWindowId, item.Id);
+                    }
                 }
                 else
                 {
-                    _checklistContainer = new StackPanel
-                    {
-                        Orientation = Orientation.Vertical,
-                        Spacing = 6
-                    };
-
-                    _btnAddChecklistItem = new Button
-                    {
-                        Content = "+",
-                        HorizontalAlignment = HorizontalAlignment.Stretch,
-                        HorizontalContentAlignment = HorizontalAlignment.Center,
-                        Padding = new Thickness(8, 4),
-                        Margin = new Thickness(0, 2, 0, 0),
-                        CornerRadius = new CornerRadius(6),
-                        BorderThickness = new Thickness(1),
-                        FontSize = 16,
-                        FontWeight = FontWeight.Bold
-                    };
-                    ToolTip.SetTip(_btnAddChecklistItem, "Adicionar nova linha");
-                    _btnAddChecklistItem.Click += (s, e) => AdicionarLinhaChecklist("", false, "", null, focusInput: true);
-
-                    var outerListStack = new StackPanel
-                    {
-                        Orientation = Orientation.Vertical,
-                        Spacing = 6,
-                        Margin = new Thickness(10)
-                    };
-                    outerListStack.Children.Add(_checklistContainer);
-                    outerListStack.Children.Add(_btnAddChecklistItem);
-
-                    var scrollViewer = new ScrollViewer
-                    {
-                        VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                        HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                        Content = outerListStack
-                    };
-
-                    cardDock.Children.Add(scrollViewer);
-
-                    if (initialChecklist != null && initialChecklist.Count > 0)
-                    {
-                        foreach (var item in initialChecklist)
-                        {
-                            AdicionarLinhaChecklist(item.Text, item.IsChecked, item.LinkedNoteContent, item.LinkedNoteFormat, focusInput: false);
-                        }
-                    }
-                    else
-                    {
-                        AdicionarLinhaChecklist("", false, "", null, focusInput: false);
-                    }
+                    AdicionarLinhaChecklist("", false, "", null, focusInput: false);
                 }
 
-                _contentCard.Child = cardDock;
+                _contentCard.Child = scrollViewer;
             }
             else if (WindowType == "browser")
             {
@@ -578,9 +566,9 @@ namespace AvaloniaMdiApp
 
         public void SincronizarNotaVinculada()
         {
-            if (_onLinkedRowSave != null && _noteTextBox != null)
+            if (_onLinkedRowSave != null && (WindowType == "notepad" || _noteTextBox != null))
             {
-                _onLinkedRowSave(WindowTitle, _noteTextBox.Text ?? string.Empty, ExportTextFormat());
+                _onLinkedRowSave(WindowTitle, ObterTextoNota(), ExportTextFormat());
             }
         }
 
@@ -607,7 +595,52 @@ namespace AvaloniaMdiApp
             _txtTitleEditor.SelectAll();
         }
 
-        public string ObterTextoNota() => _noteTextBox?.Text ?? string.Empty;
+        public IReadOnlyList<ChecklistRowState> ObterItensChecklist() => _checklistRows;
+
+        public string ObterResumoParaCalendario(string? checklistRowId = null)
+        {
+            if (WindowType == "checklist" && !string.IsNullOrWhiteSpace(checklistRowId))
+            {
+                var row = _checklistRows.Find(r => r.RowId == checklistRowId);
+                if (row != null)
+                {
+                    string itemTxt = (row.Input.Text ?? string.Empty).Trim();
+                    string notaTxt = (row.OpenNoteWindow?.ObterTextoNota() ?? row.LinkedNoteContent ?? string.Empty).Trim();
+                    string combinado = string.IsNullOrWhiteSpace(notaTxt) ? itemTxt : $"{itemTxt} — {notaTxt}";
+                    return ResumirTexto(combinado);
+                }
+            }
+
+            if (WindowType == "notepad")
+            {
+                return ResumirTexto(ObterTextoNota());
+            }
+
+            if (IsFlowchartShape)
+            {
+                return ResumirTexto(ObterTextoNota());
+            }
+
+            if (WindowType == "browser")
+            {
+                return ResumirTexto(_browserHost?.CurrentUrl ?? _txtBrowserUrl?.Text);
+            }
+
+            return ResumirTexto(WindowTitle);
+        }
+
+        private static string ResumirTexto(string? texto)
+        {
+            if (string.IsNullOrWhiteSpace(texto)) return "(Sem texto)";
+            string limpo = texto.Replace("\r", " ").Replace("\n", " ").Trim();
+            while (limpo.Contains("  ")) limpo = limpo.Replace("  ", " ");
+            return limpo.Length > 90 ? limpo.Substring(0, 87) + "..." : limpo;
+        }
+
+        public string ObterTextoNota() =>
+            WindowType == "notepad" && _richLines.Count > 0
+                ? string.Join(Environment.NewLine, _richLines.ConvertAll(l => l.GetPlainText()))
+                : (_noteTextBox?.Text ?? string.Empty);
 
         private void ConfirmarEdicaoTitulo()
         {
@@ -660,7 +693,8 @@ namespace AvaloniaMdiApp
                         ? _singleImagePath
                         : WindowType == "video"
                             ? _singleVideoPath
-                            : (_noteTextBox?.Text ?? string.Empty),
+                            : ObterTextoNota(),
+                RichLines = WindowType == "notepad" ? ExportRichLines() : new List<RichTextLineData>(),
                 TextFormat = ExportTextFormat(),
                 SpreadsheetRows = _sheetRows,
                 SpreadsheetCols = _sheetCols,
@@ -680,8 +714,11 @@ namespace AvaloniaMdiApp
 
                     data.ChecklistItems.Add(new ChecklistItemData
                     {
+                        Id = row.RowId,
                         Text = row.Input.Text ?? string.Empty,
                         IsChecked = row.Check.IsChecked == true,
+                        ColorHex = row.ColorHex,
+                        LinkedWindowId = row.LinkedWindowId,
                         LinkedNoteContent = row.LinkedNoteContent,
                         LinkedNoteFormat = row.LinkedNoteFormat
                     });
@@ -751,6 +788,40 @@ namespace AvaloniaMdiApp
         {
             CustomColor = hexColor ?? string.Empty;
             AtualizarCores();
+            _taskBar.AtualizarCorJanela(this);
+        }
+
+        public static string NormalizarFamiliaCor(string? hex)
+        {
+            if (string.IsNullOrWhiteSpace(hex)) return string.Empty;
+            return hex.Trim().ToUpperInvariant() switch
+            {
+                "#3B82F6" or "#2563EB" => "blue",
+                "#10B981" or "#059669" => "green",
+                "#F59E0B" or "#D97706" => "amber",
+                "#EF4444" or "#DC2626" => "red",
+                "#8B5CF6" or "#7C3AED" => "purple",
+                "#EC4899" or "#DB2777" => "pink",
+                "#06B6D4" or "#0891B2" => "cyan",
+                "#94A3B8" or "#475569" => "gray",
+                var other => other
+            };
+        }
+
+        public static bool CorCombinaComFiltro(string? itemHex, string? filterHex)
+        {
+            if (string.IsNullOrWhiteSpace(filterHex)) return true;
+            if (string.IsNullOrWhiteSpace(itemHex)) return false;
+            return string.Equals(NormalizarFamiliaCor(itemHex), NormalizarFamiliaCor(filterHex), StringComparison.OrdinalIgnoreCase);
+        }
+
+        public void AplicarFiltroCor(string? hexFilter)
+        {
+            bool semFiltro = string.IsNullOrWhiteSpace(hexFilter);
+            bool janelaCombina = CorCombinaComFiltro(CustomColor, hexFilter);
+            bool algumaLinhaCombina = !semFiltro && _checklistRows.Exists(r => CorCombinaComFiltro(r.ColorHex, hexFilter));
+            Opacity = (janelaCombina || algumaLinhaCombina) ? 1.0 : 0.25;
+            AtualizarFiltroCorChecklist(hexFilter);
         }
 
         public void DefinirCriticidade(string level)
@@ -896,6 +967,11 @@ namespace AvaloniaMdiApp
                 AtualizarEstiloLinhaChecklist(row);
             }
 
+            if (_richLines.Count > 0)
+            {
+                AtualizarTemaRichEditor();
+            }
+
             if (_formatToolbar != null)
             {
                 var barBg = _isDarkMode ? ThemePalette.DarkContentBg : ThemePalette.LightContentBg;
@@ -1003,9 +1079,16 @@ namespace AvaloniaMdiApp
         private void AdicionarBordasDeRedimensionamento(Grid parentGrid)
         {
             int thickness = 6;
+            int corner = 11;
+            parentGrid.Children.Add(CriarGripBorda(ResizeMode.Left, thickness, double.NaN, HorizontalAlignment.Left, VerticalAlignment.Stretch, StandardCursorType.SizeWestEast));
             parentGrid.Children.Add(CriarGripBorda(ResizeMode.Right, thickness, double.NaN, HorizontalAlignment.Right, VerticalAlignment.Stretch, StandardCursorType.SizeWestEast));
+            parentGrid.Children.Add(CriarGripBorda(ResizeMode.Top, double.NaN, thickness, HorizontalAlignment.Stretch, VerticalAlignment.Top, StandardCursorType.SizeNorthSouth));
             parentGrid.Children.Add(CriarGripBorda(ResizeMode.Bottom, double.NaN, thickness, HorizontalAlignment.Stretch, VerticalAlignment.Bottom, StandardCursorType.SizeNorthSouth));
-            parentGrid.Children.Add(CriarGripBorda(ResizeMode.BottomRight, thickness + 4, thickness + 4, HorizontalAlignment.Right, VerticalAlignment.Bottom, StandardCursorType.BottomRightCorner));
+
+            parentGrid.Children.Add(CriarGripBorda(ResizeMode.TopLeft, corner, corner, HorizontalAlignment.Left, VerticalAlignment.Top, StandardCursorType.TopLeftCorner));
+            parentGrid.Children.Add(CriarGripBorda(ResizeMode.TopRight, corner, corner, HorizontalAlignment.Right, VerticalAlignment.Top, StandardCursorType.TopRightCorner));
+            parentGrid.Children.Add(CriarGripBorda(ResizeMode.BottomLeft, corner, corner, HorizontalAlignment.Left, VerticalAlignment.Bottom, StandardCursorType.BottomLeftCorner));
+            parentGrid.Children.Add(CriarGripBorda(ResizeMode.BottomRight, corner, corner, HorizontalAlignment.Right, VerticalAlignment.Bottom, StandardCursorType.BottomRightCorner));
         }
 
         private Border CriarGripBorda(ResizeMode mode, double w, double h, HorizontalAlignment ha, VerticalAlignment va, StandardCursorType cursor)
@@ -1225,6 +1308,13 @@ namespace AvaloniaMdiApp
                     var props = e.GetCurrentPoint(this);
                     if (props.Properties.IsLeftButtonPressed && !_isMaximized)
                     {
+                        var detected = DetectarBordaFormaFluxograma(e.GetPosition(this));
+                        if (detected.Mode != ResizeMode.None)
+                        {
+                            IniciarRedimensionamento(detected.Mode, e);
+                            return;
+                        }
+
                         _isDragging = true;
                         _pointerStart = e.GetPosition(Workspace);
                         _windowStart = new Point(Canvas.GetLeft(this), Canvas.GetTop(this));
@@ -1269,9 +1359,91 @@ namespace AvaloniaMdiApp
             }
         }
 
+        private static double DistanciaPontoSegmento(Point p, Point a, Point b)
+        {
+            double vx = b.X - a.X;
+            double vy = b.Y - a.Y;
+            double wx = p.X - a.X;
+            double wy = p.Y - a.Y;
+            double c1 = vx * wx + vy * wy;
+            if (c1 <= 0) return Math.Sqrt(wx * wx + wy * wy);
+            double c2 = vx * vx + vy * vy;
+            if (c2 <= c1) return Math.Sqrt((p.X - b.X) * (p.X - b.X) + (p.Y - b.Y) * (p.Y - b.Y));
+            double t = c1 / c2;
+            double px = a.X + t * vx;
+            double py = a.Y + t * vy;
+            return Math.Sqrt((p.X - px) * (p.X - px) + (p.Y - py) * (p.Y - py));
+        }
+
+        private (ResizeMode Mode, StandardCursorType Cursor) DetectarBordaFormaFluxograma(Point pos)
+        {
+            double w = Bounds.Width > 1 ? Bounds.Width : Width;
+            double h = Bounds.Height > 1 ? Bounds.Height : Height;
+            if (w <= 10 || h <= 10 || _isMaximized || _isMinimized)
+                return (ResizeMode.None, StandardCursorType.Arrow);
+
+            double rx = w / 2.0;
+            double ry = h / 2.0;
+            double dx = (pos.X - rx) / rx;
+            double dy = (pos.Y - ry) / ry;
+
+            if (WindowType == "shape_circle")
+            {
+                double r = Math.Sqrt(dx * dx + dy * dy);
+                if (r < 0.78 || r > 1.18)
+                    return (ResizeMode.None, StandardCursorType.Arrow);
+            }
+            else if (WindowType == "shape_diamond")
+            {
+                double d = Math.Abs(dx) + Math.Abs(dy);
+                if (d < 0.78 || d > 1.18)
+                    return (ResizeMode.None, StandardCursorType.Arrow);
+            }
+            else if (WindowType == "shape_alert")
+            {
+                var top = new Point(w / 2.0, 4);
+                var br = new Point(w - 4, h - 4);
+                var bl = new Point(4, h - 4);
+                double minDist = Math.Min(
+                    DistanciaPontoSegmento(pos, top, br),
+                    Math.Min(DistanciaPontoSegmento(pos, br, bl), DistanciaPontoSegmento(pos, bl, top)));
+                if (minDist > 11)
+                    return (ResizeMode.None, StandardCursorType.Arrow);
+            }
+            else
+            {
+                bool nearEdge = pos.X <= 10 || pos.X >= w - 10 || pos.Y <= 10 || pos.Y >= h - 10;
+                if (!nearEdge)
+                    return (ResizeMode.None, StandardCursorType.Arrow);
+            }
+
+            bool left = dx < -0.35;
+            bool right = dx > 0.35;
+            bool topEdge = dy < -0.35;
+            bool bottomEdge = dy > 0.35;
+
+            if (topEdge && left) return (ResizeMode.TopLeft, StandardCursorType.TopLeftCorner);
+            if (topEdge && right) return (ResizeMode.TopRight, StandardCursorType.TopRightCorner);
+            if (bottomEdge && left) return (ResizeMode.BottomLeft, StandardCursorType.BottomLeftCorner);
+            if (bottomEdge && right) return (ResizeMode.BottomRight, StandardCursorType.BottomRightCorner);
+            if (left) return (ResizeMode.Left, StandardCursorType.SizeWestEast);
+            if (right) return (ResizeMode.Right, StandardCursorType.SizeWestEast);
+            if (topEdge) return (ResizeMode.Top, StandardCursorType.SizeNorthSouth);
+            if (bottomEdge) return (ResizeMode.Bottom, StandardCursorType.SizeNorthSouth);
+            return (ResizeMode.BottomRight, StandardCursorType.BottomRightCorner);
+        }
+
         private void OnWindowPointerMoved(object? sender, PointerEventArgs e)
         {
-            if (!_isDragging && _resizeMode == ResizeMode.None) return;
+            if (!_isDragging && _resizeMode == ResizeMode.None)
+            {
+                if (IsFlowchartShape)
+                {
+                    var detected = DetectarBordaFormaFluxograma(e.GetPosition(this));
+                    Cursor = new Cursor(detected.Cursor);
+                }
+                return;
+            }
 
             var currentPoint = e.GetPosition(Workspace);
 
@@ -1294,23 +1466,41 @@ namespace AvaloniaMdiApp
             else if (_resizeMode != ResizeMode.None)
             {
                 var diff = currentPoint - _pointerStart;
+                double newLeft = _rectStart.X;
+                double newTop = _rectStart.Y;
                 double newWidth = _rectStart.Width;
                 double newHeight = _rectStart.Height;
 
                 double minW = IsFlowchartShape ? 140 : 220;
                 double minH = IsFlowchartShape ? 95 : 140;
 
-                if (_resizeMode == ResizeMode.Right || _resizeMode == ResizeMode.BottomRight)
+                if (_resizeMode is ResizeMode.Right or ResizeMode.TopRight or ResizeMode.BottomRight)
                 {
                     newWidth = Math.Max(minW, _rectStart.Width + diff.X);
                 }
-                if (_resizeMode == ResizeMode.Bottom || _resizeMode == ResizeMode.BottomRight)
+                else if (_resizeMode is ResizeMode.Left or ResizeMode.TopLeft or ResizeMode.BottomLeft)
+                {
+                    double rightEdge = _rectStart.X + _rectStart.Width;
+                    newLeft = Math.Clamp(_rectStart.X + diff.X, 0, Math.Max(0, rightEdge - minW));
+                    newWidth = Math.Max(minW, rightEdge - newLeft);
+                }
+
+                if (_resizeMode is ResizeMode.Bottom or ResizeMode.BottomLeft or ResizeMode.BottomRight)
                 {
                     newHeight = Math.Max(minH, _rectStart.Height + diff.Y);
                 }
+                else if (_resizeMode is ResizeMode.Top or ResizeMode.TopLeft or ResizeMode.TopRight)
+                {
+                    double bottomEdge = _rectStart.Y + _rectStart.Height;
+                    newTop = Math.Clamp(_rectStart.Y + diff.Y, 0, Math.Max(0, bottomEdge - minH));
+                    newHeight = Math.Max(minH, bottomEdge - newTop);
+                }
 
+                Canvas.SetLeft(this, newLeft);
+                Canvas.SetTop(this, newTop);
                 Width = newWidth;
                 Height = newHeight;
+                _browserHost?.AtualizarLimitesNativos();
                 AtualizarTextoDimensoes();
                 OnBoundsChanged?.Invoke(this);
             }
@@ -1334,6 +1524,7 @@ namespace AvaloniaMdiApp
                 _isDragging = false;
                 _resizeMode = ResizeMode.None;
                 e.Pointer.Capture(null);
+                OnInteractionCompleted?.Invoke(this);
             }
 
             if (abrirEdicaoTitulo)

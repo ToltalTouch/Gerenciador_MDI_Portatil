@@ -25,7 +25,7 @@ namespace AvaloniaMdiApp
 
         // ==================== CAPTURA VISUAL DO WORKSPACE ====================
 
-        public static RenderTargetBitmap? CapturarWorkspaceBitmap(Canvas workspace, out int pixelWidth, out int pixelHeight)
+        internal static RenderTargetBitmap? CapturarWorkspaceBitmap(Canvas workspace, out int pixelWidth, out int pixelHeight)
         {
             pixelWidth = 0;
             pixelHeight = 0;

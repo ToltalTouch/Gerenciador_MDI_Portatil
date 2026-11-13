@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime;
+using System.Threading.Tasks;
 
 namespace AvaloniaMdiApp
 {
@@ -83,14 +84,20 @@ namespace AvaloniaMdiApp
             {
                 _settings = SettingsManager.Carregar();
                 _widgetSizePreset = string.IsNullOrWhiteSpace(_settings.WidgetSizePreset) ? "normal" : _settings.WidgetSizePreset;
+                if (string.IsNullOrWhiteSpace(_settings.ThemePreset))
+                {
+                    _settings.ThemePreset = _settings.IsDarkMode ? "dark_blue" : "light_blue";
+                }
+                _settings.IsDarkMode = ThemePalette.EhTemaEscuro(_settings.ThemePreset);
+                ThemePalette.AplicarEsquema(_settings.ThemePreset);
 
                 var wsAtual = ObterWorkspaceAtual();
-                _workspaceBgImagePath = wsAtual.BackgroundImagePath ?? string.Empty;
                 _workspaceZoom = wsAtual.WorkspaceZoom > 0 ? wsAtual.WorkspaceZoom : 1.0;
 
-                AplicarTema(_settings.IsDarkMode);
+                AplicarTema(_settings.ThemePreset);
                 AplicarEscalaLayout(_settings.LayoutScale);
                 AplicarTamanhoJanelaPrincipal(_settings.MainWindowSizePreset);
+                InicializarFiltroCores();
                 AtualizarAbasWorkspaces();
                 CarregarJanelasDoWorkspace(wsAtual);
                 AplicarZoomWorkspace(_workspaceZoom);
@@ -99,12 +106,322 @@ namespace AvaloniaMdiApp
                 {
                     _ = VerificarAtualizacaoGitHubAsync(silenciosoSeAtualizado: true);
                 }
+
+                if (_settings.GoogleDriveCloudSyncEnabled && !string.IsNullOrWhiteSpace(_settings.GoogleOAuthRefreshToken))
+                {
+                    _ = VerificarEAtualizarNuvemNaInicializacaoAsync();
+                }
+
+                if (!_settings.HasSeenWelcome)
+                {
+                    MostrarModalBoasVindas();
+                }
             };
 
             Closing += OnMainWindowClosing;
+            Closed += (s, e) =>
+            {
+                (Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.Shutdown();
+            };
+        }
+
+        private bool _isSidebarExpanded;
+        private string? _activeColorFilterHex;
+        private readonly Dictionary<string, Button> _colorFilterButtons = new(StringComparer.OrdinalIgnoreCase);
+
+        private void InicializarFiltroCores()
+        {
+            if (ColorFilterDotsPanel.Children.Count > 0) return;
+            _colorFilterButtons.Clear();
+
+            foreach (var cor in FlowchartConnectionVisual.PaletaCoresLinha)
+            {
+                string hex = cor.Hex;
+                var dotBtn = new Button
+                {
+                    Width = 16,
+                    Height = 16,
+                    Padding = new Thickness(0),
+                    CornerRadius = new CornerRadius(8),
+                    Background = SolidColorBrush.Parse(hex),
+                    BorderThickness = new Thickness(1.5),
+                    BorderBrush = Brushes.Transparent
+                };
+                ToolTip.SetTip(dotBtn, $"Destacar cor: {cor.Nome}");
+                dotBtn.Click += (_, _) =>
+                {
+                    _activeColorFilterHex = string.Equals(_activeColorFilterHex, hex, StringComparison.OrdinalIgnoreCase)
+                        ? null
+                        : hex;
+                    AplicarFiltroCores();
+                };
+                _colorFilterButtons[hex] = dotBtn;
+                ColorFilterDotsPanel.Children.Add(dotBtn);
+            }
+
+            AtualizarVisualFiltroCores();
+        }
+
+        private void ClearColorFilter_Click(object? sender, RoutedEventArgs e)
+        {
+            _activeColorFilterHex = null;
+            AplicarFiltroCores();
+        }
+
+        private void AplicarFiltroCores()
+        {
+            AtualizarVisualFiltroCores();
+
+            foreach (var win in _ativasJanelas)
+            {
+                win.AplicarFiltroCor(_activeColorFilterHex);
+            }
+
+            foreach (var conn in _conexoesAtivas)
+            {
+                bool match = DraggableWindow.CorCombinaComFiltro(conn.ColorHex, _activeColorFilterHex);
+                conn.DefinirDestaqueFiltro(match);
+            }
+
+            AppTaskBar.AplicarFiltroCor(_activeColorFilterHex);
+        }
+
+        private void AtualizarVisualFiltroCores()
+        {
+            bool semFiltro = string.IsNullOrWhiteSpace(_activeColorFilterHex);
+            BtnClearColorFilter.Background = semFiltro
+                ? ThemePalette.Accent
+                : (_isDarkMode ? ThemePalette.DarkButtonBg : ThemePalette.LightButtonBg);
+            BtnClearColorFilter.Foreground = semFiltro
+                ? Brushes.White
+                : (_isDarkMode ? ThemePalette.DarkTextPrimary : ThemePalette.LightTextPrimary);
+
+            foreach (var kvp in _colorFilterButtons)
+            {
+                bool active = !semFiltro && string.Equals(kvp.Key, _activeColorFilterHex, StringComparison.OrdinalIgnoreCase);
+                kvp.Value.BorderBrush = active
+                    ? (_isDarkMode ? Brushes.White : ThemePalette.Accent)
+                    : Brushes.Transparent;
+                kvp.Value.Width = active ? 18 : 15;
+                kvp.Value.Height = active ? 18 : 15;
+            }
+        }
+
+        private void ToggleSidebar_Click(object? sender, RoutedEventArgs e)
+        {
+            _isSidebarExpanded = !_isSidebarExpanded;
+            LeftSidebar.Width = _isSidebarExpanded ? 215 : 60;
+
+            foreach (var lbl in new[]
+            {
+                LblSidebarTitle, LblSideNotas, LblSideListas,
+                LblSidePlanilhas, LblSideGaleria, LblSideNavegador, LblSideFluxograma,
+                LblSideSalvarTudo, LblSideExtrair, LblSidePreferencias
+            })
+            {
+                if (lbl != null)
+                {
+                    lbl.IsVisible = _isSidebarExpanded;
+                }
+            }
+        }
+
+        private void MostrarModalBoasVindas()
+        {
+            var cardBg = _isDarkMode ? ThemePalette.DarkWindowBg : ThemePalette.LightWindowBg;
+            var borderBrush = _isDarkMode ? ThemePalette.DarkBorder : ThemePalette.LightBorder;
+            var textPrimary = _isDarkMode ? ThemePalette.DarkTextPrimary : ThemePalette.LightTextPrimary;
+            var textSecondary = _isDarkMode ? ThemePalette.DarkTextSecondary : ThemePalette.LightTextSecondary;
+
+            var title = new TextBlock
+            {
+                Text = "Bem-vindo ao Gerenciador MDI Portátil!",
+                FontSize = 18,
+                FontWeight = FontWeight.Bold,
+                Foreground = textPrimary
+            };
+
+            var subtitle = new TextBlock
+            {
+                Text = "Organize suas ideias, tarefas, planilhas, mídias, fluxogramas e páginas web em um único espaço de trabalho portátil.",
+                FontSize = 12.5,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = textSecondary,
+                LineHeight = 19
+            };
+
+            var tipsPanel = new StackPanel { Spacing = 8, Margin = new Thickness(0, 4, 0, 4) };
+            string[] tips =
+            {
+                "• Menu Lateral: Use os ícones à esquerda (ou clique no botão de menu) para abrir Bloco de Notas, Listas, Planilhas, Galeria, Navegador e Fluxograma.",
+                "• Fluxograma e Ligações: Conecte janelas e formas ou vincule itens individuais da Lista de Marcação a qualquer janela.",
+                "• Workspaces Portáteis: Crie vários espaços na barra superior e exporte em PDF, PNG, HTML ou ZIP."
+            };
+            foreach (var tip in tips)
+            {
+                tipsPanel.Children.Add(new TextBlock
+                {
+                    Text = tip,
+                    FontSize = 12,
+                    TextWrapping = TextWrapping.Wrap,
+                    Foreground = textPrimary,
+                    LineHeight = 18
+                });
+            }
+
+            var btnStart = new Button
+            {
+                Content = "Começar a usar",
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Padding = new Thickness(16, 8),
+                CornerRadius = new CornerRadius(6),
+                Background = ThemePalette.Accent,
+                Foreground = Brushes.White,
+                FontWeight = FontWeight.SemiBold,
+                FontSize = 12.5
+            };
+
+            btnStart.Click += (_, _) =>
+            {
+                _settings.HasSeenWelcome = true;
+                SettingsManager.Salvar(_settings);
+                ModalOverlay.IsVisible = false;
+                ModalOverlay.Child = null;
+            };
+
+            var card = new Border
+            {
+                Width = 480,
+                Padding = new Thickness(24),
+                CornerRadius = new CornerRadius(12),
+                Background = cardBg,
+                BorderBrush = borderBrush,
+                BorderThickness = new Thickness(1),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = new StackPanel
+                {
+                    Spacing = 12,
+                    Children = { title, subtitle, tipsPanel, btnStart }
+                }
+            };
+
+            ModalOverlay.Child = card;
+            ModalOverlay.IsVisible = true;
         }
 
         // ==================== ZOOM OUT / IN E PAN DO WORKSPACE ====================
+
+        private readonly Stack<string> _undoStack = new();
+        private readonly Stack<string> _redoStack = new();
+        private bool _isRestoringUndoRedo;
+
+        private string CapturarSnapshotWorkspaceJson()
+        {
+            var ws = ObterWorkspaceAtual();
+            var snapshot = new WorkspaceData
+            {
+                Id = ws.Id,
+                Name = ws.Name,
+                BackgroundImagePath = _workspaceBgImagePath,
+                WorkspaceZoom = _workspaceZoom,
+                SavedWindows = _ativasJanelas.Select(w => w.ExportState()).ToList(),
+                Connections = _conexoesAtivas.Select(c => new WindowConnectionData
+                {
+                    Id = c.ConnectionId,
+                    FromWindowId = c.FromWindow.WindowId,
+                    ToWindowId = c.ToWindow.WindowId,
+                    Label = c.Label,
+                    ColorHex = c.ColorHex
+                }).ToList(),
+                CalendarLinks = ws.CalendarLinks.Select(l => new CalendarStageLinkData
+                {
+                    Id = l.Id,
+                    StartDate = l.StartDate,
+                    EndDate = l.EndDate,
+                    TimeRange = l.TimeRange,
+                    WindowId = l.WindowId,
+                    ChecklistRowId = l.ChecklistRowId
+                }).ToList()
+            };
+            return System.Text.Json.JsonSerializer.Serialize(snapshot);
+        }
+
+        private void RegistrarEstadoUndo()
+        {
+            if (_isRestoringUndoRedo || _trocandoWorkspace) return;
+            string json = CapturarSnapshotWorkspaceJson();
+            if (_undoStack.Count > 0 && _undoStack.Peek() == json) return;
+            _undoStack.Push(json);
+            if (_undoStack.Count > 35)
+            {
+                var trimmed = _undoStack.Take(35).Reverse().ToList();
+                _undoStack.Clear();
+                foreach (var s in trimmed) _undoStack.Push(s);
+            }
+            _redoStack.Clear();
+        }
+
+        private void AplicarSnapshotWorkspaceJson(string json)
+        {
+            var snapshot = System.Text.Json.JsonSerializer.Deserialize<WorkspaceData>(json);
+            if (snapshot == null) return;
+
+            var ws = ObterWorkspaceAtual();
+            ws.SavedWindows = snapshot.SavedWindows;
+            ws.Connections = snapshot.Connections;
+            ws.CalendarLinks = snapshot.CalendarLinks;
+            ws.BackgroundImagePath = snapshot.BackgroundImagePath;
+            ws.WorkspaceZoom = snapshot.WorkspaceZoom;
+
+            _isRestoringUndoRedo = true;
+            _trocandoWorkspace = true;
+            try
+            {
+                foreach (var w in _ativasJanelas.ToList())
+                {
+                    w.Fechar();
+                }
+                _ativasJanelas.Clear();
+                _conexoesAtivas.Clear();
+                CarregarJanelasDoWorkspace(ws);
+                if (_isCalendarOpen)
+                {
+                    RenderizarCalendarioMes();
+                    RenderizarEtapasDoPeriodo();
+                }
+                AplicarFiltroCores();
+            }
+            finally
+            {
+                _trocandoWorkspace = false;
+                _isRestoringUndoRedo = false;
+            }
+        }
+
+        private void DesfazerWorkspace()
+        {
+            if (_undoStack.Count == 0) return;
+            _redoStack.Push(CapturarSnapshotWorkspaceJson());
+            string prev = _undoStack.Pop();
+            AplicarSnapshotWorkspaceJson(prev);
+            if (_settings.EnableNotifications)
+            {
+                ToastNotification.Mostrar(Workspace, "Alteração desfeita (Ctrl+Z)", "info");
+            }
+        }
+
+        private void RefazerWorkspace()
+        {
+            if (_redoStack.Count == 0) return;
+            _undoStack.Push(CapturarSnapshotWorkspaceJson());
+            string next = _redoStack.Pop();
+            AplicarSnapshotWorkspaceJson(next);
+            if (_settings.EnableNotifications)
+            {
+                ToastNotification.Mostrar(Workspace, "Alteração refeita (Ctrl+Y)", "info");
+            }
+        }
 
         private void ConfigurarEventosWorkspaceZoomEPan()
         {
@@ -174,11 +491,38 @@ namespace AvaloniaMdiApp
 
             KeyDown += (s, e) =>
             {
+                if (e.Key == Key.Escape && _isPickingCalendarTarget)
+                {
+                    CancelarModoVinculoCalendario();
+                    e.Handled = true;
+                    return;
+                }
+
                 if (e.Key == Key.Escape && _modoConexaoAtivo)
                 {
                     CancelarModoConexao();
                     e.Handled = true;
                     return;
+                }
+
+                if ((e.KeyModifiers & KeyModifiers.Control) != 0 && !ModalOverlay.IsVisible)
+                {
+                    var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
+                    if (focused is not TextBox)
+                    {
+                        if (e.Key == Key.Z)
+                        {
+                            DesfazerWorkspace();
+                            e.Handled = true;
+                            return;
+                        }
+                        if (e.Key == Key.Y)
+                        {
+                            RefazerWorkspace();
+                            e.Handled = true;
+                            return;
+                        }
+                    }
                 }
 
                 if (e.Key == Key.Delete && !ModalOverlay.IsVisible)
@@ -192,6 +536,7 @@ namespace AvaloniaMdiApp
                     var ativa = ZIndexManager.ActiveWindow;
                     if (ativa != null && _ativasJanelas.Contains(ativa))
                     {
+                        RegistrarEstadoUndo();
                         ativa.Fechar();
                         e.Handled = true;
                     }
@@ -294,6 +639,15 @@ namespace AvaloniaMdiApp
 
         private void AoClicarEmJanela(DraggableWindow janelaClicada)
         {
+            if (_isPickingCalendarTarget)
+            {
+                if (janelaClicada.WindowType != "checklist")
+                {
+                    AoSelecionarAlvoParaCalendario(janelaClicada, string.Empty);
+                }
+                return;
+            }
+
             if (!_modoConexaoAtivo) return;
 
             if (_janelaOrigemConexao == null)
@@ -431,20 +785,6 @@ namespace AvaloniaMdiApp
 
         private void AtualizarVisualBotaoConexaoHud()
         {
-            if (_modoConexaoAtivo)
-            {
-                BtnHudConnect.Content = "✕ Cancelar Ligação";
-                BtnHudConnect.Background = ThemePalette.Accent;
-                BtnHudConnect.Foreground = Brushes.White;
-                BtnHudConnect.BorderBrush = ThemePalette.AccentLight;
-            }
-            else
-            {
-                BtnHudConnect.Content = AppIcons.WithText(AppIcons.Link, "Conectar", 11, 5, ThemePalette.IconLightGray);
-                BtnHudConnect.Background = _isDarkMode ? ThemePalette.DarkButtonBg : ThemePalette.LightButtonBg;
-                BtnHudConnect.Foreground = _isDarkMode ? ThemePalette.DarkTextPrimary : ThemePalette.LightTextPrimary;
-                BtnHudConnect.BorderBrush = _isDarkMode ? ThemePalette.DarkBorder : ThemePalette.LightBorder;
-            }
         }
 
         private void LimparConexoesWorkspace_Click(object? sender, RoutedEventArgs e)
@@ -492,10 +832,23 @@ namespace AvaloniaMdiApp
             return ws;
         }
 
+        private bool TemCoisasParaSalvar()
+        {
+            return _ativasJanelas.Count > 0 || _conexoesAtivas.Count > 0;
+        }
+
         private void OnMainWindowClosing(object? sender, WindowClosingEventArgs e)
         {
             if (_saidaConfirmada)
             {
+                return;
+            }
+
+            // Se não há nada aberto no workspace para salvar, fecha diretamente sem modal nem travamento
+            if (!TemCoisasParaSalvar())
+            {
+                _saidaConfirmada = true;
+                LiberarRecursosAntesDeFechar();
                 return;
             }
 
@@ -518,6 +871,7 @@ namespace AvaloniaMdiApp
             {
                 ModalOverlay.IsVisible = false;
                 _saidaConfirmada = true;
+                LiberarRecursosAntesDeFechar();
                 Close();
             };
 
@@ -527,6 +881,7 @@ namespace AvaloniaMdiApp
                 ModalOverlay.IsVisible = false;
                 SalvarTodosWorkspacesNoDisco();
                 _saidaConfirmada = true;
+                LiberarRecursosAntesDeFechar();
                 Close();
             };
 
@@ -536,6 +891,18 @@ namespace AvaloniaMdiApp
 
             AplicarEstiloModal();
             ModalOverlay.IsVisible = true;
+        }
+
+        private void LiberarRecursosAntesDeFechar()
+        {
+            foreach (var win in _ativasJanelas.ToList())
+            {
+                try
+                {
+                    win.Fechar();
+                }
+                catch { }
+            }
         }
 
         private Button CriarBotaoModal(string texto, bool isPrimary, bool isDanger, StreamGeometry? icon = null)
@@ -644,34 +1011,44 @@ namespace AvaloniaMdiApp
             AtualizarDimensoesCanvasWorkspace();
         }
 
-        private void AplicarTema(bool isDarkMode)
+        private void AplicarTema(string? preset = null)
         {
-            _isDarkMode = isDarkMode;
+            string p = preset ?? _settings.ThemePreset;
+            ThemePalette.AplicarEsquema(p);
+            _isDarkMode = ThemePalette.EhTemaEscuro(p);
+            _settings.IsDarkMode = _isDarkMode;
+            _settings.ThemePreset = p;
 
             if (Application.Current != null)
             {
-                Application.Current.RequestedThemeVariant = isDarkMode ? ThemeVariant.Dark : ThemeVariant.Light;
+                Application.Current.RequestedThemeVariant = _isDarkMode ? ThemeVariant.Dark : ThemeVariant.Light;
             }
 
-            var workspaceBg = isDarkMode ? ThemePalette.DarkWorkspaceBg : ThemePalette.LightWorkspaceBg;
-            var barBg = isDarkMode ? ThemePalette.DarkBarBg : ThemePalette.LightBarBg;
-            var borderBrush = isDarkMode ? ThemePalette.DarkBorder : ThemePalette.LightBorder;
-            var textPrimary = isDarkMode ? ThemePalette.DarkTextPrimary : ThemePalette.LightTextPrimary;
-            var btnBg = isDarkMode ? ThemePalette.DarkButtonBg : ThemePalette.LightButtonBg;
+            var workspaceBg = _isDarkMode ? ThemePalette.DarkWorkspaceBg : ThemePalette.LightWorkspaceBg;
+            var barBg = _isDarkMode ? ThemePalette.DarkBarBg : ThemePalette.LightBarBg;
+            var borderBrush = _isDarkMode ? ThemePalette.DarkBorder : ThemePalette.LightBorder;
+            var textPrimary = _isDarkMode ? ThemePalette.DarkTextPrimary : ThemePalette.LightTextPrimary;
+            var btnBg = _isDarkMode ? ThemePalette.DarkButtonBg : ThemePalette.LightButtonBg;
 
             RootDock.Background = workspaceBg;
             WorkspaceViewport.Background = workspaceBg;
-            AplicarFundoWorkspace(workspaceBg);
+            AplicarFundoWorkspace();
             TopBar.Background = barBg;
             TopBar.BorderBrush = borderBrush;
+            LblColorFilter.Foreground = _isDarkMode ? ThemePalette.DarkTextSecondary : ThemePalette.LightTextSecondary;
+            AtualizarVisualFiltroCores();
+            LeftSidebar.Background = barBg;
+            LeftSidebar.BorderBrush = borderBrush;
+            BtnToggleSidebar.Foreground = textPrimary;
 
-            foreach (var menuItem in new[] { MenuTopWorkspaces, MenuTopNotas, MenuTopListas, MenuTopPlanilhas, MenuTopGaleria, MenuTopNavegador, MenuTopFluxograma, MenuTopJanelas, MenuTopPreferencias })
+            foreach (var sideBtn in new[] { BtnSideNotas, BtnSideListas, BtnSidePlanilhas, BtnSideGaleria, BtnSideNavegador, BtnSideFluxograma, BtnSideSalvarTudo, BtnSideExtrair, BtnSidePreferencias })
             {
-                if (menuItem != null)
+                if (sideBtn != null)
                 {
-                    menuItem.Foreground = textPrimary;
+                    sideBtn.Foreground = textPrimary;
                 }
             }
+            AtualizarTemaCalendario();
 
             BtnAddWorkspace.Background = btnBg;
             BtnAddWorkspace.Foreground = textPrimary;
@@ -680,32 +1057,31 @@ namespace AvaloniaMdiApp
             BottomBar.BorderBrush = borderBrush;
             WorkspaceHud.Background = workspaceBg;
             WorkspaceHud.BorderBrush = borderBrush;
-            HudDividerShapes.Background = borderBrush;
-            HudDivider.Background = borderBrush;
 
-            foreach (var btn in new[] { BtnHudShapeRect, BtnHudShapeDiamond, BtnHudShapeCircle, BtnHudWarning, BtnHudZoomOut, BtnHudZoomReset, BtnHudZoomIn })
+            foreach (var btn in new[] { BtnHudZoomOut, BtnHudZoomReset, BtnHudZoomIn })
             {
                 btn.Background = btnBg;
                 btn.Foreground = textPrimary;
                 btn.BorderBrush = borderBrush;
             }
-            AtualizarVisualBotaoConexaoHud();
 
-            AppTaskBar.AplicarTema(isDarkMode);
-            _settingsWindow?.AplicarTema(isDarkMode);
+            AppTaskBar.AplicarTema(_isDarkMode);
+            _settingsWindow?.AplicarTema(_isDarkMode);
             AplicarEstiloModal();
             AtualizarAbasWorkspaces();
 
             foreach (var win in _ativasJanelas)
             {
-                win.AplicarTema(isDarkMode);
+                win.AplicarTema(_isDarkMode);
             }
 
             foreach (var conn in _conexoesAtivas)
             {
-                conn.AplicarTema(isDarkMode);
+                conn.AplicarTema(_isDarkMode);
             }
         }
+
+        private void AplicarTema(bool isDarkMode) => AplicarTema(isDarkMode ? "dark_blue" : "light_blue");
 
         // ==================== GERENCIAMENTO DE WORKSPACES ====================
 
@@ -872,7 +1248,8 @@ namespace AvaloniaMdiApp
                         winData.SpreadsheetCols,
                         winData.SpreadsheetCells,
                         winData.ConditionalRules,
-                        winData.CriticalityLevel);
+                        winData.CriticalityLevel,
+                        winData.RichLines);
                 }
             }
 
@@ -895,6 +1272,7 @@ namespace AvaloniaMdiApp
         private void SincronizarWorkspaceAtualEmMemoria()
         {
             var ws = ObterWorkspaceAtual();
+            ws.LastModifiedUtc = DateTime.UtcNow;
             ws.BackgroundImagePath = _workspaceBgImagePath ?? string.Empty;
             ws.WorkspaceZoom = _workspaceZoom;
             ws.SavedWindows.Clear();
@@ -942,62 +1320,19 @@ namespace AvaloniaMdiApp
         private void NovoWorkspace_Click(object? sender, RoutedEventArgs e)
         {
             string nomeSugerido = $"Workspace {_settings.Workspaces.Count + 1}";
-            ModalTitle.Text = "Criar Novo Workspace";
-            ModalMessage.Text = "Cada Workspace possui suas próprias janelas, fluxograma, galerias e plano de fundo. Digite o nome:";
-            ModalInputBox.Text = nomeSugerido;
-            ModalInputBox.IsVisible = true;
-            ModalButtonsPanel.Children.Clear();
+            SincronizarWorkspaceAtualEmMemoria();
 
-            var btnCancelar = CriarBotaoModal("Cancelar", isPrimary: false, isDanger: false);
-            btnCancelar.Click += (s, ev) => ModalOverlay.IsVisible = false;
-
-            var btnCriar = CriarBotaoModal("Criar Workspace", isPrimary: true, isDanger: false);
-            void ConfirmarCriacao()
+            var novoWs = new WorkspaceData
             {
-                string nome = (ModalInputBox.Text ?? string.Empty).Trim();
-                if (string.IsNullOrWhiteSpace(nome))
-                {
-                    nome = nomeSugerido;
-                }
+                Id = Guid.NewGuid().ToString("N"),
+                Name = nomeSugerido,
+                LastModifiedUtc = DateTime.UtcNow
+            };
+            _settings.Workspaces.Add(novoWs);
+            AlternarParaWorkspace(novoWs.Id);
+            SalvarTodosWorkspacesNoDisco();
 
-                ModalOverlay.IsVisible = false;
-                SincronizarWorkspaceAtualEmMemoria();
-
-                var novoWs = new WorkspaceData
-                {
-                    Id = Guid.NewGuid().ToString("N"),
-                    Name = nome
-                };
-                _settings.Workspaces.Add(novoWs);
-                AlternarParaWorkspace(novoWs.Id);
-                SalvarTodosWorkspacesNoDisco();
-            }
-
-            btnCriar.Click += (s, ev) => ConfirmarCriacao();
-            ModalInputBox.KeyDown += OnModalInputKeyDown;
-
-            void OnModalInputKeyDown(object? s, KeyEventArgs ev)
-            {
-                if (ev.Key == Key.Enter)
-                {
-                    ev.Handled = true;
-                    ModalInputBox.KeyDown -= OnModalInputKeyDown;
-                    ConfirmarCriacao();
-                }
-                else if (ev.Key == Key.Escape)
-                {
-                    ev.Handled = true;
-                    ModalInputBox.KeyDown -= OnModalInputKeyDown;
-                    ModalOverlay.IsVisible = false;
-                }
-            }
-
-            ModalButtonsPanel.Children.Add(btnCancelar);
-            ModalButtonsPanel.Children.Add(btnCriar);
-            AplicarEstiloModal();
-            ModalOverlay.IsVisible = true;
-            ModalInputBox.Focus();
-            ModalInputBox.SelectAll();
+            ToastNotification.Mostrar(Workspace, $"✓ {novoWs.Name} criado com sucesso!", "success");
         }
 
         private void RenomearWorkspaceAtual_Click(object? sender, RoutedEventArgs e)
@@ -1082,28 +1417,7 @@ namespace AvaloniaMdiApp
             ModalOverlay.IsVisible = true;
         }
 
-        private void MenuWorkspaces_SubmenuOpened(object? sender, RoutedEventArgs e)
-        {
-            var wsAtual = ObterWorkspaceAtual();
-            MenuExcluirWorkspace.IsEnabled = _settings.Workspaces.Count > 1;
-            MenuListaWorkspaces.Items.Clear();
-
-            foreach (var ws in _settings.Workspaces)
-            {
-                bool isCurrent = ws.Id == wsAtual.Id;
-                int qtdJanelas = isCurrent ? _ativasJanelas.Count : (ws.SavedWindows?.Count ?? 0);
-                var item = new MenuItem
-                {
-                    Icon = AppIcons.Create(isCurrent ? AppIcons.Workspace : AppIcons.Sleep, 12, isCurrent ? ThemePalette.IconLightGray : ThemePalette.IconMutedGray),
-                    Header = isCurrent
-                        ? $"✓ {ws.Name} (Ativo — {qtdJanelas} janela(s))"
-                        : $"{ws.Name} (Hibernado — {qtdJanelas} janela(s) salvas)"
-                };
-                string id = ws.Id;
-                item.Click += (s, ev) => AlternarParaWorkspace(id);
-                MenuListaWorkspaces.Items.Add(item);
-            }
-        }
+        private void MenuModulo_Opening(object? sender, EventArgs e) => MenuModulo_SubmenuOpened(sender, null!);
 
         // ==================== CATÁLOGO E MENUS DE MÓDULOS ====================
 
@@ -1151,28 +1465,13 @@ namespace AvaloniaMdiApp
             }
         }
 
-        private void SalvarJanelaAtiva_Click(object? sender, RoutedEventArgs e)
-        {
-            var ativa = ZIndexManager.ActiveWindow;
-            if (ativa != null && _ativasJanelas.Contains(ativa))
-            {
-                SalvarJanelaNoCatalogo(ativa, mostrarToast: true);
-            }
-            else if (_ativasJanelas.Count > 0)
-            {
-                SalvarJanelaNoCatalogo(_ativasJanelas[^1], mostrarToast: true);
-            }
-            else
-            {
-                ToastNotification.Mostrar(Workspace, "Nenhuma janela aberta para salvar.", "warning");
-            }
-        }
-
         private void SalvarTodasJanelas_Click(object? sender, RoutedEventArgs e)
         {
             if (_ativasJanelas.Count == 0)
             {
                 SalvarTodosWorkspacesNoDisco();
+                TentarSincronizarGoogleDriveAutomatico();
+                TentarSincronizarGoogleDriveNuvemAutomatico();
                 ToastNotification.Mostrar(Workspace, "Estado do Workspace salvo!", "success");
                 return;
             }
@@ -1182,139 +1481,160 @@ namespace AvaloniaMdiApp
                 SalvarJanelaNoCatalogo(win, mostrarToast: false);
             }
 
+            bool driveOk = TentarSincronizarGoogleDriveAutomatico();
+            TentarSincronizarGoogleDriveNuvemAutomatico();
+
             if (_settings.EnableNotifications)
             {
-                ToastNotification.Mostrar(Workspace, $"Todas as {_ativasJanelas.Count} janelas foram salvas em {ObterWorkspaceAtual().Name}!", "success");
+                string msgBase = $"Todas as {_ativasJanelas.Count} janelas foram salvas em {ObterWorkspaceAtual().Name}!";
+                if (_settings.GoogleDriveSyncEnabled)
+                {
+                    msgBase += driveOk
+                        ? " • Backup sincronizado no Google Drive!"
+                        : " • (Aviso: falha na sincronização do Google Drive)";
+                }
+                ToastNotification.Mostrar(Workspace, msgBase, driveOk ? "success" : "info");
             }
         }
 
-        private void MenuFluxograma_SubmenuOpened(object? sender, RoutedEventArgs e)
+        private void TentarSincronizarGoogleDriveNuvemAutomatico()
         {
-            MenuCorLinhasFluxograma.Items.Clear();
+            if (!_settings.GoogleDriveCloudSyncEnabled || string.IsNullOrWhiteSpace(_settings.GoogleOAuthRefreshToken))
+                return;
 
-            foreach (var cor in FlowchartConnectionVisual.PaletaCoresLinha)
+            _ = Task.Run(async () =>
             {
-                bool isDefault = string.Equals(_settings.DefaultFlowchartLineColor, cor.Hex, StringComparison.OrdinalIgnoreCase);
-                var item = new MenuItem
+                try
                 {
-                    Icon = AppIcons.Create(AppIcons.CircleDot, 10, ThemePalette.IconLightGray),
-                    Header = isDefault ? $"✓ {cor.Nome} (Padrão)" : cor.Nome
-                };
-                string hex = cor.Hex;
-                item.Click += (s, ev) =>
-                {
-                    _settings.DefaultFlowchartLineColor = hex;
-                    foreach (var conn in _conexoesAtivas)
+                    var ws = ObterWorkspaceAtual();
+                    var (ok, fileId, msg) = await GoogleDriveCloudClient.UploadWorkspaceAsync(_settings, ws);
+                    await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                     {
-                        conn.DefinirCor(hex);
+                        if (ok)
+                        {
+                            _settings.LastCloudSyncUtc = DateTime.UtcNow.ToString("o");
+                            SalvarTodosWorkspacesNoDisco();
+                            if (_settings.EnableNotifications)
+                            {
+                                ToastNotification.Mostrar(Workspace, $"☁ Workspace '{ws.Name}' sincronizado diretamente no Google Drive!", "success");
+                            }
+                        }
+                    });
+                }
+                catch { }
+            });
+        }
+
+        private async Task VerificarEAtualizarNuvemNaInicializacaoAsync()
+        {
+            if (!_settings.GoogleDriveCloudSyncEnabled || string.IsNullOrWhiteSpace(_settings.GoogleOAuthRefreshToken))
+                return;
+
+            try
+            {
+                var wsAtual = ObterWorkspaceAtual();
+                var cloudInfo = await GoogleDriveCloudClient.VerificarVersaoNuvemAsync(_settings, wsAtual);
+
+                if (cloudInfo != null && cloudInfo.ExistsInCloud && cloudInfo.IsCloudNewer)
+                {
+                    var cloudWs = await GoogleDriveCloudClient.BaixarWorkspaceDaNuvemAsync(_settings, wsAtual.Id);
+                    if (cloudWs != null)
+                    {
+                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            int idx = _settings.Workspaces.FindIndex(w => w.Id == cloudWs.Id);
+                            if (idx >= 0)
+                            {
+                                _settings.Workspaces[idx] = cloudWs;
+                            }
+                            else
+                            {
+                                _settings.Workspaces.Add(cloudWs);
+                            }
+                            SalvarTodosWorkspacesNoDisco();
+
+                            if (_settings.ActiveWorkspaceId == cloudWs.Id)
+                            {
+                                CarregarJanelasDoWorkspace(cloudWs);
+                            }
+
+                            ToastNotification.Mostrar(Workspace, $"☁ Versão mais recente do Google Drive carregada com sucesso!", "success");
+                        });
                     }
-                    SalvarTodosWorkspacesNoDisco();
-                };
-                MenuCorLinhasFluxograma.Items.Add(item);
-            }
-
-            MenuCriticidadeJanelaAtiva.Items.Clear();
-            var ativa = ZIndexManager.ActiveWindow ?? (_ativasJanelas.Count > 0 ? _ativasJanelas[^1] : null);
-            MenuCriticidadeJanelaAtiva.IsEnabled = ativa != null;
-            if (ativa != null)
-            {
-                foreach (var crit in DraggableWindow.NiveisCriticidade)
-                {
-                    bool selecionado = string.Equals(ativa.CriticalityLevel, crit.Key, StringComparison.OrdinalIgnoreCase);
-                    var item = new MenuItem
-                    {
-                        Icon = AppIcons.Create(crit.Key == "none" ? AppIcons.CircleDot : AppIcons.Warning, 11, ThemePalette.IconLightGray),
-                        Header = selecionado ? $"✓ {crit.Label}" : crit.Label
-                    };
-                    string key = crit.Key;
-                    item.Click += (s, ev) =>
-                    {
-                        ativa.DefinirCriticidade(key);
-                        SalvarTodosWorkspacesNoDisco();
-                    };
-                    MenuCriticidadeJanelaAtiva.Items.Add(item);
                 }
             }
+            catch { }
+        }
+
+        private bool TentarSincronizarGoogleDriveAutomatico()
+        {
+            if (!_settings.GoogleDriveSyncEnabled) return false;
+            try
+            {
+                var ws = ObterWorkspaceAtual();
+                if (GoogleDriveSyncService.SincronizarWorkspaceNoGoogleDrive(ws, _settings.GoogleDriveFolderPath, out _, out _))
+                {
+                    _settings.LastGoogleDriveSyncDate = DateTime.Now.ToString("dd/MM/yyyy HH:mm");
+                    SalvarTodosWorkspacesNoDisco();
+                    return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        private void SincronizarGoogleDriveManual_Click(object? sender, RoutedEventArgs e)
+        {
+            var ws = ObterWorkspaceAtual();
+            string pasta = string.IsNullOrWhiteSpace(_settings.GoogleDriveFolderPath)
+                ? GoogleDriveSyncService.DetectarPastaPadraoGoogleDrive()
+                : _settings.GoogleDriveFolderPath;
+
+            if (GoogleDriveSyncService.SincronizarWorkspaceNoGoogleDrive(ws, pasta, out string salvoEm, out string erro))
+            {
+                _settings.LastGoogleDriveSyncDate = DateTime.Now.ToString("dd/MM/yyyy HH:mm");
+                SalvarTodosWorkspacesNoDisco();
+                ToastNotification.Mostrar(Workspace, $"Backup do Workspace sincronizado no Google Drive com sucesso!\nArquivo: {System.IO.Path.GetFileName(salvoEm)}", "success");
+            }
+            else
+            {
+                ToastNotification.Mostrar(Workspace, $"Falha ao sincronizar no Google Drive: {erro}", "danger");
+            }
+        }
+
+        private void AbrirPastaGoogleDrive_Click(object? sender, RoutedEventArgs e)
+        {
+            string pasta = string.IsNullOrWhiteSpace(_settings.GoogleDriveFolderPath)
+                ? GoogleDriveSyncService.DetectarPastaPadraoGoogleDrive()
+                : _settings.GoogleDriveFolderPath;
+            GoogleDriveSyncService.AbrirPastaNoExplorador(pasta);
         }
 
         private void MenuModulo_SubmenuOpened(object? sender, RoutedEventArgs e)
         {
             var ws = ObterWorkspaceAtual();
 
-            PreencherSubmenusModulo(ws, new[] { "notepad" }, MenuNotasMaisUsadas, MenuNotasSalvas);
-            PreencherSubmenusModulo(ws, new[] { "checklist" }, MenuListasMaisUsadas, MenuListasSalvas);
-            PreencherSubmenusModulo(ws, new[] { "spreadsheet" }, MenuPlanilhasMaisUsadas, MenuPlanilhasSalvas);
-            PreencherSubmenusModulo(ws, new[] { "gallery", "image", "video" }, MenuGaleriaMaisUsadas, MenuGaleriaSalvas);
-            PreencherSubmenusModulo(ws, new[] { "browser" }, MenuNavegadorMaisUsadas, MenuNavegadorSalvos);
-            PreencherSubmenusModulo(ws, null, MenuMaisUsadas, MenuJanelasSalvas);
-
-            MenuCorJanelaAtiva.Items.Clear();
-            var ativa = ZIndexManager.ActiveWindow ?? (_ativasJanelas.Count > 0 ? _ativasJanelas[^1] : null);
-            MenuCorJanelaAtiva.IsEnabled = ativa != null;
-            if (ativa != null)
-            {
-                foreach (var cor in DraggableWindow.PaletaCoresJanela)
-                {
-                    var item = new MenuItem
-                    {
-                        Icon = AppIcons.Create(AppIcons.CircleDot, 10, ThemePalette.IconLightGray),
-                        Header = cor.Nome
-                    };
-                    string hex = cor.Hex;
-                    item.Click += (s, ev) =>
-                    {
-                        ativa.DefinirCorJanela(hex);
-                        SalvarTodosWorkspacesNoDisco();
-                    };
-                    MenuCorJanelaAtiva.Items.Add(item);
-                }
-            }
+            PreencherSubmenuSalvos(ws, new[] { "gallery", "image", "video" }, MenuGaleriaSalvas);
+            PreencherSubmenuSalvos(ws, new[] { "browser" }, MenuNavegadorSalvos);
         }
 
-        private void PreencherSubmenusModulo(
+        private void PreencherSubmenuSalvos(
             WorkspaceData ws,
             string[]? filtroTipos,
-            MenuItem menuMaisUsadas,
             MenuItem menuSalvas)
         {
+            if (menuSalvas == null) return;
             IEnumerable<WindowStateData> query = ws.SavedCatalog;
             if (filtroTipos != null && filtroTipos.Length > 0)
             {
                 query = query.Where(x => filtroTipos.Contains(x.WindowType));
             }
 
-            var listaFiltrada = query.ToList();
-
-            menuMaisUsadas.Items.Clear();
-            var maisUsadas = listaFiltrada
-                .OrderByDescending(x => x.AccessCount)
-                .ThenByDescending(x => x.LastUsedUtc)
-                .Take(6)
-                .ToList();
-
-            if (maisUsadas.Count == 0)
-            {
-                menuMaisUsadas.Items.Add(new MenuItem { Header = "(Nenhum item salvo)", IsEnabled = false });
-            }
-            else
-            {
-                foreach (var item in maisUsadas)
-                {
-                    var mi = new MenuItem
-                    {
-                        Icon = AppIcons.Create(AppIcons.FromWindowType(item.WindowType)),
-                        Header = $"{item.Title} ({item.AccessCount}x)"
-                    };
-                    string id = item.Id;
-                    mi.Click += (s, ev) => AbrirJanelaDoCatalogo(id);
-                    menuMaisUsadas.Items.Add(mi);
-                }
-            }
-
-            menuSalvas.Items.Clear();
-            var salvas = listaFiltrada
+            var salvas = query
                 .OrderByDescending(x => x.LastUsedUtc)
                 .ToList();
+
+            menuSalvas.Items.Clear();
 
             if (salvas.Count == 0)
             {
@@ -1582,6 +1902,62 @@ namespace AvaloniaMdiApp
             }
         }
 
+        private void VincularOuFocarJanelaDaLinha(DraggableWindow checklistWin, ChecklistRowState row)
+        {
+            var menu = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedRight };
+
+            if (!string.IsNullOrWhiteSpace(row.LinkedWindowId))
+            {
+                var target = _ativasJanelas.FirstOrDefault(w => w.WindowId == row.LinkedWindowId);
+                if (target != null)
+                {
+                    var miGo = new MenuItem { Header = $"Focar: {target.WindowTitle}" };
+                    miGo.Click += (_, _) =>
+                    {
+                        if (target.IsMinimized) target.ToggleMinimize();
+                        ZIndexManager.BringToFront(target);
+                        CriarOuFocarConexaoFluxograma(checklistWin, target);
+                    };
+                    menu.Items.Add(miGo);
+                }
+
+                var miUnlink = new MenuItem { Header = "Remover vínculo" };
+                miUnlink.Click += (_, _) =>
+                {
+                    row.LinkedWindowId = string.Empty;
+                    checklistWin.AtualizarIndicadorVinculoLinha(row);
+                };
+                menu.Items.Add(miUnlink);
+                menu.Items.Add(new Separator());
+            }
+
+            var outrasJanelas = _ativasJanelas.Where(w => w != checklistWin).ToList();
+            if (outrasJanelas.Count == 0)
+            {
+                menu.Items.Add(new MenuItem { Header = "Nenhuma outra janela aberta", IsEnabled = false });
+            }
+            else
+            {
+                foreach (var win in outrasJanelas)
+                {
+                    var targetWin = win;
+                    var miWin = new MenuItem { Header = $"Vincular a: {targetWin.WindowTitle}" };
+                    miWin.Click += (_, _) =>
+                    {
+                        row.LinkedWindowId = targetWin.WindowId;
+                        checklistWin.AtualizarIndicadorVinculoLinha(row);
+                        CriarOuFocarConexaoFluxograma(checklistWin, targetWin);
+                    };
+                    menu.Items.Add(miWin);
+                }
+            }
+
+            if (row.BtnLinkWindow != null)
+            {
+                menu.ShowAt(row.BtnLinkWindow);
+            }
+        }
+
         private void AbrirChecklist_Click(object? sender, RoutedEventArgs e)
         {
             _contadorListas++;
@@ -1611,74 +1987,6 @@ namespace AvaloniaMdiApp
             if (_settings.EnableNotifications)
             {
                 ToastNotification.Mostrar(Workspace, $"{titulo} criada!", "info");
-            }
-        }
-
-        private void AbrirPlanilhaExemplo_Click(object? sender, RoutedEventArgs e)
-        {
-            _contadorPlanilhas++;
-            double f = ObterFatorTamanhoWidget();
-            double offsetX = 65 + ((_contadorPlanilhas - 1) * 32) % 280;
-            double offsetY = 48 + ((_contadorPlanilhas - 1) * 32) % 180;
-
-            var celulasExemplo = new List<SpreadsheetCellData>
-            {
-                new() { CellKey = "A1", RawValue = "Item" },
-                new() { CellKey = "B1", RawValue = "Valor" },
-                new() { CellKey = "C1", RawValue = "Status (SE)" },
-                new() { CellKey = "A2", RawValue = "Vendas Jan" },
-                new() { CellKey = "B2", RawValue = "150" },
-                new() { CellKey = "C2", RawValue = "=SE(B2>=100; \"Aprovado\"; \"Reprovado\")" },
-                new() { CellKey = "A3", RawValue = "Vendas Fev" },
-                new() { CellKey = "B3", RawValue = "85" },
-                new() { CellKey = "C3", RawValue = "=SE(B3>=100; \"Aprovado\"; \"Reprovado\")" },
-                new() { CellKey = "A4", RawValue = "Vendas Mar" },
-                new() { CellKey = "B4", RawValue = "210" },
-                new() { CellKey = "C4", RawValue = "=SE(B4>=100; \"Aprovado\"; \"Reprovado\")" },
-                new() { CellKey = "A5", RawValue = "Despesa Extra" },
-                new() { CellKey = "B5", RawValue = "-45" },
-                new() { CellKey = "C5", RawValue = "=SE(B5>=0; \"Positivo\"; \"Negativo\")" },
-                new() { CellKey = "A7", RawValue = "SOMA Total" },
-                new() { CellKey = "B7", RawValue = "=SOMA(B2:B5)" },
-                new() { CellKey = "A8", RawValue = "MÉDIA" },
-                new() { CellKey = "B8", RawValue = "=MEDIA(B2:B5)" },
-                new() { CellKey = "A9", RawValue = "MÁXIMO" },
-                new() { CellKey = "B9", RawValue = "=MAXIMO(B2:B5)" }
-            };
-
-            var regrasExemplo = new List<ConditionalFormatRuleData>
-            {
-                new() { Range = "B2:B9", Operator = ">=", Value1 = "100", StyleKey = "green" },
-                new() { Range = "B2:B9", Operator = "<", Value1 = "0", StyleKey = "red" },
-                new() { Range = "C2:C5", Operator = "contains", Value1 = "Aprovado", StyleKey = "green" },
-                new() { Range = "C2:C5", Operator = "contains", Value1 = "Reprovado", StyleKey = "red" }
-            };
-
-            string titulo = $"Planilha Exemplo #{_contadorPlanilhas}";
-            CriarJanelaInterna(
-                titulo,
-                offsetX,
-                offsetY,
-                Math.Round(640 * f),
-                Math.Round(420 * f),
-                "spreadsheet",
-                "",
-                null,
-                null,
-                1,
-                null,
-                null,
-                null,
-                null,
-                "#059669",
-                12,
-                6,
-                celulasExemplo,
-                regrasExemplo);
-
-            if (_settings.EnableNotifications)
-            {
-                ToastNotification.Mostrar(Workspace, $"{titulo} (com SOMA, MEDIA, SE e Formatação Condicional) aberta!", "success");
             }
         }
 
@@ -1888,40 +2196,105 @@ namespace AvaloniaMdiApp
             }
         }
 
-        private void AplicarFundoWorkspace(IBrush fallbackBg)
+        private void AplicarFundoWorkspace(IBrush? fallbackBg = null)
         {
-            if (!string.IsNullOrWhiteSpace(_workspaceBgImagePath) && File.Exists(_workspaceBgImagePath))
-            {
-                try
-                {
-                    _workspaceBgBitmap?.Dispose();
-                    _workspaceBgBitmap = new Bitmap(_workspaceBgImagePath);
-                    Workspace.Background = new ImageBrush(_workspaceBgBitmap)
-                    {
-                        Stretch = Stretch.UniformToFill
-                    };
-                    return;
-                }
-                catch { }
-            }
+            var baseBg = fallbackBg ?? (_isDarkMode ? ThemePalette.DarkWorkspaceBg : ThemePalette.LightWorkspaceBg);
+            var solidColor = (baseBg as ISolidColorBrush)?.Color ?? (_isDarkMode ? Color.Parse("#0F172A") : Color.Parse("#F1F5F9"));
 
-            _workspaceBgBitmap?.Dispose();
-            _workspaceBgBitmap = null;
-            Workspace.Background = fallbackBg;
+            string style = _settings.WorkspaceBackgroundStyle?.ToLowerInvariant() ?? "grid";
+
+            if (style == "dots")
+            {
+                // Fundo Pontilhado (Dots Pattern)
+                var dotColor = _isDarkMode ? Color.FromArgb(70, 203, 213, 225) : Color.FromArgb(70, 71, 85, 105);
+                var group = new DrawingGroup();
+                group.Children.Add(new GeometryDrawing
+                {
+                    Brush = new SolidColorBrush(solidColor),
+                    Geometry = new RectangleGeometry(new Rect(0, 0, 24, 24))
+                });
+                group.Children.Add(new GeometryDrawing
+                {
+                    Brush = new SolidColorBrush(dotColor),
+                    Geometry = new EllipseGeometry(new Rect(11, 11, 2, 2))
+                });
+
+                Workspace.Background = new DrawingBrush
+                {
+                    TileMode = TileMode.Tile,
+                    SourceRect = new RelativeRect(0, 0, 24, 24, RelativeUnit.Absolute),
+                    DestinationRect = new RelativeRect(0, 0, 24, 24, RelativeUnit.Absolute),
+                    Drawing = group
+                };
+            }
+            else if (style == "grid")
+            {
+                // Fundo Quadriculado estilo planilha (Grid Pattern)
+                var gridLineColor = _isDarkMode ? Color.FromArgb(40, 148, 163, 184) : Color.FromArgb(45, 100, 116, 139);
+                var linePen = new Pen(new SolidColorBrush(gridLineColor), 1);
+
+                var group = new DrawingGroup();
+                group.Children.Add(new GeometryDrawing
+                {
+                    Brush = new SolidColorBrush(solidColor),
+                    Geometry = new RectangleGeometry(new Rect(0, 0, 30, 30))
+                });
+                group.Children.Add(new GeometryDrawing
+                {
+                    Pen = linePen,
+                    Geometry = StreamGeometry.Parse("M 0 30 L 30 30 M 30 0 L 30 30")
+                });
+
+                Workspace.Background = new DrawingBrush
+                {
+                    TileMode = TileMode.Tile,
+                    SourceRect = new RelativeRect(0, 0, 30, 30, RelativeUnit.Absolute),
+                    DestinationRect = new RelativeRect(0, 0, 30, 30, RelativeUnit.Absolute),
+                    Drawing = group
+                };
+            }
+            else
+            {
+                // Fundo Liso / Cor Sólida do Tema
+                Workspace.Background = new SolidColorBrush(solidColor);
+            }
         }
 
         private void AbrirNavegadorComUrl(string url, string sufixoTitulo = "")
         {
             _contadorNavegadores++;
             double f = ObterFatorTamanhoWidget();
+            double w = Math.Round(800 * f);
+            double h = Math.Round(450 * f);
+
+            double vpW = WorkspaceViewport.Bounds.Width;
+            double vpH = WorkspaceViewport.Bounds.Height;
+            if (vpW > 100 && vpH > 100)
+            {
+                double maxW = Math.Max(420, vpW - 40);
+                double maxH = Math.Max(260, vpH - 40);
+                if (w > maxW)
+                {
+                    w = maxW;
+                    h = Math.Round(w * 9.0 / 16.0);
+                }
+                if (h > maxH)
+                {
+                    h = maxH;
+                    w = Math.Round(h * 16.0 / 9.0);
+                }
+            }
+
             double offsetX = 50 + ((_contadorNavegadores - 1) * 32) % 260;
             double offsetY = 40 + ((_contadorNavegadores - 1) * 32) % 160;
+            if (vpW > w + 20) offsetX = Math.Min(offsetX, vpW - w - 20);
+            if (vpH > h + 20) offsetY = Math.Min(offsetY, vpH - h - 20);
 
             string titulo = string.IsNullOrWhiteSpace(sufixoTitulo)
                 ? $"Navegador #{_contadorNavegadores}"
                 : $"Navegador - {sufixoTitulo}";
 
-            CriarJanelaInterna(titulo, offsetX, offsetY, Math.Round(660 * f), Math.Round(450 * f), "browser", url);
+            CriarJanelaInterna(titulo, Math.Max(12, offsetX), Math.Max(12, offsetY), w, h, "browser", url);
 
             if (_settings.EnableNotifications)
             {
@@ -1935,69 +2308,11 @@ namespace AvaloniaMdiApp
         private void AbrirNavegadorGitHub_Click(object? sender, RoutedEventArgs e) => AbrirNavegadorComUrl("https://github.com", "GitHub");
         private void AbrirNavegadorWikipedia_Click(object? sender, RoutedEventArgs e) => AbrirNavegadorComUrl("https://pt.wikipedia.org", "Wikipédia");
 
-        private void OrganizarCascata_Click(object? sender, RoutedEventArgs e)
-        {
-            if (_ativasJanelas.Count == 0) return;
-
-            double f = ObterFatorTamanhoWidget();
-            double w = Math.Round(340 * f);
-            double h = Math.Round(230 * f);
-
-            for (int i = 0; i < _ativasJanelas.Count; i++)
-            {
-                var win = _ativasJanelas[i];
-                double x = 36 + (i * 32) % Math.Max(100, Workspace.Bounds.Width - (w + 20));
-                double y = 36 + (i * 32) % Math.Max(100, Workspace.Bounds.Height - (h + 20));
-                win.SetPosicaoNormal(x, y, w, h);
-                ZIndexManager.BringToFront(win);
-            }
-            AtualizarDimensoesCanvasWorkspace();
-        }
-
-        private void OrganizarGrade_Click(object? sender, RoutedEventArgs e)
-        {
-            int count = _ativasJanelas.Count;
-            if (count == 0) return;
-
-            int cols = (int)Math.Ceiling(Math.Sqrt(count));
-            int rows = (int)Math.Ceiling((double)count / cols);
-
-            double padding = 16;
-            double availW = Math.Max(300, Workspace.Bounds.Width - padding * (cols + 1));
-            double availH = Math.Max(200, Workspace.Bounds.Height - padding * (rows + 1));
-
-            double cellW = Math.Max(220, availW / cols);
-            double cellH = Math.Max(140, availH / rows);
-
-            for (int i = 0; i < count; i++)
-            {
-                int col = i % cols;
-                int row = i / cols;
-                double x = padding + col * (cellW + padding);
-                double y = padding + row * (cellH + padding);
-
-                _ativasJanelas[i].SetPosicaoNormal(x, y, cellW, cellH);
-            }
-            AtualizarDimensoesCanvasWorkspace();
-        }
-
-        private void FecharTodasJanelas_Click(object? sender, RoutedEventArgs e)
-        {
-            if (_ativasJanelas.Count == 0) return;
-            var copia = _ativasJanelas.ToList();
-            foreach (var win in copia)
-            {
-                win.Fechar();
-            }
-            if (_settings.EnableNotifications)
-            {
-                ToastNotification.Mostrar(Workspace, "Todas as janelas do Workspace foram fechadas.", "info");
-            }
-        }
-
         private void AlternarTemaRapido_Click(object? sender, RoutedEventArgs e)
         {
             _settings.IsDarkMode = !_isDarkMode;
+            _settings.ThemePreset = _settings.IsDarkMode ? "dark_blue" : "light_blue";
+            ThemePalette.AplicarEsquema(_settings.ThemePreset);
             AplicarTema(_settings.IsDarkMode);
             SalvarTodosWorkspacesNoDisco();
         }
@@ -2512,11 +2827,26 @@ namespace AvaloniaMdiApp
         {
             if (_settingsWindow != null)
             {
-                ZIndexManager.BringToFront(_settingsWindow);
+                _settingsWindow.IsVisible = true;
                 return;
             }
 
-            _settingsWindow = new SettingsWindow(Workspace, _settings);
+            _settingsWindow = new SettingsWindow(_settings, Workspace);
+
+            _settingsWindow.OnThemePresetChanged += (preset) =>
+            {
+                _settings.ThemePreset = preset;
+                _settings.IsDarkMode = ThemePalette.EhTemaEscuro(preset);
+                AplicarTema(preset);
+                SalvarTodosWorkspacesNoDisco();
+            };
+
+            _settingsWindow.OnWorkspaceBackgroundStyleChanged += (style) =>
+            {
+                _settings.WorkspaceBackgroundStyle = style;
+                AplicarFundoWorkspace();
+                SalvarTodosWorkspacesNoDisco();
+            };
 
             _settingsWindow.OnSettingsChanged += (isDark, notif, layoutScale, mainWinPreset, widgetPreset) =>
             {
@@ -2526,7 +2856,7 @@ namespace AvaloniaMdiApp
                 _settings.MainWindowSizePreset = mainWinPreset;
                 _settings.WidgetSizePreset = widgetPreset;
 
-                AplicarTema(isDark);
+                AplicarTema(_settings.ThemePreset);
                 AplicarEscalaLayout(layoutScale);
                 AplicarTamanhoJanelaPrincipal(mainWinPreset);
                 AplicarPresetJanelasInternas(widgetPreset);
@@ -2544,9 +2874,172 @@ namespace AvaloniaMdiApp
                 await VerificarAtualizacaoGitHubAsync(silenciosoSeAtualizado: false);
             };
 
-            _settingsWindow.OnClosed += () => _settingsWindow = null;
+            _settingsWindow.OnGoogleDriveSettingsChanged += (enabled, folder) =>
+            {
+                _settings.GoogleDriveSyncEnabled = enabled;
+                _settings.GoogleDriveFolderPath = folder;
+                SalvarTodosWorkspacesNoDisco();
+            };
 
-            Workspace.Children.Add(_settingsWindow);
+            _settingsWindow.OnTestGoogleDriveSyncRequested += () =>
+            {
+                var ws = ObterWorkspaceAtual();
+                string pasta = string.IsNullOrWhiteSpace(_settings.GoogleDriveFolderPath)
+                    ? GoogleDriveSyncService.DetectarPastaPadraoGoogleDrive()
+                    : _settings.GoogleDriveFolderPath;
+
+                if (GoogleDriveSyncService.SincronizarWorkspaceNoGoogleDrive(ws, pasta, out string salvoEm, out string erro))
+                {
+                    _settings.LastGoogleDriveSyncDate = DateTime.Now.ToString("dd/MM/yyyy HH:mm");
+                    SalvarTodosWorkspacesNoDisco();
+                    ToastNotification.Mostrar(Workspace, $"Backup do Google Drive criado com sucesso!\nArquivo: {System.IO.Path.GetFileName(salvoEm)}", "success");
+                }
+                else
+                {
+                    ToastNotification.Mostrar(Workspace, $"Falha ao sincronizar no Google Drive: {erro}", "danger");
+                }
+            };
+
+            _settingsWindow.OnOpenGoogleDriveFolderRequested += () =>
+            {
+                string pasta = string.IsNullOrWhiteSpace(_settings.GoogleDriveFolderPath)
+                    ? GoogleDriveSyncService.DetectarPastaPadraoGoogleDrive()
+                    : _settings.GoogleDriveFolderPath;
+                GoogleDriveSyncService.AbrirPastaNoExplorador(pasta);
+            };
+
+            _settingsWindow.OnGoogleLoginRequested += async (clientId, clientSecret) =>
+            {
+                try
+                {
+                    ToastNotification.Mostrar(Workspace, "Abrindo navegador para autorizar acesso ao Google Drive...", "info");
+                    var (sucesso, email, refreshToken, accessToken, expiryUtc, erro) =
+                        await GoogleDriveCloudClient.IniciarFluxoLoginAsync(clientId, clientSecret);
+
+                    if (sucesso)
+                    {
+                        _settings.GoogleOAuthClientId = clientId;
+                        _settings.GoogleOAuthClientSecret = clientSecret;
+                        _settings.GoogleOAuthAccessToken = accessToken;
+                        _settings.GoogleOAuthRefreshToken = refreshToken;
+                        _settings.GoogleOAuthTokenExpiryUtc = expiryUtc.ToString("o");
+                        _settings.GoogleUserEmail = email;
+                        _settings.GoogleDriveCloudSyncEnabled = true;
+                        SalvarTodosWorkspacesNoDisco();
+
+                        ToastNotification.Mostrar(Workspace, $"✓ Conta conectada: {email}", "success");
+
+                        if (_settingsWindow != null)
+                        {
+                            MainRootGrid.Children.Remove(_settingsWindow);
+                            _settingsWindow = null;
+                        }
+                        AbrirConfiguracoes_Click(null, new RoutedEventArgs());
+                    }
+                    else
+                    {
+                        ToastNotification.Mostrar(Workspace, $"Falha ao conectar com o Google: {erro}", "danger");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ToastNotification.Mostrar(Workspace, $"Erro: {ex.Message}", "danger");
+                }
+            };
+
+            _settingsWindow.OnGoogleLogoutRequested += () =>
+            {
+                _settings.GoogleOAuthAccessToken = "";
+                _settings.GoogleOAuthRefreshToken = "";
+                _settings.GoogleOAuthTokenExpiryUtc = "";
+                _settings.GoogleUserEmail = "";
+                _settings.GoogleDriveCloudSyncEnabled = false;
+                SalvarTodosWorkspacesNoDisco();
+
+                ToastNotification.Mostrar(Workspace, "Conta do Google Drive desconectada.", "info");
+
+                if (_settingsWindow != null)
+                {
+                    MainRootGrid.Children.Remove(_settingsWindow);
+                    _settingsWindow = null;
+                }
+                AbrirConfiguracoes_Click(null, new RoutedEventArgs());
+            };
+
+            _settingsWindow.OnCloudAutoSyncChanged += (enabled) =>
+            {
+                _settings.GoogleDriveCloudSyncEnabled = enabled;
+                SalvarTodosWorkspacesNoDisco();
+                ToastNotification.Mostrar(Workspace, enabled ? "Sincronização em nuvem ativada" : "Sincronização em nuvem desativada", "info");
+            };
+
+            _settingsWindow.OnUploadCloudRequested += async () =>
+            {
+                try
+                {
+                    ToastNotification.Mostrar(Workspace, "Enviando workspace para o Google Drive...", "info");
+                    var ws = ObterWorkspaceAtual();
+                    var (ok, fileId, msg) = await GoogleDriveCloudClient.UploadWorkspaceAsync(_settings, ws);
+                    if (ok)
+                    {
+                        _settings.LastCloudSyncUtc = DateTime.UtcNow.ToString("o");
+                        SalvarTodosWorkspacesNoDisco();
+                        ToastNotification.Mostrar(Workspace, $"☁ Workspace '{ws.Name}' enviado com sucesso para a nuvem!", "success");
+                    }
+                    else
+                    {
+                        ToastNotification.Mostrar(Workspace, $"Falha no upload para nuvem: {msg}", "danger");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ToastNotification.Mostrar(Workspace, $"Erro no upload: {ex.Message}", "danger");
+                }
+            };
+
+            _settingsWindow.OnDownloadCloudRequested += async () =>
+            {
+                try
+                {
+                    ToastNotification.Mostrar(Workspace, "Verificando versão no Google Drive...", "info");
+                    var ws = ObterWorkspaceAtual();
+                    var cloudInfo = await GoogleDriveCloudClient.VerificarVersaoNuvemAsync(_settings, ws);
+                    if (cloudInfo == null || !cloudInfo.ExistsInCloud)
+                    {
+                        ToastNotification.Mostrar(Workspace, "Nenhum arquivo deste workspace encontrado na nuvem ainda.", "info");
+                        return;
+                    }
+
+                    var cloudWs = await GoogleDriveCloudClient.BaixarWorkspaceDaNuvemAsync(_settings, ws.Id);
+                    if (cloudWs != null)
+                    {
+                        int idx = _settings.Workspaces.FindIndex(w => w.Id == cloudWs.Id);
+                        if (idx >= 0) _settings.Workspaces[idx] = cloudWs;
+                        SalvarTodosWorkspacesNoDisco();
+                        CarregarJanelasDoWorkspace(cloudWs);
+                        ToastNotification.Mostrar(Workspace, $"✓ Workspace '{cloudWs.Name}' atualizado com a versão da nuvem!", "success");
+                    }
+                    else
+                    {
+                        ToastNotification.Mostrar(Workspace, "Não foi possível baixar o workspace da nuvem.", "danger");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ToastNotification.Mostrar(Workspace, $"Erro no download: {ex.Message}", "danger");
+                }
+            };
+
+            _settingsWindow.OnClosed += () =>
+            {
+                if (_settingsWindow != null)
+                {
+                    MainRootGrid.Children.Remove(_settingsWindow);
+                    _settingsWindow = null;
+                }
+            };
+
+            MainRootGrid.Children.Add(_settingsWindow);
         }
 
         private DraggableWindow CriarJanelaInterna(
@@ -2569,7 +3062,8 @@ namespace AvaloniaMdiApp
             int spreadsheetCols = 6,
             List<SpreadsheetCellData>? initialSpreadsheetCells = null,
             List<ConditionalFormatRuleData>? initialConditionalRules = null,
-            string criticalityLevel = "none")
+            string criticalityLevel = "none",
+            List<RichTextLineData>? initialRichLines = null)
         {
             var win = new DraggableWindow(
                 Workspace,
@@ -2594,7 +3088,8 @@ namespace AvaloniaMdiApp
                 spreadsheetCols,
                 initialSpreadsheetCells,
                 initialConditionalRules,
-                criticalityLevel);
+                criticalityLevel,
+                initialRichLines);
 
             _ativasJanelas.Add(win);
             win.OnClosed += () =>
@@ -2609,7 +3104,16 @@ namespace AvaloniaMdiApp
             win.OnBoundsChanged += (_) => AtualizarDimensoesCanvasWorkspace();
             win.OnConnectRequested += (janelaOrigem) => IniciarConexaoAPartirDeJanela(janelaOrigem);
             win.OnWindowClicked += (janelaClicada) => AoClicarEmJanela(janelaClicada);
+            win.OnChecklistRowClicked += (checklistWin, row) =>
+            {
+                if (_isPickingCalendarTarget)
+                {
+                    AoSelecionarAlvoParaCalendario(checklistWin, row.RowId);
+                }
+            };
+            win.OnInteractionCompleted += (_) => RegistrarEstadoUndo();
             win.OnRequestOpenRowNotepad += (checklistWin, row) => AbrirOuFocarNotaDaLinha(checklistWin, row);
+            win.OnRequestLinkRowWindow += (checklistWin, row) => VincularOuFocarJanelaDaLinha(checklistWin, row);
             win.OnRequestOpenGalleryImage += (galleryWin, card) => AbrirOuFocarImagemDaGaleria(galleryWin, card);
             win.OnRequestSetWorkspaceBackground += (filePath) => AlternarFundoWorkspace(filePath);
             win.OnSaveRequested += (janela) => SalvarJanelaNoCatalogo(janela, mostrarToast: true);

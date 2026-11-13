@@ -560,6 +560,21 @@ namespace AvaloniaMdiApp
             long hash = HashCode.Combine(physX, physY, physW, physH);
             var workspace = _ownerWindow?.Workspace;
 
+            int clipLeft = 0, clipTop = 0, clipRight = physW, clipBottom = physH;
+            if (workspace?.Parent is Visual viewportVisual)
+            {
+                Point? vpTL = viewportVisual.TranslatePoint(new Point(0, 0), topLevel);
+                Point? vpBR = viewportVisual.TranslatePoint(new Point(viewportVisual.Bounds.Width, viewportVisual.Bounds.Height), topLevel);
+                if (vpTL != null && vpBR != null)
+                {
+                    clipLeft = Math.Max(0, (int)Math.Ceiling(vpTL.Value.X * scaling) - physX);
+                    clipTop = Math.Max(0, (int)Math.Ceiling(vpTL.Value.Y * scaling) - physY);
+                    clipRight = Math.Min(physW, (int)Math.Floor(vpBR.Value.X * scaling) - physX);
+                    clipBottom = Math.Min(physH, (int)Math.Floor(vpBR.Value.Y * scaling) - physY);
+                    hash = HashCode.Combine(hash, clipLeft, clipTop, clipRight, clipBottom);
+                }
+            }
+
             if (workspace != null && _ownerWindow != null)
             {
                 int ownerIdx = workspace.Children.IndexOf(_ownerWindow);
@@ -597,7 +612,9 @@ namespace AvaloniaMdiApp
 
             _lastRegionHash = hash;
 
-            IntPtr finalRgn = CreateRectRgn(0, 0, physW, physH);
+            IntPtr finalRgn = clipRight > clipLeft && clipBottom > clipTop
+                ? CreateRectRgn(clipLeft, clipTop, clipRight, clipBottom)
+                : CreateRectRgn(0, 0, 0, 0);
             if (finalRgn == IntPtr.Zero)
                 return;
 

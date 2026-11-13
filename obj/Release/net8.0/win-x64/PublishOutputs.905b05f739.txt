@@ -1,2 +1,0 @@
-C:\C#\Gerenciador MDI Portátil\dist\windows\Microsoft.Web.WebView2.Core.xml
-C:\C#\Gerenciador MDI Portátil\dist\windows\AvaloniaMdiApp.exe
