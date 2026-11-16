@@ -108,10 +108,8 @@ namespace AvaloniaMdiApp
 
             try
             {
-                // Evita falhas de renderização/sandbox do WebKit2GTK no Ubuntu 24.04/26.04 e Wayland/XWayland
+                // Evita falhas de sincronização DMA-BUF do WebKit2GTK em drivers específicos no Linux
                 Environment.SetEnvironmentVariable("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-                Environment.SetEnvironmentVariable("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
-                Environment.SetEnvironmentVariable("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS", "1");
 
                 // Força o backend X11 no GDK para compatibilidade com o XID do Avalonia
                 gdk_set_allowed_backends("x11");
@@ -229,6 +227,15 @@ namespace AvaloniaMdiApp
 
                                 gtk_container_add(_gtkPlug, _webkitView);
                                 gtk_widget_realize(_gtkPlug);
+
+                                // Garante fundo branco sólido opaco para evitar transparência
+                                var whiteBg = new GdkRGBA { Red = 1.0, Green = 1.0, Blue = 1.0, Alpha = 1.0 };
+                                try
+                                {
+                                    webkit_web_view_set_background_color(_webkitView, ref whiteBg);
+                                }
+                                catch { }
+
                                 gtk_widget_show_all(_gtkPlug);
 
                                 IntPtr xid = gtk_plug_get_id(_gtkPlug);
@@ -1050,5 +1057,17 @@ namespace AvaloniaMdiApp
 
         [DllImport("webkit2gtk", CallingConvention = CallingConvention.Cdecl)]
         private static extern void webkit_web_view_reload(IntPtr webView);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct GdkRGBA
+        {
+            public double Red;
+            public double Green;
+            public double Blue;
+            public double Alpha;
+        }
+
+        [DllImport("webkit2gtk", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void webkit_web_view_set_background_color(IntPtr webView, ref GdkRGBA rgba);
     }
 }

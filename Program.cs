@@ -12,8 +12,6 @@ namespace AvaloniaMdiApp
             {
                 Environment.SetEnvironmentVariable("GDK_BACKEND", "x11");
                 Environment.SetEnvironmentVariable("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-                Environment.SetEnvironmentVariable("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
-                Environment.SetEnvironmentVariable("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS", "1");
             }
 
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);

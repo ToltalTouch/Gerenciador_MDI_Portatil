@@ -791,6 +791,18 @@ namespace AvaloniaMdiApp
             _taskBar.AtualizarCorJanela(this);
         }
 
+        public string ObterCorEfetiva()
+        {
+            if (!string.IsNullOrWhiteSpace(CustomColor))
+                return CustomColor;
+
+            var (_, critColorHex) = ObterInfoCriticidade(CriticalityLevel);
+            if (!string.IsNullOrWhiteSpace(critColorHex))
+                return critColorHex;
+
+            return string.Empty;
+        }
+
         public static string NormalizarFamiliaCor(string? hex)
         {
             if (string.IsNullOrWhiteSpace(hex)) return string.Empty;

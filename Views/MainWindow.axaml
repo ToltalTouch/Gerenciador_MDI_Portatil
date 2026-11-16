@@ -132,6 +132,10 @@
                     <MenuItem Header="Abrir Pasta do Google Drive" Click="AbrirPastaGoogleDrive_Click">
                       <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.ExternalLink}"/></MenuItem.Icon>
                     </MenuItem>
+                    <Separator/>
+                    <MenuItem Header="Histórico de Notificações..." Click="AbrirHistoricoNotificacoes_Click">
+                      <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Bell}"/></MenuItem.Icon>
+                    </MenuItem>
                   </MenuFlyout>
                 </Button.Flyout>
               </Button>

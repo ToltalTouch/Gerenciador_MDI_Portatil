@@ -98,8 +98,8 @@ namespace AvaloniaMdiApp
 
             try
             {
-                // Abre o navegador padrão do usuário
-                Process.Start(new ProcessStartInfo(authUrl) { UseShellExecute = true });
+                // Tenta abrir o navegador padrão do usuário de forma segura e resiliente
+                AbrirNavegadorPadrao(authUrl);
 
                 using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
                 var contextTask = listener.GetContextAsync();
@@ -277,15 +277,14 @@ namespace AvaloniaMdiApp
                 // Verifica se o arquivo já existe no Drive
                 string? existingFileId = await LocalizarArquivoNoDriveAsync(token, folderId, fileName);
 
-                string boundary = "-------MdiMultipartBoundary" + Guid.NewGuid().ToString("N");
-                var multipartContent = new MultipartFormDataContent(boundary);
+                string boundary = "MdiMultipartBoundary" + Guid.NewGuid().ToString("N");
+                var multipartContent = new MultipartContent("related", boundary);
 
-                var metadataObj = new
+                var metadataDict = new Dictionary<string, object>
                 {
-                    name = fileName,
-                    description = $"Backup do Workspace {wsData.Name} no Gerenciador MDI",
-                    parents = existingFileId == null ? new[] { folderId } : null,
-                    appProperties = new Dictionary<string, string>
+                    ["name"] = fileName,
+                    ["description"] = $"Backup do Workspace {wsData.Name} no Gerenciador MDI",
+                    ["appProperties"] = new Dictionary<string, string>
                     {
                         ["workspaceId"] = wsData.Id,
                         ["workspaceName"] = wsData.Name,
@@ -293,7 +292,12 @@ namespace AvaloniaMdiApp
                     }
                 };
 
-                var metaPart = new StringContent(JsonSerializer.Serialize(metadataObj), Encoding.UTF8, "application/json");
+                if (existingFileId == null)
+                {
+                    metadataDict["parents"] = new[] { folderId };
+                }
+
+                var metaPart = new StringContent(JsonSerializer.Serialize(metadataDict), Encoding.UTF8, "application/json");
                 multipartContent.Add(metaPart);
 
                 var filePart = new ByteArrayContent(fileBytes);
@@ -482,6 +486,47 @@ namespace AvaloniaMdiApp
             }
             catch { }
             return null;
+        }
+
+        public static void AbrirNavegadorPadrao(string url)
+        {
+            try
+            {
+                if (OperatingSystem.IsWindows())
+                {
+                    Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+                }
+                else if (OperatingSystem.IsLinux())
+                {
+                    // No Linux, xdg-open evita subprocessos zygote que causam pipe quebrado em navegadores Chromium existentes
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = "xdg-open",
+                        Arguments = $"\"{url}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    };
+                    Process.Start(psi);
+                }
+                else if (OperatingSystem.IsMacOS())
+                {
+                    Process.Start("open", $"\"{url}\"");
+                }
+                else
+                {
+                    Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+                }
+            }
+            catch
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+                }
+                catch { }
+            }
         }
     }
 }

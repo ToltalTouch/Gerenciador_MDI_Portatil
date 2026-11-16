@@ -3,14 +3,20 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
+using System;
 using System.Collections.Generic;
 
 namespace AvaloniaMdiApp
 {
     public class TaskBar : Border
     {
+        public event Action? OnNotificationHistoryClicked;
+
         private readonly StackPanel _taskContainer;
         private readonly TextBlock _lblStatus;
+        private readonly Button _btnNotifHistory;
+        private readonly TextBlock _lblNotifBadge;
+        private readonly Border _notifBadgeBorder;
         private readonly Dictionary<DraggableWindow, Button> _windowButtons = new();
         private readonly Dictionary<DraggableWindow, Border> _windowIndicators = new();
         private readonly Dictionary<DraggableWindow, TextBlock> _windowLabels = new();
@@ -41,18 +47,93 @@ namespace AvaloniaMdiApp
             Grid.SetColumn(scrollViewer, 0);
             grid.Children.Add(scrollViewer);
 
+            var rightControls = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 8,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(6, 0, 12, 0)
+            };
+
             _lblStatus = new TextBlock
             {
                 Text = "0 janelas",
                 FontSize = 11.5,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(12, 0, 16, 0)
+                VerticalAlignment = VerticalAlignment.Center
             };
-            Grid.SetColumn(_lblStatus, 1);
-            grid.Children.Add(_lblStatus);
+
+            var notifIconPanel = new Panel();
+            var iconBell = AppIcons.Create(AppIcons.Bell, 14, ThemePalette.IconLightGray);
+            notifIconPanel.Children.Add(iconBell);
+
+            _lblNotifBadge = new TextBlock
+            {
+                Text = "0",
+                FontSize = 9,
+                FontWeight = FontWeight.Bold,
+                Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            _notifBadgeBorder = new Border
+            {
+                Background = ThemePalette.Accent,
+                CornerRadius = new CornerRadius(7),
+                MinWidth = 14,
+                Height = 14,
+                Padding = new Thickness(3, 0),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, -6, -8, 0),
+                IsVisible = false,
+                Child = _lblNotifBadge
+            };
+            notifIconPanel.Children.Add(_notifBadgeBorder);
+
+            _btnNotifHistory = new Button
+            {
+                Content = notifIconPanel,
+                Width = 32,
+                Height = 30,
+                Padding = new Thickness(0),
+                CornerRadius = new CornerRadius(6),
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(1),
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+            ToolTip.SetTip(_btnNotifHistory, "Histórico de Notificações");
+            _btnNotifHistory.Click += (s, e) => OnNotificationHistoryClicked?.Invoke();
+
+            rightControls.Children.Add(_lblStatus);
+            rightControls.Children.Add(_btnNotifHistory);
+
+            Grid.SetColumn(rightControls, 1);
+            grid.Children.Add(rightControls);
 
             Child = grid;
             AplicarTema(true);
+
+            NotificationHistoryService.OnHistoryUpdated += AtualizarContadorNotificacoes;
+            AtualizarContadorNotificacoes();
+        }
+
+        private void AtualizarContadorNotificacoes()
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                int total = NotificationHistoryService.TotalNaoLidos;
+                if (total > 0)
+                {
+                    _lblNotifBadge.Text = total > 99 ? "99+" : total.ToString();
+                    _notifBadgeBorder.IsVisible = true;
+                }
+                else
+                {
+                    _notifBadgeBorder.IsVisible = false;
+                }
+            });
         }
 
         public void AplicarTema(bool isDarkMode)
@@ -61,6 +142,7 @@ namespace AvaloniaMdiApp
             Background = isDarkMode ? ThemePalette.DarkBarBg : ThemePalette.LightBarBg;
             BorderBrush = isDarkMode ? ThemePalette.DarkBorder : ThemePalette.LightBorder;
             _lblStatus.Foreground = isDarkMode ? ThemePalette.DarkTextSecondary : ThemePalette.LightTextSecondary;
+            _btnNotifHistory.BorderBrush = isDarkMode ? ThemePalette.DarkBorder : ThemePalette.LightBorder;
 
             foreach (var kvp in _windowButtons)
             {

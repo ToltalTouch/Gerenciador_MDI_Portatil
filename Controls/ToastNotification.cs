@@ -13,6 +13,7 @@ namespace AvaloniaMdiApp
         private static readonly IBrush SuccessBorder = SolidColorBrush.Parse("#10B981").ToImmutable();
         private static readonly IBrush WarningBorder = SolidColorBrush.Parse("#F59E0B").ToImmutable();
         private static readonly IBrush InfoBorder = SolidColorBrush.Parse("#3B82F6").ToImmutable();
+        private static readonly IBrush DangerBorder = SolidColorBrush.Parse("#EF4444").ToImmutable();
 
         private static ToastNotification? _toastAtivo;
         private readonly DispatcherTimer _timer;
@@ -21,14 +22,20 @@ namespace AvaloniaMdiApp
         public ToastNotification(Canvas workspace, string mensagem, string tipo = "info")
         {
             _workspace = workspace;
-            Width = 290;
-            Height = 62;
+            Width = 320;
+            MinHeight = 62;
             CornerRadius = new CornerRadius(8);
             Padding = new Thickness(12, 10);
             Background = ToastBg;
             BorderThickness = new Thickness(1);
 
-            IBrush accentBrush = tipo == "success" ? SuccessBorder : tipo == "warning" ? WarningBorder : InfoBorder;
+            IBrush accentBrush = tipo == "success"
+                ? SuccessBorder
+                : tipo == "warning"
+                    ? WarningBorder
+                    : (tipo == "danger" || tipo == "error")
+                        ? DangerBorder
+                        : InfoBorder;
             BorderBrush = accentBrush;
 
             double viewWidth = workspace.Bounds.Width;
@@ -78,7 +85,13 @@ namespace AvaloniaMdiApp
 
             var lblTitulo = new TextBlock
             {
-                Text = tipo == "success" ? "✓ Sucesso" : tipo == "warning" ? "⚠ Aviso" : "ℹ Informação",
+                Text = tipo == "success"
+                    ? "✓ Sucesso"
+                    : tipo == "warning"
+                        ? "⚠ Aviso"
+                        : (tipo == "danger" || tipo == "error")
+                            ? "✕ Erro"
+                            : "ℹ Informação",
                 Foreground = ThemePalette.DarkTextPrimary,
                 FontWeight = FontWeight.SemiBold,
                 FontSize = 12
@@ -89,7 +102,8 @@ namespace AvaloniaMdiApp
                 Text = mensagem,
                 Foreground = ThemePalette.DarkTextSecondary,
                 FontSize = 11.5,
-                TextTrimming = TextTrimming.CharacterEllipsis
+                TextWrapping = TextWrapping.Wrap,
+                MaxHeight = 75
             };
 
             panel.Children.Add(lblTitulo);
@@ -121,6 +135,12 @@ namespace AvaloniaMdiApp
 
         public static void Mostrar(Canvas workspace, string mensagem, string tipo = "info")
         {
+            try
+            {
+                NotificationHistoryService.Adicionar(mensagem, tipo);
+            }
+            catch { }
+
             _toastAtivo?.Remover();
             var toast = new ToastNotification(workspace, mensagem, tipo);
             _toastAtivo = toast;

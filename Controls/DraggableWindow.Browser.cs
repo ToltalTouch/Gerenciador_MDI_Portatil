@@ -136,7 +136,8 @@ namespace AvaloniaMdiApp
             var browserBodyHost = new Grid
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                VerticalAlignment = VerticalAlignment.Stretch
+                VerticalAlignment = VerticalAlignment.Stretch,
+                Background = Brushes.White
             };
             browserBodyHost.Children.Add(new TextBlock
             {

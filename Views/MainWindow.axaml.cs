@@ -80,6 +80,8 @@ namespace AvaloniaMdiApp
                 }
             };
 
+            AppTaskBar.OnNotificationHistoryClicked += () => AbrirHistoricoNotificacoes();
+
             Loaded += (s, e) =>
             {
                 _settings = SettingsManager.Carregar();
@@ -669,7 +671,17 @@ namespace AvaloniaMdiApp
         private void ConcluirConexaoEntreJanelas(DraggableWindow origem, DraggableWindow destino)
         {
             CancelarModoConexao();
-            CriarOuFocarConexaoFluxograma(origem, destino, mostrarToast: true);
+
+            // Se a janela de origem possui uma cor definida, herda para a linha e para a janela de destino
+            string corOrigem = origem.ObterCorEfetiva();
+            string? corLinha = !string.IsNullOrWhiteSpace(corOrigem) ? corOrigem : null;
+
+            if (!string.IsNullOrWhiteSpace(corOrigem) && string.IsNullOrWhiteSpace(destino.ObterCorEfetiva()))
+            {
+                destino.DefinirCorJanela(corOrigem);
+            }
+
+            CriarOuFocarConexaoFluxograma(origem, destino, mostrarToast: true, colorHex: corLinha);
             SalvarTodosWorkspacesNoDisco();
         }
 
@@ -1610,6 +1622,30 @@ namespace AvaloniaMdiApp
             GoogleDriveSyncService.AbrirPastaNoExplorador(pasta);
         }
 
+        private NotificationHistoryModal? _notificationHistoryModal;
+
+        private void AbrirHistoricoNotificacoes_Click(object? sender, RoutedEventArgs e)
+        {
+            AbrirHistoricoNotificacoes();
+        }
+
+        private void AbrirHistoricoNotificacoes()
+        {
+            if (_notificationHistoryModal != null)
+            {
+                MainRootGrid.Children.Remove(_notificationHistoryModal);
+                _notificationHistoryModal = null;
+            }
+
+            _notificationHistoryModal = new NotificationHistoryModal(_isDarkMode);
+            _notificationHistoryModal.OnClosed += () =>
+            {
+                _notificationHistoryModal = null;
+            };
+
+            MainRootGrid.Children.Add(_notificationHistoryModal);
+        }
+
         private void MenuModulo_SubmenuOpened(object? sender, RoutedEventArgs e)
         {
             var ws = ObterWorkspaceAtual();
@@ -1827,6 +1863,12 @@ namespace AvaloniaMdiApp
                 ? "Nova Nota"
                 : row.Input.Text.Trim();
 
+            // A cor base é priorizada pela cor do item da linha; se não houver, herda da janela da checklist
+            string corBase = !string.IsNullOrWhiteSpace(row.ColorHex)
+                ? row.ColorHex
+                : checklistWin.ObterCorEfetiva();
+            string? corLinha = !string.IsNullOrWhiteSpace(corBase) ? corBase : null;
+
             if (row.OpenNoteWindow != null && _ativasJanelas.Contains(row.OpenNoteWindow))
             {
                 row.OpenNoteWindow.AccessCount++;
@@ -1834,7 +1876,13 @@ namespace AvaloniaMdiApp
                 {
                     row.OpenNoteWindow.ToggleMinimize();
                 }
-                CriarOuFocarConexaoFluxograma(checklistWin, row.OpenNoteWindow);
+
+                if (!string.IsNullOrWhiteSpace(corBase) && string.IsNullOrWhiteSpace(row.OpenNoteWindow.ObterCorEfetiva()))
+                {
+                    row.OpenNoteWindow.DefinirCorJanela(corBase);
+                }
+
+                CriarOuFocarConexaoFluxograma(checklistWin, row.OpenNoteWindow, colorHex: corLinha);
                 ZIndexManager.BringToFront(row.OpenNoteWindow);
                 return;
             }
@@ -1851,7 +1899,13 @@ namespace AvaloniaMdiApp
                 {
                     existente.ToggleMinimize();
                 }
-                CriarOuFocarConexaoFluxograma(checklistWin, existente);
+
+                if (!string.IsNullOrWhiteSpace(corBase) && string.IsNullOrWhiteSpace(existente.ObterCorEfetiva()))
+                {
+                    existente.DefinirCorJanela(corBase);
+                }
+
+                CriarOuFocarConexaoFluxograma(checklistWin, existente, colorHex: corLinha);
                 ZIndexManager.BringToFront(existente);
                 return;
             }
@@ -1883,10 +1937,11 @@ namespace AvaloniaMdiApp
                     row.LinkedNoteFormat = formatoNota;
                     checklistWin.AtualizarIndicadorNotaLinha(row);
                 },
-                row.LinkedNoteFormat);
+                row.LinkedNoteFormat,
+                customColor: corBase);
 
             row.OpenNoteWindow = noteWin;
-            CriarOuFocarConexaoFluxograma(checklistWin, noteWin);
+            CriarOuFocarConexaoFluxograma(checklistWin, noteWin, colorHex: corLinha);
 
             noteWin.OnClosed += () =>
             {
@@ -1906,6 +1961,11 @@ namespace AvaloniaMdiApp
         {
             var menu = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedRight };
 
+            string corBase = !string.IsNullOrWhiteSpace(row.ColorHex)
+                ? row.ColorHex
+                : checklistWin.ObterCorEfetiva();
+            string? corLinha = !string.IsNullOrWhiteSpace(corBase) ? corBase : null;
+
             if (!string.IsNullOrWhiteSpace(row.LinkedWindowId))
             {
                 var target = _ativasJanelas.FirstOrDefault(w => w.WindowId == row.LinkedWindowId);
@@ -1916,7 +1976,11 @@ namespace AvaloniaMdiApp
                     {
                         if (target.IsMinimized) target.ToggleMinimize();
                         ZIndexManager.BringToFront(target);
-                        CriarOuFocarConexaoFluxograma(checklistWin, target);
+                        if (!string.IsNullOrWhiteSpace(corBase) && string.IsNullOrWhiteSpace(target.ObterCorEfetiva()))
+                        {
+                            target.DefinirCorJanela(corBase);
+                        }
+                        CriarOuFocarConexaoFluxograma(checklistWin, target, colorHex: corLinha);
                     };
                     menu.Items.Add(miGo);
                 }
@@ -1946,7 +2010,11 @@ namespace AvaloniaMdiApp
                     {
                         row.LinkedWindowId = targetWin.WindowId;
                         checklistWin.AtualizarIndicadorVinculoLinha(row);
-                        CriarOuFocarConexaoFluxograma(checklistWin, targetWin);
+                        if (!string.IsNullOrWhiteSpace(corBase) && string.IsNullOrWhiteSpace(targetWin.ObterCorEfetiva()))
+                        {
+                            targetWin.DefinirCorJanela(corBase);
+                        }
+                        CriarOuFocarConexaoFluxograma(checklistWin, targetWin, colorHex: corLinha);
                     };
                     menu.Items.Add(miWin);
                 }
@@ -2088,6 +2156,8 @@ namespace AvaloniaMdiApp
 
         private void AbrirOuFocarImagemDaGaleria(DraggableWindow galleryWin, GalleryCardState card)
         {
+            string? corOrigem = galleryWin.ObterCorEfetiva();
+
             if (card.OpenImageWindow != null && _ativasJanelas.Contains(card.OpenImageWindow))
             {
                 card.OpenImageWindow.AccessCount++;
@@ -2095,7 +2165,13 @@ namespace AvaloniaMdiApp
                 {
                     card.OpenImageWindow.ToggleMinimize();
                 }
-                CriarOuFocarConexaoFluxograma(galleryWin, card.OpenImageWindow);
+
+                if (!string.IsNullOrEmpty(corOrigem) && string.IsNullOrEmpty(card.OpenImageWindow.ObterCorEfetiva()))
+                {
+                    card.OpenImageWindow.DefinirCorJanela(corOrigem);
+                }
+
+                CriarOuFocarConexaoFluxograma(galleryWin, card.OpenImageWindow, colorHex: corOrigem);
                 ZIndexManager.BringToFront(card.OpenImageWindow);
                 return;
             }
@@ -2119,7 +2195,13 @@ namespace AvaloniaMdiApp
                 {
                     existente.ToggleMinimize();
                 }
-                CriarOuFocarConexaoFluxograma(galleryWin, existente);
+
+                if (!string.IsNullOrEmpty(corOrigem) && string.IsNullOrEmpty(existente.ObterCorEfetiva()))
+                {
+                    existente.DefinirCorJanela(corOrigem);
+                }
+
+                CriarOuFocarConexaoFluxograma(galleryWin, existente, colorHex: corOrigem);
                 ZIndexManager.BringToFront(existente);
                 return;
             }
@@ -2140,10 +2222,11 @@ namespace AvaloniaMdiApp
                 winW,
                 winH,
                 targetType,
-                card.FilePath);
+                card.FilePath,
+                customColor: corOrigem);
 
             card.OpenImageWindow = mediaWin;
-            CriarOuFocarConexaoFluxograma(galleryWin, mediaWin);
+            CriarOuFocarConexaoFluxograma(galleryWin, mediaWin, colorHex: corOrigem);
 
             mediaWin.OnClosed += () =>
             {
