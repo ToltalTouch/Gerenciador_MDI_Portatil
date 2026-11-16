@@ -417,34 +417,93 @@ namespace AvaloniaMdiApp
 
                 if (OperatingSystem.IsWindows() && !string.IsNullOrWhiteSpace(resultado.ExecutablePath) && File.Exists(resultado.ExecutablePath))
                 {
-                    string sourceDir = Path.GetDirectoryName(resultado.ExecutablePath) ?? resultado.ExtractedDirectory;
-                    string exeName = Path.GetFileName(resultado.ExecutablePath);
-                    string batPath = Path.Combine(Path.GetTempPath(), "atualizar_gerenciador_mdi.bat");
+                    bool hasExtractedDir = !string.IsNullOrWhiteSpace(resultado.ExtractedDirectory) && Directory.Exists(resultado.ExtractedDirectory);
+                    string sourceDir = hasExtractedDir ? (Path.GetDirectoryName(resultado.ExecutablePath) ?? resultado.ExtractedDirectory) : string.Empty;
+                    string sourceFile = resultado.ExecutablePath;
+                    string exeName = !string.IsNullOrWhiteSpace(resultado.ExecutablePath)
+                        ? Path.GetFileName(resultado.ExecutablePath)
+                        : (Path.GetFileName(Environment.ProcessPath) ?? "AvaloniaMdiApp.exe");
+                    string targetExe = Path.Combine(appDir, exeName);
 
-                    var sb = new StringBuilder();
-                    sb.AppendLine("@echo off");
-                    sb.AppendLine("timeout /t 2 /nobreak >nul");
-                    if (!string.IsNullOrWhiteSpace(sourceDir) && Directory.Exists(sourceDir))
+                    int pid = Environment.ProcessId;
+
+                    // Script em PowerShell usando -EncodedCommand (Base64 UTF-16LE):
+                    // Elimina completamente problemas de encoding de caracteres (como 'Portátil' virando 'Port├¡til')
+                    // e implementa laço de espera para liberação de arquivos bloqueados pelo processo atual.
+                    string psScript = $@"
+$targetExe = '{targetExe.Replace("'", "''")}'
+$appDir = '{appDir.Replace("'", "''")}'
+$sourceDir = '{sourceDir.Replace("'", "''")}'
+$sourceFile = '{sourceFile.Replace("'", "''")}'
+$hasDir = {(hasExtractedDir ? "$true" : "$false")}
+
+try {{
+    $p = Get-Process -Id {pid} -ErrorAction SilentlyContinue
+    if ($p) {{ $p.WaitForExit(10000) }}
+}} catch {{}}
+Start-Sleep -Milliseconds 600
+
+$copied = $false
+for ($i = 0; $i -lt 15; $i++) {{
+    try {{
+        if ($hasDir -and (Test-Path -LiteralPath $sourceDir)) {{
+            Copy-Item -Path ""$sourceDir\*"" -Destination $appDir -Recurse -Force -ErrorAction Stop
+        }} elseif (Test-Path -LiteralPath $sourceFile) {{
+            Copy-Item -LiteralPath $sourceFile -Destination $targetExe -Force -ErrorAction Stop
+        }}
+        $copied = $true
+        break
+    }} catch {{
+        Start-Sleep -Seconds 1
+    }}
+}}
+
+if (Test-Path -LiteralPath $targetExe) {{
+    Start-Process -FilePath $targetExe -WorkingDirectory $appDir
+}}
+";
+
+                    // Fallback para .cmd com codepage UTF-8 (chcp 65001) e BOM
+                    var sbBat = new StringBuilder();
+                    sbBat.AppendLine("chcp 65001 >nul");
+                    sbBat.AppendLine("@echo off");
+                    sbBat.AppendLine("timeout /t 2 /nobreak >nul");
+                    if (hasExtractedDir && !string.IsNullOrWhiteSpace(sourceDir))
                     {
-                        sb.AppendLine($"xcopy /E /Y /I \"{sourceDir}\\*\" \"{appDir}\\\" >nul");
-                        sb.AppendLine($"start \"\" \"{Path.Combine(appDir, exeName)}\"");
+                        sbBat.AppendLine($"xcopy /E /Y /I \"{sourceDir}\\*\" \"{appDir}\\\" >nul");
                     }
-                    else
+                    else if (!string.IsNullOrWhiteSpace(sourceFile))
                     {
-                        sb.AppendLine($"copy /Y \"{resultado.ExecutablePath}\" \"{Path.Combine(appDir, exeName)}\" >nul");
-                        sb.AppendLine($"start \"\" \"{Path.Combine(appDir, exeName)}\"");
+                        sbBat.AppendLine($"copy /Y \"{sourceFile}\" \"{targetExe}\" >nul");
                     }
+                    sbBat.AppendLine($"start \"\" \"{targetExe}\"");
 
-                    File.WriteAllText(batPath, sb.ToString(), Encoding.Default);
+                    string batPath = Path.Combine(Path.GetTempPath(), "atualizar_gerenciador_mdi.cmd");
+                    File.WriteAllText(batPath, sbBat.ToString(), new UTF8Encoding(true));
 
-                    Process.Start(new ProcessStartInfo
+                    try
                     {
-                        FileName = "cmd.exe",
-                        Arguments = $"/c \"{batPath}\"",
-                        CreateNoWindow = true,
-                        UseShellExecute = false
-                    });
-                    return true;
+                        string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(psScript));
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "powershell.exe",
+                            Arguments = $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand {encodedCommand}",
+                            CreateNoWindow = true,
+                            UseShellExecute = false
+                        });
+                        return true;
+                    }
+                    catch
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "cmd.exe",
+                            Arguments = $"/c \"{batPath}\"",
+                            CreateNoWindow = true,
+                            UseShellExecute = false
+                        });
+                        return true;
+                    }
                 }
 
                 if (OperatingSystem.IsLinux() && !string.IsNullOrWhiteSpace(resultado.ExecutablePath) && File.Exists(resultado.ExecutablePath))

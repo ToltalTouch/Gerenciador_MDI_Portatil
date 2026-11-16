@@ -10,6 +10,11 @@ echo [1/3] Gerando executavel portatil (.exe) para Windows (win-x64)...
 echo ==========================================
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false -o dist\windows
 
+if exist "dist\portatil" (
+    echo Sincronizando versao portatil para dist\portatil...
+    copy /Y "dist\windows\AvaloniaMdiApp.exe" "dist\portatil\AvaloniaMdiApp.exe" >nul
+)
+
 powershell -NoProfile -Command "Compress-Archive -Path 'dist\windows\*' -DestinationPath 'dist\release\GerenciadorMdiPortatil-win-x64.zip' -Force"
 
 echo ==========================================
