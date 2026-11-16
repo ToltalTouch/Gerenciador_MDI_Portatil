@@ -1663,13 +1663,17 @@ namespace AvaloniaMdiApp
                         : (_isDarkMode ? ThemePalette.DarkBorder : ThemePalette.LightBorder)
                 };
                 ToolTip.SetTip(btn, ativo
-                    ? $"Workspace ativo: {ws.Name}"
-                    : $"{ws.Name} (Hibernado — 0 recursos visuais na RAM. Clique para ativar)");
+                    ? $"Workspace ativo: {ws.Name} (Clique c/ botão direito para mudar nome ou fechar)"
+                    : $"{ws.Name} (Hibernado. Clique para ativar ou botão direito para opções)");
+
+                btn.ContextMenu = CriarMenuContextoWorkspace(ws);
 
                 string targetId = ws.Id;
                 btn.Click += (s, e) => AlternarParaWorkspace(targetId);
                 WorkspaceTabsPanel.Children.Add(btn);
             }
+
+            AtualizarMenuContextoCanvas();
         }
 
         private void AlternarParaWorkspace(string workspaceId)
@@ -1879,12 +1883,175 @@ namespace AvaloniaMdiApp
             ToastNotification.Mostrar(Workspace, $"✓ {novoWs.Name} criado com sucesso!", "success");
         }
 
-        private void RenomearWorkspaceAtual_Click(object? sender, RoutedEventArgs e)
+        private ContextMenu CriarMenuContextoWorkspace(WorkspaceData ws)
         {
+            var menu = new ContextMenu();
+            bool ativo = ws.Id == _settings.ActiveWorkspaceId;
+
+            if (!ativo)
+            {
+                var itemAtivar = new MenuItem
+                {
+                    Header = "Ativar este Workspace",
+                    Icon = new PathIcon
+                    {
+                        Data = AppIcons.Workspace,
+                        Width = 13,
+                        Height = 13,
+                        Foreground = ThemePalette.Accent
+                    }
+                };
+                itemAtivar.Click += (s, e) => AlternarParaWorkspace(ws.Id);
+                menu.Items.Add(itemAtivar);
+                menu.Items.Add(new Separator());
+            }
+
+            var itemRenomear = new MenuItem
+            {
+                Header = "Mudar Nome...",
+                Icon = new PathIcon
+                {
+                    Data = AppIcons.Edit,
+                    Width = 13,
+                    Height = 13,
+                    Foreground = ThemePalette.IconLightGray
+                }
+            };
+            itemRenomear.Click += (s, e) => SolicitarRenomearWorkspace(ws);
+            menu.Items.Add(itemRenomear);
+
+            var itemExcluir = new MenuItem
+            {
+                Header = "Fechar Workspace",
+                Icon = new PathIcon
+                {
+                    Data = AppIcons.Trash,
+                    Width = 13,
+                    Height = 13,
+                    Foreground = ThemePalette.Danger
+                }
+            };
+
+            if (_settings.Workspaces.Count <= 1)
+            {
+                itemExcluir.IsEnabled = false;
+                ToolTip.SetTip(itemExcluir, "É necessário manter pelo menos um Workspace ativo.");
+            }
+            else
+            {
+                itemExcluir.Click += (s, e) => SolicitarExcluirWorkspace(ws);
+            }
+            menu.Items.Add(itemExcluir);
+
+            menu.Items.Add(new Separator());
+
+            var itemNovo = new MenuItem
+            {
+                Header = "Novo Workspace",
+                Icon = new PathIcon
+                {
+                    Data = AppIcons.Plus,
+                    Width = 13,
+                    Height = 13,
+                    Foreground = ThemePalette.IconLightGray
+                }
+            };
+            itemNovo.Click += (s, e) => NovoWorkspace_Click(null, null!);
+            menu.Items.Add(itemNovo);
+
+            return menu;
+        }
+
+        private void AtualizarMenuContextoCanvas()
+        {
+            if (Workspace == null) return;
+            Workspace.ContextMenu = CriarMenuContextoCanvas();
+        }
+
+        private ContextMenu CriarMenuContextoCanvas()
+        {
+            var menu = new ContextMenu();
             var wsAtual = ObterWorkspaceAtual();
-            ModalTitle.Text = "Renomear Workspace";
-            ModalMessage.Text = $"Digite o novo nome para \"{wsAtual.Name}\":";
-            ModalInputBox.Text = wsAtual.Name;
+
+            var itemRenomear = new MenuItem
+            {
+                Header = $"Mudar Nome de \"{wsAtual.Name}\"...",
+                Icon = new PathIcon
+                {
+                    Data = AppIcons.Edit,
+                    Width = 13,
+                    Height = 13,
+                    Foreground = ThemePalette.IconLightGray
+                }
+            };
+            itemRenomear.Click += (s, e) => SolicitarRenomearWorkspace(ObterWorkspaceAtual());
+            menu.Items.Add(itemRenomear);
+
+            var itemExcluir = new MenuItem
+            {
+                Header = $"Fechar Workspace \"{wsAtual.Name}\"",
+                Icon = new PathIcon
+                {
+                    Data = AppIcons.Trash,
+                    Width = 13,
+                    Height = 13,
+                    Foreground = ThemePalette.Danger
+                }
+            };
+
+            if (_settings.Workspaces.Count <= 1)
+            {
+                itemExcluir.IsEnabled = false;
+                ToolTip.SetTip(itemExcluir, "É necessário manter pelo menos um Workspace ativo.");
+            }
+            else
+            {
+                itemExcluir.Click += (s, e) => SolicitarExcluirWorkspace(ObterWorkspaceAtual());
+            }
+            menu.Items.Add(itemExcluir);
+
+            menu.Items.Add(new Separator());
+
+            var itemNovo = new MenuItem
+            {
+                Header = "Novo Workspace",
+                Icon = new PathIcon
+                {
+                    Data = AppIcons.Plus,
+                    Width = 13,
+                    Height = 13,
+                    Foreground = ThemePalette.IconLightGray
+                }
+            };
+            itemNovo.Click += (s, e) => NovoWorkspace_Click(null, null!);
+            menu.Items.Add(itemNovo);
+
+            if (!string.IsNullOrWhiteSpace(_workspaceBgImagePath))
+            {
+                menu.Items.Add(new Separator());
+                var itemResetFundo = new MenuItem
+                {
+                    Header = "Restaurar Fundo Padrão do Workspace",
+                    Icon = new PathIcon
+                    {
+                        Data = AppIcons.Refresh,
+                        Width = 13,
+                        Height = 13,
+                        Foreground = ThemePalette.IconMutedGray
+                    }
+                };
+                itemResetFundo.Click += (s, e) => RestaurarFundoWorkspace_Click(null, null!);
+                menu.Items.Add(itemResetFundo);
+            }
+
+            return menu;
+        }
+
+        private void SolicitarRenomearWorkspace(WorkspaceData ws)
+        {
+            ModalTitle.Text = "Mudar Nome do Workspace";
+            ModalMessage.Text = $"Digite o novo nome para \"{ws.Name}\":";
+            ModalInputBox.Text = ws.Name;
             ModalInputBox.IsVisible = true;
             if (ModalCheckBox != null) ModalCheckBox.IsVisible = false;
             ModalButtonsPanel.Children.Clear();
@@ -1898,9 +2065,13 @@ namespace AvaloniaMdiApp
                 string novoNome = (ModalInputBox.Text ?? string.Empty).Trim();
                 if (!string.IsNullOrWhiteSpace(novoNome))
                 {
-                    wsAtual.Name = novoNome;
+                    ws.Name = novoNome;
                     AtualizarAbasWorkspaces();
                     SalvarTodosWorkspacesNoDisco();
+                    if (_settings.EnableNotifications)
+                    {
+                        ToastNotification.Mostrar(Workspace, $"Workspace renomeado para \"{novoNome}\".", "success");
+                    }
                 }
                 ModalOverlay.IsVisible = false;
             };
@@ -1913,7 +2084,7 @@ namespace AvaloniaMdiApp
             ModalInputBox.SelectAll();
         }
 
-        private void ExcluirWorkspaceAtual_Click(object? sender, RoutedEventArgs e)
+        private void SolicitarExcluirWorkspace(WorkspaceData ws)
         {
             if (_settings.Workspaces.Count <= 1)
             {
@@ -1921,9 +2092,8 @@ namespace AvaloniaMdiApp
                 return;
             }
 
-            var wsAtual = ObterWorkspaceAtual();
-            ModalTitle.Text = "Excluir Workspace";
-            ModalMessage.Text = $"Tem certeza de que deseja excluir o workspace \"{wsAtual.Name}\" e todas as janelas dele?";
+            ModalTitle.Text = "Fechar Workspace";
+            ModalMessage.Text = $"Tem certeza de que deseja fechar e apagar o workspace \"{ws.Name}\" e todas as janelas dele?";
             ModalInputBox.IsVisible = false;
             if (ModalCheckBox != null) ModalCheckBox.IsVisible = false;
             ModalButtonsPanel.Children.Clear();
@@ -1931,29 +2101,38 @@ namespace AvaloniaMdiApp
             var btnCancelar = CriarBotaoModal("Cancelar", isPrimary: false, isDanger: false);
             btnCancelar.Click += (s, ev) => ModalOverlay.IsVisible = false;
 
-            var btnExcluir = CriarBotaoModal("Excluir Workspace", isPrimary: false, isDanger: true);
+            var btnExcluir = CriarBotaoModal("Fechar Workspace", isPrimary: false, isDanger: true);
             btnExcluir.Click += (s, ev) =>
             {
                 ModalOverlay.IsVisible = false;
-                string nomeRemovido = wsAtual.Name;
+                string nomeRemovido = ws.Name;
 
-                LimparJanelasVisuaisDoCanvas();
-                _settings.Workspaces.Remove(wsAtual);
+                bool eraAtivo = ws.Id == _settings.ActiveWorkspaceId;
+                if (eraAtivo)
+                {
+                    LimparJanelasVisuaisDoCanvas();
+                    _settings.Workspaces.Remove(ws);
 
-                var proximo = _settings.Workspaces[0];
-                _settings.ActiveWorkspaceId = proximo.Id;
-                _workspaceBgImagePath = proximo.BackgroundImagePath ?? string.Empty;
-                _workspaceZoom = proximo.WorkspaceZoom > 0 ? proximo.WorkspaceZoom : 1.0;
+                    var proximo = _settings.Workspaces[0];
+                    _settings.ActiveWorkspaceId = proximo.Id;
+                    _workspaceBgImagePath = proximo.BackgroundImagePath ?? string.Empty;
+                    _workspaceZoom = proximo.WorkspaceZoom > 0 ? proximo.WorkspaceZoom : 1.0;
 
-                AplicarFundoWorkspace(_isDarkMode ? ThemePalette.DarkWorkspaceBg : ThemePalette.LightWorkspaceBg);
-                CarregarJanelasDoWorkspace(proximo);
-                AplicarZoomWorkspace(_workspaceZoom);
+                    AplicarFundoWorkspace(_isDarkMode ? ThemePalette.DarkWorkspaceBg : ThemePalette.LightWorkspaceBg);
+                    CarregarJanelasDoWorkspace(proximo);
+                    AplicarZoomWorkspace(_workspaceZoom);
+                }
+                else
+                {
+                    _settings.Workspaces.Remove(ws);
+                }
+
                 AtualizarAbasWorkspaces();
                 SalvarTodosWorkspacesNoDisco();
 
                 if (_settings.EnableNotifications)
                 {
-                    ToastNotification.Mostrar(Workspace, $"Workspace \"{nomeRemovido}\" excluído.", "info");
+                    ToastNotification.Mostrar(Workspace, $"Workspace \"{nomeRemovido}\" fechado com sucesso.", "info");
                 }
             };
 
@@ -1961,6 +2140,16 @@ namespace AvaloniaMdiApp
             ModalButtonsPanel.Children.Add(btnExcluir);
             AplicarEstiloModal();
             ModalOverlay.IsVisible = true;
+        }
+
+        private void RenomearWorkspaceAtual_Click(object? sender, RoutedEventArgs e)
+        {
+            SolicitarRenomearWorkspace(ObterWorkspaceAtual());
+        }
+
+        private void ExcluirWorkspaceAtual_Click(object? sender, RoutedEventArgs e)
+        {
+            SolicitarExcluirWorkspace(ObterWorkspaceAtual());
         }
 
         private void MenuModulo_Opening(object? sender, EventArgs e) => MenuModulo_SubmenuOpened(sender, null!);
@@ -3173,6 +3362,8 @@ namespace AvaloniaMdiApp
                 // Fundo Liso / Cor Sólida do Tema
                 Workspace.Background = new SolidColorBrush(solidColor);
             }
+
+            AtualizarMenuContextoCanvas();
         }
 
         private void AbrirNavegadorComUrl(string url, string sufixoTitulo = "")
