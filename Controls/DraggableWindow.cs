@@ -20,7 +20,10 @@ namespace AvaloniaMdiApp
         public event Action<DraggableWindow>? OnConnectRequested;
         public event Action<DraggableWindow>? OnWindowClicked;
         public event Action<DraggableWindow, ChecklistRowState>? OnChecklistRowClicked;
+        public event Action<DraggableWindow>? OnInteractionStarted;
         public event Action<DraggableWindow>? OnInteractionCompleted;
+        public event Action<DraggableWindow, string>? OnColorChanged;
+        public event Action<DraggableWindow, Button>? OnRequestRadialMenu;
 
         public string WindowId { get; }
         public string WindowTitle { get; private set; }
@@ -314,11 +317,16 @@ namespace AvaloniaMdiApp
                 AtualizarVisibilidadeControlesHover();
             };
 
-            _btnConfig = CreateControlButton("", out _, (s, e) => { });
+            _btnConfig = CreateControlButton("", out _, (s, e) =>
+            {
+                if (_btnConfig != null)
+                {
+                    OnRequestRadialMenu?.Invoke(this, _btnConfig);
+                }
+            });
             _btnConfig.Content = AppIcons.Create(AppIcons.Settings, 12, ThemePalette.IconLightGray);
             _btnConfig.IsVisible = false;
-            _btnConfig.Flyout = configFlyout;
-            ToolTip.SetTip(_btnConfig, "Configurações da janela (Cor, Criticidade, Conectar, Excluir)");
+            ToolTip.SetTip(_btnConfig, "Opções da janela (Menu Circular)");
 
             var btnMin = CreateControlButton("—", out _btnMinText, (s, e) => ToggleMinimize());
             var btnMax = CreateControlButton("▢", out _btnMaxText, (s, e) => ToggleMaximize());
@@ -524,10 +532,13 @@ namespace AvaloniaMdiApp
                     VerticalContentAlignment = VerticalAlignment.Center,
                     IsVisible = false,
                     Cursor = new Cursor(StandardCursorType.Hand),
-                    Content = AppIcons.Create(AppIcons.Settings, 11.5, ThemePalette.IconLightGray),
-                    Flyout = configFlyout
+                    Content = AppIcons.Create(AppIcons.Settings, 11.5, ThemePalette.IconLightGray)
                 };
-                ToolTip.SetTip(_btnShapeConfig, "Configurar forma (Cor, Formato, Criticidade, Conectar, Excluir)");
+                _btnShapeConfig.Click += (s, e) =>
+                {
+                    OnRequestRadialMenu?.Invoke(this, _btnShapeConfig);
+                };
+                ToolTip.SetTip(_btnShapeConfig, "Opções da forma (Menu Circular)");
 
                 shapeFloatingControls.Children.Add(_shapeMoveHandle);
                 shapeFloatingControls.Children.Add(_btnShapeConfig);
@@ -585,7 +596,7 @@ namespace AvaloniaMdiApp
             _taskBar.AtualizarTituloJanela(this, novoTitulo);
         }
 
-        private void IniciarEdicaoTitulo()
+        public void IniciarEdicaoTitulo()
         {
             _txtTitleEditor.Text = WindowTitle;
             _lblTitle.IsVisible = false;
@@ -784,11 +795,34 @@ namespace AvaloniaMdiApp
             OnBoundsChanged?.Invoke(this);
         }
 
-        public void DefinirCorJanela(string hexColor)
+        public Button ObterBotaoConfig() => _btnShapeConfig ?? _btnConfig;
+
+        public void ForcarExibirBotaoConfig(bool exibir)
+        {
+            if (_btnConfig != null) _btnConfig.IsVisible = exibir;
+            if (_btnShapeConfig != null) _btnShapeConfig.IsVisible = exibir;
+        }
+
+        public void DispararMenuRadialManual()
+        {
+            ForcarExibirBotaoConfig(true);
+            OnRequestRadialMenu?.Invoke(this, ObterBotaoConfig());
+        }
+
+        public void DefinirCorJanela(string hexColor, bool notificarMudanca = true)
         {
             CustomColor = hexColor ?? string.Empty;
             AtualizarCores();
             _taskBar.AtualizarCorJanela(this);
+            if (notificarMudanca)
+            {
+                OnColorChanged?.Invoke(this, CustomColor);
+            }
+        }
+
+        public void IniciarConexao()
+        {
+            OnConnectRequested?.Invoke(this);
         }
 
         public string ObterCorEfetiva()
@@ -1124,6 +1158,7 @@ namespace AvaloniaMdiApp
             var props = e.GetCurrentPoint(this);
             if (props.Properties.IsLeftButtonPressed)
             {
+                OnInteractionStarted?.Invoke(this);
                 _resizeMode = mode;
                 _pointerStart = e.GetPosition(Workspace);
                 _rectStart = new Rect(Canvas.GetLeft(this), Canvas.GetTop(this), Width, Height);
@@ -1327,7 +1362,9 @@ namespace AvaloniaMdiApp
                             return;
                         }
 
+                        Focus();
                         _isDragging = true;
+                        OnInteractionStarted?.Invoke(this);
                         _pointerStart = e.GetPosition(Workspace);
                         _windowStart = new Point(Canvas.GetLeft(this), Canvas.GetTop(this));
                         e.Pointer.Capture(this);
@@ -1358,7 +1395,9 @@ namespace AvaloniaMdiApp
                     _pressedOnTitleText = clicouTextoTitulo;
                     if (!_isMaximized)
                     {
+                        Focus();
                         _isDragging = true;
+                        OnInteractionStarted?.Invoke(this);
                         _pointerStart = e.GetPosition(Workspace);
                         _windowStart = new Point(Canvas.GetLeft(this), Canvas.GetTop(this));
                         e.Pointer.Capture(this);

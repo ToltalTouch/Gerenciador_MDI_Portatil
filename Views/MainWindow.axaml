@@ -14,6 +14,20 @@
       <Setter Property="Height" Value="12"/>
       <Setter Property="Foreground" Value="#CBD5E1"/>
     </Style>
+    <Style Selector="Button.sideSubItem">
+      <Setter Property="Height" Value="28"/>
+      <Setter Property="Padding" Value="8,0"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Left"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.sideSubItem:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#27272A"/>
+    </Style>
   </Window.Styles>
 
   <LayoutTransformControl Name="RootScaleHost">
@@ -56,7 +70,7 @@
         </Border>
 
         <!-- Barra Lateral Retrátil de Widgets -->
-        <Border Name="LeftSidebar" DockPanel.Dock="Left" Width="60" Background="#18181B" BorderBrush="#27272A" BorderThickness="0,0,1,0">
+        <Border Name="LeftSidebar" DockPanel.Dock="Left" Width="60" ClipToBounds="True" Background="#18181B" BorderBrush="#27272A" BorderThickness="0,0,1,0">
           <Border.Transitions>
             <Transitions>
               <DoubleTransition Property="Width" Duration="0:0:0.18" Easing="CubicEaseOut"/>
@@ -140,6 +154,12 @@
                 </Button.Flyout>
               </Button>
 
+              <Button Name="BtnSideAjuda" Height="40" Padding="14,0" Background="Transparent" BorderThickness="0" CornerRadius="8" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" ToolTip.Tip="Guia de Uso &amp; Ajuda Interativa&#x0a;Aprenda passo a passo como usar cada recurso do app com exemplos práticos interativos!" Click="AbrirAjudaTutorial_Click">
+                <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                  <PathIcon Data="{x:Static local:AppIcons.Help}" Width="18" Height="18" Foreground="#38BDF8"/>
+                  <TextBlock Name="LblSideAjuda" Text="Ajuda &amp; Tutorial" FontSize="13" IsVisible="False" VerticalAlignment="Center"/>
+                </StackPanel>
+              </Button>
               <Button Name="BtnSidePreferencias" Height="40" Padding="14,0" Background="Transparent" BorderThickness="0" CornerRadius="8" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" ToolTip.Tip="Preferências do Sistema&#x0a;Ajuste o tema visual (claro/escuro e cores), notificações, escala de exibição, tamanho das janelas e atualizações." Click="AbrirConfiguracoes_Click">
                 <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
                   <PathIcon Data="{x:Static local:AppIcons.Settings}" Width="18" Height="18" Foreground="#CBD5E1"/>
@@ -171,89 +191,149 @@
                   </StackPanel>
                 </Button>
 
-                <Button Name="BtnSideGaleria" Height="40" Padding="14,0" Background="Transparent" BorderThickness="0" CornerRadius="8" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" ToolTip.Tip="Galeria de Mídias&#x0a;Visualize miniaturas de imagens e vídeos, abra mídias em janelas flutuantes dedicadas ou defina imagens como fundo do Workspace.">
-                  <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                    <PathIcon Data="{x:Static local:AppIcons.Image}" Width="18" Height="18" Foreground="#CBD5E1"/>
-                    <TextBlock Name="LblSideGaleria" Text="Galeria" FontSize="13" IsVisible="False" VerticalAlignment="Center"/>
-                  </StackPanel>
-                  <Button.Flyout>
-                    <MenuFlyout Placement="RightEdgeAlignedTop" Opening="MenuModulo_Opening">
-                      <MenuItem Header="Nova Galeria" Click="AbrirGaleria_Click">
-                        <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Plus}"/></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Name="MenuGaleriaSalvas" Header="Abrir Galeria Existente">
-                        <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Folder}"/></MenuItem.Icon>
-                      </MenuItem>
-                      <Separator/>
-                      <MenuItem Header="Abrir Imagem em Janela..." Click="AbrirImagemAvulsa_Click">
-                        <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Image}"/></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Header="Abrir Vídeo em Janela..." Click="AbrirVideoAvulso_Click">
-                        <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Video}"/></MenuItem.Icon>
-                      </MenuItem>
-                    </MenuFlyout>
-                  </Button.Flyout>
+                <!-- Galeria (Accordion Dropdown) -->
+                <Button Name="BtnSideGaleria" Height="40" Padding="14,0" Background="Transparent" BorderThickness="0" CornerRadius="8" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" ToolTip.Tip="Galeria de Mídias&#x0a;Clique para expandir as opções de imagens e vídeos." Click="ToggleDropdownGaleria_Click">
+                  <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                    <PathIcon Grid.Column="0" Data="{x:Static local:AppIcons.Image}" Width="18" Height="18" Foreground="#CBD5E1" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Name="LblSideGaleria" Text="Galeria" FontSize="13" Margin="12,0,0,0" IsVisible="False" VerticalAlignment="Center"/>
+                    <PathIcon Grid.Column="2" Name="ChevronSideGaleria" Data="{x:Static local:AppIcons.ChevronDown}" Width="10" Height="10" Foreground="#94A3B8" IsVisible="False" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                  </Grid>
                 </Button>
+                <!-- Submenu Galeria com linha guia vertical -->
+                <Border Name="PanelSubmenuGaleria" IsVisible="False" ClipToBounds="True" MaxHeight="0" Opacity="0" Margin="22,1,4,4" BorderBrush="#334155" BorderThickness="1.5,0,0,0" Padding="8,2,0,2">
+                  <Border.Transitions>
+                    <Transitions>
+                      <DoubleTransition Property="MaxHeight" Duration="0:0:0.24" Easing="CubicEaseOut"/>
+                      <DoubleTransition Property="Opacity" Duration="0:0:0.20" Easing="CubicEaseOut"/>
+                    </Transitions>
+                  </Border.Transitions>
+                  <StackPanel Orientation="Vertical" Spacing="2">
+                    <Button Classes="sideSubItem" Click="AbrirGaleria_Click">
+                      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <PathIcon Data="{x:Static local:AppIcons.Plus}" Width="10" Height="10" Foreground="#38BDF8"/>
+                        <TextBlock Text="Nova Galeria" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Classes="sideSubItem" Click="AbrirImagemAvulsa_Click">
+                      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <PathIcon Data="{x:Static local:AppIcons.Image}" Width="10" Height="10" Foreground="#38BDF8"/>
+                        <TextBlock Text="Abrir Imagem em Janela" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Classes="sideSubItem" Click="AbrirVideoAvulso_Click">
+                      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <PathIcon Data="{x:Static local:AppIcons.Video}" Width="10" Height="10" Foreground="#38BDF8"/>
+                        <TextBlock Text="Abrir Vídeo em Janela" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
+                  </StackPanel>
+                </Border>
 
-                <Button Name="BtnSideNavegador" Height="40" Padding="14,0" Background="Transparent" BorderThickness="0" CornerRadius="8" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" ToolTip.Tip="Navegador Web&#x0a;Abra páginas da internet diretamente no sistema em janelas multitarefa, com atalhos rápidos para Google, YouTube, GitHub e Wikipédia.">
-                  <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                    <PathIcon Data="{x:Static local:AppIcons.Globe}" Width="18" Height="18" Foreground="#CBD5E1"/>
-                    <TextBlock Name="LblSideNavegador" Text="Navegador" FontSize="13" IsVisible="False" VerticalAlignment="Center"/>
-                  </StackPanel>
-                  <Button.Flyout>
-                    <MenuFlyout Placement="RightEdgeAlignedTop" Opening="MenuModulo_Opening">
-                      <MenuItem Header="Novo Navegador Web" Click="AbrirNavegador_Click">
-                        <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Globe}"/></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Name="MenuNavegadorSalvos" Header="Navegadores Salvos">
-                        <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Folder}"/></MenuItem.Icon>
-                      </MenuItem>
-                      <Separator/>
-                      <MenuItem Header="Abrir Google" Click="AbrirNavegadorGoogle_Click">
-                        <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Search}"/></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Header="Abrir YouTube" Click="AbrirNavegadorYouTube_Click">
-                        <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Play}"/></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Header="Abrir GitHub" Click="AbrirNavegadorGitHub_Click">
-                        <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Code}"/></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Header="Abrir Wikipédia" Click="AbrirNavegadorWikipedia_Click">
-                        <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.Book}"/></MenuItem.Icon>
-                      </MenuItem>
-                    </MenuFlyout>
-                  </Button.Flyout>
+                <!-- Navegador Web (Accordion Dropdown) -->
+                <Button Name="BtnSideNavegador" Height="40" Padding="14,0" Background="Transparent" BorderThickness="0" CornerRadius="8" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" ToolTip.Tip="Navegador Web&#x0a;Clique para expandir os atalhos e novo navegador." Click="ToggleDropdownNavegador_Click">
+                  <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                    <PathIcon Grid.Column="0" Data="{x:Static local:AppIcons.Globe}" Width="18" Height="18" Foreground="#CBD5E1" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Name="LblSideNavegador" Text="Navegador" FontSize="13" Margin="12,0,0,0" IsVisible="False" VerticalAlignment="Center"/>
+                    <PathIcon Grid.Column="2" Name="ChevronSideNavegador" Data="{x:Static local:AppIcons.ChevronDown}" Width="10" Height="10" Foreground="#94A3B8" IsVisible="False" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                  </Grid>
                 </Button>
+                <!-- Submenu Navegador com linha guia vertical -->
+                <Border Name="PanelSubmenuNavegador" IsVisible="False" ClipToBounds="True" MaxHeight="0" Opacity="0" Margin="22,1,4,4" BorderBrush="#334155" BorderThickness="1.5,0,0,0" Padding="8,2,0,2">
+                  <Border.Transitions>
+                    <Transitions>
+                      <DoubleTransition Property="MaxHeight" Duration="0:0:0.24" Easing="CubicEaseOut"/>
+                      <DoubleTransition Property="Opacity" Duration="0:0:0.20" Easing="CubicEaseOut"/>
+                    </Transitions>
+                  </Border.Transitions>
+                  <StackPanel Orientation="Vertical" Spacing="2">
+                    <Button Classes="sideSubItem" Click="AbrirNavegador_Click">
+                      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <PathIcon Data="{x:Static local:AppIcons.Plus}" Width="10" Height="10" Foreground="#38BDF8"/>
+                        <TextBlock Text="Novo Navegador" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Classes="sideSubItem" Click="AbrirNavegadorGoogle_Click">
+                      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <PathIcon Data="{x:Static local:AppIcons.Search}" Width="10" Height="10" Foreground="#38BDF8"/>
+                        <TextBlock Text="Google" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Classes="sideSubItem" Click="AbrirNavegadorYouTube_Click">
+                      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <PathIcon Data="{x:Static local:AppIcons.Play}" Width="10" Height="10" Foreground="#38BDF8"/>
+                        <TextBlock Text="YouTube" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Classes="sideSubItem" Click="AbrirNavegadorGitHub_Click">
+                      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <PathIcon Data="{x:Static local:AppIcons.Code}" Width="10" Height="10" Foreground="#38BDF8"/>
+                        <TextBlock Text="GitHub" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Classes="sideSubItem" Click="AbrirNavegadorWikipedia_Click">
+                      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <PathIcon Data="{x:Static local:AppIcons.Book}" Width="10" Height="10" Foreground="#38BDF8"/>
+                        <TextBlock Text="Wikipédia" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
+                  </StackPanel>
+                </Border>
 
-                <Button Name="BtnSideFluxograma" Height="40" Padding="14,0" Background="Transparent" BorderThickness="0" CornerRadius="8" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" ToolTip.Tip="Fluxograma e Processos&#x0a;Adicione etapas, decisões e pontos de início/fim ao Workspace.">
-                  <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                    <PathIcon Data="{x:Static local:AppIcons.ShapeDiamond}" Width="18" Height="18" Foreground="#CBD5E1"/>
-                    <TextBlock Name="LblSideFluxograma" Text="Fluxograma" FontSize="13" IsVisible="False" VerticalAlignment="Center"/>
-                  </StackPanel>
-                  <Button.Flyout>
-                    <MenuFlyout Placement="RightEdgeAlignedTop">
-                      <MenuItem Header="Adicionar Retângulo (Etapa / Processo)" Click="AdicionarFormaRetangulo_Click">
-                        <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.ShapeRect}"/></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Header="Adicionar Losango (Decisão / Condição)" Click="AdicionarFormaLosango_Click">
-                        <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.ShapeDiamond}"/></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Header="Adicionar Círculo (Início / Fim)" Click="AdicionarFormaCirculo_Click">
-                        <MenuItem.Icon><PathIcon Data="{x:Static local:AppIcons.ShapeCircle}"/></MenuItem.Icon>
-                      </MenuItem>
-                    </MenuFlyout>
-                  </Button.Flyout>
+                <!-- Fluxograma (Accordion Dropdown) -->
+                <Button Name="BtnSideFluxograma" Height="40" Padding="14,0" Background="Transparent" BorderThickness="0" CornerRadius="8" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" ToolTip.Tip="Fluxograma e Processos&#x0a;Clique para expandir as formas de processos e decisões." Click="ToggleDropdownFluxograma_Click">
+                  <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                    <PathIcon Grid.Column="0" Data="{x:Static local:AppIcons.ShapeDiamond}" Width="18" Height="18" Foreground="#CBD5E1" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Name="LblSideFluxograma" Text="Fluxograma" FontSize="13" Margin="12,0,0,0" IsVisible="False" VerticalAlignment="Center"/>
+                    <PathIcon Grid.Column="2" Name="ChevronSideFluxograma" Data="{x:Static local:AppIcons.ChevronDown}" Width="10" Height="10" Foreground="#94A3B8" IsVisible="False" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                  </Grid>
                 </Button>
+                <!-- Submenu Fluxograma com linha guia vertical -->
+                <Border Name="PanelSubmenuFluxograma" IsVisible="False" ClipToBounds="True" MaxHeight="0" Opacity="0" Margin="22,1,4,4" BorderBrush="#334155" BorderThickness="1.5,0,0,0" Padding="8,2,0,2">
+                  <Border.Transitions>
+                    <Transitions>
+                      <DoubleTransition Property="MaxHeight" Duration="0:0:0.24" Easing="CubicEaseOut"/>
+                      <DoubleTransition Property="Opacity" Duration="0:0:0.20" Easing="CubicEaseOut"/>
+                    </Transitions>
+                  </Border.Transitions>
+                  <StackPanel Orientation="Vertical" Spacing="2">
+                    <Button Classes="sideSubItem" Click="AdicionarFormaRetangulo_Click">
+                      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <PathIcon Data="{x:Static local:AppIcons.ShapeRect}" Width="10" Height="10" Foreground="#38BDF8"/>
+                        <TextBlock Text="Processo (Retângulo)" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Classes="sideSubItem" Click="AdicionarFormaLosango_Click">
+                      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <PathIcon Data="{x:Static local:AppIcons.ShapeDiamond}" Width="10" Height="10" Foreground="#38BDF8"/>
+                        <TextBlock Text="Decisão (Losango)" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Classes="sideSubItem" Click="AdicionarFormaCirculo_Click">
+                      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <PathIcon Data="{x:Static local:AppIcons.ShapeCircle}" Width="10" Height="10" Foreground="#38BDF8"/>
+                        <TextBlock Text="Início / Fim (Círculo)" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
+                  </StackPanel>
+                </Border>
               </StackPanel>
             </ScrollViewer>
           </DockPanel>
         </Border>
 
         <!-- Barra Lateral Direita do Calendário -->
-        <Border Name="RightCalendarBar" DockPanel.Dock="Right" Width="46" Background="#18181B" BorderBrush="#27272A" BorderThickness="1,0,0,0">
+        <Border Name="RightCalendarBar" DockPanel.Dock="Right" Width="46" ClipToBounds="True" Background="#18181B" BorderBrush="#27272A" BorderThickness="1,0,0,0">
+          <Border.Transitions>
+            <Transitions>
+              <DoubleTransition Property="Width" Duration="0:0:0.18" Easing="CubicEaseOut"/>
+            </Transitions>
+          </Border.Transitions>
           <StackPanel Orientation="Vertical" Spacing="6" Margin="5,8">
-            <Button Name="BtnRightCalendario" Height="38" Padding="0" Background="Transparent" BorderThickness="0" CornerRadius="8" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" ToolTip.Tip="Calendário de Etapas&#x0a;Selecione dias ou arraste um período para planejar etapas, marcar horários, consultar feriados nacionais e vincular janelas ou itens de lista." Click="ToggleCalendarPanel_Click">
-              <PathIcon Data="{x:Static local:AppIcons.Calendar}" Width="18" Height="18" Foreground="#CBD5E1"/>
+            <Button Name="BtnRightCalendario" Height="38" Padding="10,0" Background="Transparent" BorderThickness="0" CornerRadius="8" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" ToolTip.Tip="Calendário de Etapas&#x0a;Selecione dias ou arraste um período para planejar etapas, marcar horários, consultar feriados nacionais e vincular janelas ou itens de lista." Click="ToggleCalendarPanel_Click">
+              <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <PathIcon Data="{x:Static local:AppIcons.Calendar}" Width="18" Height="18" Foreground="#CBD5E1"/>
+                <TextBlock Name="LblRightCalendario" Text="Calendário" FontSize="13" IsVisible="False" VerticalAlignment="Center"/>
+              </StackPanel>
             </Button>
           </StackPanel>
         </Border>
@@ -333,9 +413,14 @@
             <LayoutTransformControl Name="WorkspaceZoomHost"
                                     HorizontalAlignment="Left"
                                     VerticalAlignment="Top">
-              <Canvas Name="Workspace" Background="#0F172A" ClipToBounds="True"/>
+              <Canvas Name="Workspace" Background="#0F172A" ClipToBounds="True" Focusable="True"/>
             </LayoutTransformControl>
           </ScrollViewer>
+
+          <!-- Overlay para Menu Circular / Radial (Estilo The Sims 4 - Contido no Quadro do Workspace) -->
+          <Panel Name="RadialMenuOverlay" IsVisible="False" Background="#01000000" ZIndex="9800">
+            <Canvas Name="RadialMenuCanvas" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+          </Panel>
         </Grid>
       </DockPanel>
 

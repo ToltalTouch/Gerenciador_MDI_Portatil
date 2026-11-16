@@ -17,6 +17,7 @@ namespace AvaloniaMdiApp
         private Button? _btnBrowserExternal;
         private TextBox? _txtBrowserUrl;
         private ChromiumWebViewHost? _browserHost;
+        private Grid? _browserBodyHost;
 
         private Control CriarConteudoNavegador(string initialUrl)
         {
@@ -133,13 +134,13 @@ namespace AvaloniaMdiApp
             _browserToolbar.Child = navGrid;
             DockPanel.SetDock(_browserToolbar, Dock.Top);
 
-            var browserBodyHost = new Grid
+            _browserBodyHost = new Grid
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch,
-                Background = Brushes.White
+                Background = _isDarkMode ? SolidColorBrush.Parse("#1E293B") : SolidColorBrush.Parse("#F8FAFC")
             };
-            browserBodyHost.Children.Add(new TextBlock
+            _browserBodyHost.Children.Add(new TextBlock
             {
                 Text = "Página Web ativa",
                 FontSize = 12,
@@ -147,10 +148,10 @@ namespace AvaloniaMdiApp
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             });
-            browserBodyHost.Children.Add(_browserHost);
+            _browserBodyHost.Children.Add(_browserHost);
 
             browserDock.Children.Add(_browserToolbar);
-            browserDock.Children.Add(browserBodyHost);
+            browserDock.Children.Add(_browserBodyHost);
 
             return browserDock;
         }
@@ -188,6 +189,11 @@ namespace AvaloniaMdiApp
                 _txtBrowserUrl.Background = inputBg;
                 _txtBrowserUrl.BorderBrush = borderBrush;
                 _txtBrowserUrl.Foreground = textBrush;
+            }
+
+            if (_browserBodyHost != null)
+            {
+                _browserBodyHost.Background = _isDarkMode ? SolidColorBrush.Parse("#1E293B") : SolidColorBrush.Parse("#F8FAFC");
             }
         }
     }

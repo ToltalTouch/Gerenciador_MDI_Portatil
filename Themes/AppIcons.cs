@@ -56,6 +56,8 @@ namespace AvaloniaMdiApp
         public static readonly StreamGeometry AlignCenter = StreamGeometry.Parse("M 2 3 L 14 3 L 14 4.6 L 2 4.6 Z M 4 6.4 L 12 6.4 L 12 8 L 4 8 Z M 2 9.8 L 14 9.8 L 14 11.4 L 2 11.4 Z M 5 13.2 L 11 13.2 L 11 14.8 L 5 14.8 Z");
         public static readonly StreamGeometry AlignRight = StreamGeometry.Parse("M 2 3 L 14 3 L 14 4.6 L 2 4.6 Z M 6 6.4 L 14 6.4 L 14 8 L 6 8 Z M 2 9.8 L 14 9.8 L 14 11.4 L 2 11.4 Z M 8 13.2 L 14 13.2 L 14 14.8 L 8 14.8 Z");
         public static readonly StreamGeometry Refresh = StreamGeometry.Parse("M 8 2 A 6 6 0 1 0 13.6 10.2 L 12 9.6 A 4.3 4.3 0 1 1 11.2 5.2 L 9.2 5.2 L 9.2 6.8 L 14 6.8 L 14 2 L 12.4 2 L 12.4 4 A 6 6 0 0 0 8 2 Z");
+        public static readonly StreamGeometry ChevronDown = StreamGeometry.Parse("M 3.5 5.5 L 8 10 L 12.5 5.5 L 11.4 4.4 L 8 7.8 L 4.6 4.4 Z");
+        public static readonly StreamGeometry ChevronUp = StreamGeometry.Parse("M 3.5 10.5 L 8 6 L 12.5 10.5 L 11.4 11.6 L 8 8.2 L 4.6 11.6 Z");
         public static readonly StreamGeometry Close = StreamGeometry.Parse("M 3.2 2 L 8 6.8 L 12.8 2 L 14 3.2 L 9.2 8 L 14 12.8 L 12.8 14 L 8 9.2 L 3.2 14 L 2 12.8 L 6.8 8 L 2 3.2 Z");
         public static readonly StreamGeometry Download = StreamGeometry.Parse("M 7.2 2 L 8.8 2 L 8.8 8.6 L 11.4 6 L 12.5 7.1 L 8 11.6 L 3.5 7.1 L 4.6 6 L 7.2 8.6 Z M 2.5 12.5 L 13.5 12.5 L 13.5 14 L 2.5 14 Z");
         public static readonly StreamGeometry ShapeRect = StreamGeometry.Parse("M 2 3.5 L 14 3.5 L 14 12.5 L 2 12.5 Z M 3.5 5 L 3.5 11 L 12.5 11 L 12.5 5 Z");

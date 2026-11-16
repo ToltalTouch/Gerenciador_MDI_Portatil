@@ -128,6 +128,7 @@ namespace AvaloniaMdiApp
         public string MainWindowSizePreset { get; set; } = "1024x680";
         public string WidgetSizePreset { get; set; } = "normal";
         public string DefaultFlowchartLineColor { get; set; } = "#3B82F6";
+        public bool AutoExpandSidebarsOnHover { get; set; } = true;
         public bool AutoCheckUpdatesOnStartup { get; set; } = true;
         public bool HasSeenWelcome { get; set; } = false;
         public string GitHubRepository { get; set; } = "ToltalTouch/Janela_multitarefa";

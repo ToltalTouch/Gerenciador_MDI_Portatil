@@ -38,6 +38,7 @@ namespace AvaloniaMdiApp
         private readonly ComboBox _cmbThemePreset;
         private readonly ComboBox _cmbBackgroundStyle;
         private readonly ToggleSwitch _notifToggle;
+        private readonly ToggleSwitch _autoExpandSidebarToggle;
         private readonly ToggleSwitch _autoUpdateToggle;
         private readonly Button _btnCheckUpdateNow;
         private readonly Button _btnCreateShortcut;
@@ -278,6 +279,16 @@ namespace AvaloniaMdiApp
             };
             _notifToggle.IsCheckedChanged += (s, e) => SalvarConfiguracoesGerais();
 
+            _autoExpandSidebarToggle = new ToggleSwitch
+            {
+                IsChecked = settings.AutoExpandSidebarsOnHover,
+                OnContent = "Ativo",
+                OffContent = "Desativado",
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _autoExpandSidebarToggle.IsCheckedChanged += (s, e) => SalvarConfiguracoesGerais();
+
             _autoUpdateToggle = new ToggleSwitch
             {
                 IsChecked = settings.AutoCheckUpdatesOnStartup,
@@ -329,6 +340,10 @@ namespace AvaloniaMdiApp
                 CriarLinhaItem("Checar ao Iniciar", "Verificar se há novas versões no GitHub Releases ao abrir", _autoUpdateToggle),
                 CriarDivisor(),
                 CriarLinhaItem("Verificação Manual", "Checar agora se existe uma versão mais recente", _btnCheckUpdateNow)
+            ));
+            panelGeral.Children.Add(CriarCabecalhoSecao("MENUS LATERAIS"));
+            panelGeral.Children.Add(CriarCardAgrupado(
+                CriarLinhaItem("Expandir ao Passar o Mouse", "Expande os menus laterais exibindo os nomes dos botões ao passar o ponteiro e recolhe ao sair", _autoExpandSidebarToggle)
             ));
             _categoryPanels["geral"] = panelGeral;
 
@@ -1062,6 +1077,7 @@ namespace AvaloniaMdiApp
                 _ => "normal"
             };
 
+            _settings.AutoExpandSidebarsOnHover = _autoExpandSidebarToggle.IsChecked == true;
             AplicarTema(isDark);
             OnSettingsChanged?.Invoke(isDark, notif, scale, mainWinPreset, widgetPreset);
         }

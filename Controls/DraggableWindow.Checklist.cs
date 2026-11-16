@@ -77,7 +77,9 @@ namespace AvaloniaMdiApp
                 CornerRadius = new CornerRadius(4),
                 Opacity = string.IsNullOrWhiteSpace(linkedWindowId) ? 0.65 : 1.0
             };
-            ToolTip.SetTip(btnLinkWindow, "Vincular / focar janela para este item");
+            ToolTip.SetTip(btnLinkWindow, string.IsNullOrWhiteSpace(linkedWindowId)
+                ? "Vincular a uma janela (clique e aponte para a janela desejada no Workspace)"
+                : "Item vinculado! Clique para focar a janela ou alterar o vínculo");
 
             var btnNote = new Button
             {
@@ -264,6 +266,9 @@ namespace AvaloniaMdiApp
             row.BtnLinkWindow.Opacity = temVinculo ? 1.0 : 0.65;
             row.BtnLinkWindow.BorderThickness = temVinculo ? new Thickness(1) : new Thickness(0);
             row.BtnLinkWindow.BorderBrush = temVinculo ? ThemePalette.AccentLight : Brushes.Transparent;
+            ToolTip.SetTip(row.BtnLinkWindow, temVinculo
+                ? "Item vinculado! Clique para focar a janela ou alterar o vínculo"
+                : "Vincular a uma janela (clique e aponte para a janela desejada no Workspace)");
         }
 
         public void AtualizarFiltroCorChecklist(string? hexFilter)

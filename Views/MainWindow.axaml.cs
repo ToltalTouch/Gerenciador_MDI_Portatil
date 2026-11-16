@@ -9,6 +9,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
+using Avalonia.Threading;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -48,10 +49,22 @@ namespace AvaloniaMdiApp
         private DraggableWindow? _janelaOrigemConexao;
         private Avalonia.Controls.Shapes.Path? _previewConnectionPath;
 
+        // Estado de Vínculo de Linha de Checklist com Janela pelo Mouse
+        private bool _modoVinculoLinhaAtivo = false;
+        private DraggableWindow? _checklistWinOrigemVinculo;
+        private ChecklistRowState? _linhaOrigemVinculo;
+
         // Estado de Panning (arrastar o fundo do Workspace)
         private bool _isPanningWorkspace = false;
         private Point _panPointerStart;
         private Vector _panOffsetStart;
+        private string? _snapshotBeforeInteraction;
+
+        // Timers para expansão e retração dos menus laterais com delay
+        private DispatcherTimer? _leftSidebarOpenTimer;
+        private DispatcherTimer? _leftSidebarCloseTimer;
+        private DispatcherTimer? _rightSidebarOpenTimer;
+        private DispatcherTimer? _rightSidebarCloseTimer;
 
         public MainWindow()
         {
@@ -67,16 +80,35 @@ namespace AvaloniaMdiApp
             LinuxDesktopIntegration.GarantirIntegracaoDesktopLinux();
 
             ConfigurarEventosWorkspaceZoomEPan();
+            InicializarTimersHoverMenusLaterais();
 
             ModalOverlay.PropertyChanged += (s, e) =>
             {
                 if (e.Property == Visual.IsVisibleProperty)
                 {
-                    bool modalAtivo = ModalOverlay.IsVisible;
-                    foreach (var win in _ativasJanelas)
-                    {
-                        win.SetModalOverlaySuspended(modalAtivo);
-                    }
+                    AtualizarSuspensaoNavegadores();
+                }
+            };
+
+            RadialMenuOverlay.PropertyChanged += (s, e) =>
+            {
+                if (e.Property == Visual.IsVisibleProperty)
+                {
+                    AtualizarSuspensaoNavegadores();
+                }
+            };
+
+            RadialMenuOverlay.PointerPressed += (s, e) =>
+            {
+                FecharMenuCircular();
+                e.Handled = true;
+            };
+
+            RootDock.PointerPressed += (s, e) =>
+            {
+                if (RadialMenuOverlay.IsVisible)
+                {
+                    FecharMenuCircular();
                 }
             };
 
@@ -128,6 +160,8 @@ namespace AvaloniaMdiApp
         }
 
         private bool _isSidebarExpanded;
+        private bool _isSidebarPinned;
+        private InteractiveTutorialModal? _tutorialModal;
         private string? _activeColorFilterHex;
         private readonly Dictionary<string, Button> _colorFilterButtons = new(StringComparer.OrdinalIgnoreCase);
 
@@ -209,23 +243,189 @@ namespace AvaloniaMdiApp
             }
         }
 
-        private void ToggleSidebar_Click(object? sender, RoutedEventArgs e)
+        private void ExpandirLeftSidebar(bool expand)
         {
-            _isSidebarExpanded = !_isSidebarExpanded;
-            LeftSidebar.Width = _isSidebarExpanded ? 215 : 60;
+            _isSidebarExpanded = expand;
+            LeftSidebar.Width = expand ? 230 : 60;
 
-            foreach (var lbl in new[]
+            var labels = new Control?[]
             {
                 LblSidebarTitle, LblSideNotas, LblSideListas,
                 LblSidePlanilhas, LblSideGaleria, LblSideNavegador, LblSideFluxograma,
-                LblSideSalvarTudo, LblSideExtrair, LblSidePreferencias
-            })
+                LblSideSalvarTudo, LblSideExtrair, LblSideAjuda, LblSidePreferencias,
+                ChevronSideGaleria, ChevronSideNavegador, ChevronSideFluxograma
+            };
+
+            if (expand)
             {
-                if (lbl != null)
+                foreach (var lbl in labels)
                 {
-                    lbl.IsVisible = _isSidebarExpanded;
+                    if (lbl != null)
+                    {
+                        lbl.IsVisible = true;
+                        lbl.Opacity = 0.0;
+                    }
                 }
+
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    await System.Threading.Tasks.Task.Delay(35);
+                    if (_isSidebarExpanded)
+                    {
+                        foreach (var lbl in labels)
+                        {
+                            if (lbl != null) lbl.Opacity = 1.0;
+                        }
+                    }
+                });
             }
+            else
+            {
+                foreach (var lbl in labels)
+                {
+                    if (lbl != null) lbl.Opacity = 0.0;
+                }
+
+                // Fecha submenus ao retrair para modo compacto de 60px
+                FechamentoRapidoDropdown(PanelSubmenuGaleria, ChevronSideGaleria);
+                FechamentoRapidoDropdown(PanelSubmenuNavegador, ChevronSideNavegador);
+                FechamentoRapidoDropdown(PanelSubmenuFluxograma, ChevronSideFluxograma);
+
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    await System.Threading.Tasks.Task.Delay(130);
+                    if (!_isSidebarExpanded)
+                    {
+                        foreach (var lbl in labels)
+                        {
+                            if (lbl != null) lbl.IsVisible = false;
+                        }
+                    }
+                });
+            }
+        }
+
+        private void AnimarToggleDropdown(Border? panel, PathIcon? chevron, double targetMaxHeight)
+        {
+            if (panel == null) return;
+
+            bool estaAberto = panel.IsVisible && panel.MaxHeight > 0 && panel.Opacity > 0.4;
+            if (estaAberto)
+            {
+                panel.MaxHeight = 0;
+                panel.Opacity = 0.0;
+                if (chevron != null) chevron.Data = AppIcons.ChevronDown;
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    await System.Threading.Tasks.Task.Delay(250);
+                    if (panel.MaxHeight == 0)
+                    {
+                        panel.IsVisible = false;
+                    }
+                });
+            }
+            else
+            {
+                panel.IsVisible = true;
+                panel.MaxHeight = 0;
+                panel.Opacity = 0.0;
+                if (chevron != null) chevron.Data = AppIcons.ChevronUp;
+
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    await System.Threading.Tasks.Task.Delay(20);
+                    panel.MaxHeight = targetMaxHeight;
+                    panel.Opacity = 1.0;
+                });
+            }
+        }
+
+        private void FechamentoRapidoDropdown(Border? panel, PathIcon? chevron)
+        {
+            if (panel == null) return;
+            panel.MaxHeight = 0;
+            panel.Opacity = 0.0;
+            panel.IsVisible = false;
+            if (chevron != null) chevron.Data = AppIcons.ChevronDown;
+        }
+
+        private void ToggleDropdownGaleria_Click(object? sender, RoutedEventArgs e)
+        {
+            _leftSidebarCloseTimer?.Stop();
+            if (!_isSidebarExpanded)
+            {
+                ExpandirLeftSidebar(true);
+                AnimarToggleDropdown(PanelSubmenuGaleria, ChevronSideGaleria, 150);
+                return;
+            }
+
+            AnimarToggleDropdown(PanelSubmenuGaleria, ChevronSideGaleria, 150);
+        }
+
+        private void ToggleDropdownNavegador_Click(object? sender, RoutedEventArgs e)
+        {
+            _leftSidebarCloseTimer?.Stop();
+            if (!_isSidebarExpanded)
+            {
+                ExpandirLeftSidebar(true);
+                AnimarToggleDropdown(PanelSubmenuNavegador, ChevronSideNavegador, 110);
+                return;
+            }
+
+            AnimarToggleDropdown(PanelSubmenuNavegador, ChevronSideNavegador, 110);
+        }
+
+        private void ToggleDropdownFluxograma_Click(object? sender, RoutedEventArgs e)
+        {
+            _leftSidebarCloseTimer?.Stop();
+            if (!_isSidebarExpanded)
+            {
+                ExpandirLeftSidebar(true);
+                AnimarToggleDropdown(PanelSubmenuFluxograma, ChevronSideFluxograma, 150);
+                return;
+            }
+
+            AnimarToggleDropdown(PanelSubmenuFluxograma, ChevronSideFluxograma, 150);
+        }
+
+        private void ExpandirRightCalendarBar(bool expand)
+        {
+            RightCalendarBar.Width = expand ? 145 : 46;
+            if (LblRightCalendario == null) return;
+
+            if (expand)
+            {
+                LblRightCalendario.IsVisible = true;
+                LblRightCalendario.Opacity = 0.0;
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    await System.Threading.Tasks.Task.Delay(35);
+                    if (RightCalendarBar.Width > 50)
+                    {
+                        LblRightCalendario.Opacity = 1.0;
+                    }
+                });
+            }
+            else
+            {
+                LblRightCalendario.Opacity = 0.0;
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    await System.Threading.Tasks.Task.Delay(130);
+                    if (RightCalendarBar.Width <= 50)
+                    {
+                        LblRightCalendario.IsVisible = false;
+                    }
+                });
+            }
+        }
+
+        private void ToggleSidebar_Click(object? sender, RoutedEventArgs e)
+        {
+            _leftSidebarOpenTimer?.Stop();
+            _leftSidebarCloseTimer?.Stop();
+            _isSidebarPinned = !_isSidebarPinned;
+            ExpandirLeftSidebar(_isSidebarPinned);
         }
 
         private void MostrarModalBoasVindas()
@@ -385,6 +585,10 @@ namespace AvaloniaMdiApp
                     w.Fechar();
                 }
                 _ativasJanelas.Clear();
+                foreach (var conn in _conexoesAtivas.ToList())
+                {
+                    conn.RemoverDoCanvas();
+                }
                 _conexoesAtivas.Clear();
                 CarregarJanelasDoWorkspace(ws);
                 if (_isCalendarOpen)
@@ -403,10 +607,19 @@ namespace AvaloniaMdiApp
 
         private void DesfazerWorkspace()
         {
-            if (_undoStack.Count == 0) return;
+            if (_undoStack.Count == 0)
+            {
+                if (_settings.EnableNotifications)
+                {
+                    ToastNotification.Mostrar(Workspace, "Nada para desfazer", "info");
+                }
+                return;
+            }
+
             _redoStack.Push(CapturarSnapshotWorkspaceJson());
             string prev = _undoStack.Pop();
             AplicarSnapshotWorkspaceJson(prev);
+            SalvarTodosWorkspacesNoDisco();
             if (_settings.EnableNotifications)
             {
                 ToastNotification.Mostrar(Workspace, "Alteração desfeita (Ctrl+Z)", "info");
@@ -415,10 +628,19 @@ namespace AvaloniaMdiApp
 
         private void RefazerWorkspace()
         {
-            if (_redoStack.Count == 0) return;
+            if (_redoStack.Count == 0)
+            {
+                if (_settings.EnableNotifications)
+                {
+                    ToastNotification.Mostrar(Workspace, "Nada para refazer", "info");
+                }
+                return;
+            }
+
             _undoStack.Push(CapturarSnapshotWorkspaceJson());
             string next = _redoStack.Pop();
             AplicarSnapshotWorkspaceJson(next);
+            SalvarTodosWorkspacesNoDisco();
             if (_settings.EnableNotifications)
             {
                 ToastNotification.Mostrar(Workspace, "Alteração refeita (Ctrl+Y)", "info");
@@ -445,9 +667,18 @@ namespace AvaloniaMdiApp
             {
                 if (e.Source == Workspace)
                 {
+                    Workspace.Focus();
+                    if (_modoVinculoLinhaAtivo)
+                    {
+                        CancelarModoVinculoLinha(notificar: true);
+                        e.Handled = true;
+                        return;
+                    }
+
                     if (_modoConexaoAtivo)
                     {
-                        CancelarModoConexao();
+                        CancelarModoVinculoLinha();
+            CancelarModoConexao();
                         e.Handled = true;
                         return;
                     }
@@ -466,6 +697,11 @@ namespace AvaloniaMdiApp
 
             Workspace.PointerMoved += (s, e) =>
             {
+                if (_modoVinculoLinhaAtivo && _checklistWinOrigemVinculo != null && _linhaOrigemVinculo != null)
+                {
+                    AtualizarLinhaPreviewVinculo(e.GetPosition(Workspace));
+                }
+
                 if (_modoConexaoAtivo && _janelaOrigemConexao != null)
                 {
                     AtualizarLinhaPreviewConexao(e.GetPosition(Workspace));
@@ -491,59 +727,178 @@ namespace AvaloniaMdiApp
                 }
             };
 
-            KeyDown += (s, e) =>
+            AddHandler(InputElement.KeyDownEvent, MainWindow_KeyDown, RoutingStrategies.Tunnel);
+
+            // Expansão suave dos menus laterais ao passar o mouse com delays (1,0s abrir, 1,7s fechar)
+            LeftSidebar.PointerEntered += (s, e) =>
             {
-                if (e.Key == Key.Escape && _isPickingCalendarTarget)
+                _leftSidebarCloseTimer?.Stop();
+                if (_settings.AutoExpandSidebarsOnHover && !_isSidebarPinned && !_isSidebarExpanded)
+                {
+                    _leftSidebarOpenTimer?.Stop();
+                    _leftSidebarOpenTimer?.Start();
+                }
+            };
+            LeftSidebar.PointerExited += (s, e) =>
+            {
+                _leftSidebarOpenTimer?.Stop();
+                if (_settings.AutoExpandSidebarsOnHover && !_isSidebarPinned && _isSidebarExpanded)
+                {
+                    _leftSidebarCloseTimer?.Stop();
+                    _leftSidebarCloseTimer?.Start();
+                }
+            };
+
+            RightCalendarBar.PointerEntered += (s, e) =>
+            {
+                _rightSidebarCloseTimer?.Stop();
+                if (_settings.AutoExpandSidebarsOnHover && RightCalendarBar.Width <= 50)
+                {
+                    _rightSidebarOpenTimer?.Stop();
+                    _rightSidebarOpenTimer?.Start();
+                }
+            };
+            RightCalendarBar.PointerExited += (s, e) =>
+            {
+                _rightSidebarOpenTimer?.Stop();
+                if (_settings.AutoExpandSidebarsOnHover && RightCalendarBar.Width > 50)
+                {
+                    _rightSidebarCloseTimer?.Stop();
+                    _rightSidebarCloseTimer?.Start();
+                }
+            };
+        }
+
+        private void InicializarTimersHoverMenusLaterais()
+        {
+            // Delay de 1,0s para expandir no hover
+            _leftSidebarOpenTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.0) };
+            _leftSidebarOpenTimer.Tick += (s, e) =>
+            {
+                _leftSidebarOpenTimer.Stop();
+                if (_settings.AutoExpandSidebarsOnHover && !_isSidebarPinned && !_isSidebarExpanded)
+                {
+                    ExpandirLeftSidebar(true);
+                }
+            };
+
+            // Delay de 1,7s para fechar após o mouse sair
+            _leftSidebarCloseTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.7) };
+            _leftSidebarCloseTimer.Tick += (s, e) =>
+            {
+                _leftSidebarCloseTimer.Stop();
+                if (_settings.AutoExpandSidebarsOnHover && !_isSidebarPinned && _isSidebarExpanded)
+                {
+                    ExpandirLeftSidebar(false);
+                }
+            };
+
+            _rightSidebarOpenTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.0) };
+            _rightSidebarOpenTimer.Tick += (s, e) =>
+            {
+                _rightSidebarOpenTimer.Stop();
+                if (_settings.AutoExpandSidebarsOnHover)
+                {
+                    ExpandirRightCalendarBar(true);
+                }
+            };
+
+            _rightSidebarCloseTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.7) };
+            _rightSidebarCloseTimer.Tick += (s, e) =>
+            {
+                _rightSidebarCloseTimer.Stop();
+                if (_settings.AutoExpandSidebarsOnHover)
+                {
+                    ExpandirRightCalendarBar(false);
+                }
+            };
+        }
+
+        private void MainWindow_KeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Escape)
+            {
+                if (RadialMenuOverlay.IsVisible)
+                {
+                    FecharMenuCircular();
+                    e.Handled = true;
+                    return;
+                }
+
+                if (_modoVinculoLinhaAtivo)
+                {
+                    CancelarModoVinculoLinha(notificar: true);
+                    e.Handled = true;
+                    return;
+                }
+
+                if (_isPickingCalendarTarget)
                 {
                     CancelarModoVinculoCalendario();
                     e.Handled = true;
                     return;
                 }
 
-                if (e.Key == Key.Escape && _modoConexaoAtivo)
+                if (_modoConexaoAtivo)
                 {
+                    CancelarModoVinculoLinha();
                     CancelarModoConexao();
                     e.Handled = true;
                     return;
                 }
+            }
 
-                if ((e.KeyModifiers & KeyModifiers.Control) != 0 && !ModalOverlay.IsVisible)
-                {
-                    var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
-                    if (focused is not TextBox)
-                    {
-                        if (e.Key == Key.Z)
-                        {
-                            DesfazerWorkspace();
-                            e.Handled = true;
-                            return;
-                        }
-                        if (e.Key == Key.Y)
-                        {
-                            RefazerWorkspace();
-                            e.Handled = true;
-                            return;
-                        }
-                    }
-                }
+            bool isCtrl = (e.KeyModifiers & KeyModifiers.Control) != 0;
+            bool isShift = (e.KeyModifiers & KeyModifiers.Shift) != 0;
 
-                if (e.Key == Key.Delete && !ModalOverlay.IsVisible)
+            if (isCtrl && !ModalOverlay.IsVisible)
+            {
+                var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
+
+                if (e.Key == Key.Z && !isShift)
                 {
-                    var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
-                    if (focused is TextBox)
+                    if (focused is TextBox tb && tb.CanUndo)
                     {
+                        // Deixa o TextBox nativo processar o Ctrl+Z de texto
                         return;
                     }
 
-                    var ativa = ZIndexManager.ActiveWindow;
-                    if (ativa != null && _ativasJanelas.Contains(ativa))
-                    {
-                        RegistrarEstadoUndo();
-                        ativa.Fechar();
-                        e.Handled = true;
-                    }
+                    DesfazerWorkspace();
+                    e.Handled = true;
+                    return;
                 }
-            };
+
+                if (e.Key == Key.Y || (e.Key == Key.Z && isShift))
+                {
+                    if (focused is TextBox tb && tb.CanRedo)
+                    {
+                        tb.Redo();
+                        e.Handled = true;
+                        return;
+                    }
+
+                    RefazerWorkspace();
+                    e.Handled = true;
+                    return;
+                }
+            }
+
+            if (e.Key == Key.Delete && !ModalOverlay.IsVisible)
+            {
+                var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
+                if (focused is TextBox)
+                {
+                    return;
+                }
+
+                var ativa = ZIndexManager.ActiveWindow;
+                if (ativa != null && _ativasJanelas.Contains(ativa))
+                {
+                    RegistrarEstadoUndo();
+                    ativa.Fechar();
+                    e.Handled = true;
+                }
+            }
         }
 
         private void WorkspaceZoomIn_Click(object? sender, RoutedEventArgs e)
@@ -604,7 +959,8 @@ namespace AvaloniaMdiApp
         {
             if (_modoConexaoAtivo)
             {
-                CancelarModoConexao();
+                CancelarModoVinculoLinha();
+            CancelarModoConexao();
                 return;
             }
 
@@ -641,6 +997,12 @@ namespace AvaloniaMdiApp
 
         private void AoClicarEmJanela(DraggableWindow janelaClicada)
         {
+            if (_modoVinculoLinhaAtivo)
+            {
+                ConcluirVinculoLinhaComJanela(janelaClicada);
+                return;
+            }
+
             if (_isPickingCalendarTarget)
             {
                 if (janelaClicada.WindowType != "checklist")
@@ -670,7 +1032,10 @@ namespace AvaloniaMdiApp
 
         private void ConcluirConexaoEntreJanelas(DraggableWindow origem, DraggableWindow destino)
         {
+            CancelarModoVinculoLinha();
             CancelarModoConexao();
+
+            RegistrarEstadoUndo();
 
             // Se a janela de origem possui uma cor definida, herda para a linha e para a janela de destino
             string corOrigem = origem.ObterCorEfetiva();
@@ -725,6 +1090,7 @@ namespace AvaloniaMdiApp
             visual.OnColorChanged += (_) => SalvarTodosWorkspacesNoDisco();
             visual.OnRemoveRequested += (conn) =>
             {
+                RegistrarEstadoUndo();
                 conn.RemoverDoCanvas();
                 _conexoesAtivas.Remove(conn);
                 SalvarTodosWorkspacesNoDisco();
@@ -807,6 +1173,8 @@ namespace AvaloniaMdiApp
                 return;
             }
 
+            RegistrarEstadoUndo();
+
             foreach (var conn in _conexoesAtivas.ToList())
             {
                 conn.RemoverDoCanvas();
@@ -831,6 +1199,127 @@ namespace AvaloniaMdiApp
                 conn.RemoverDoCanvas();
                 _conexoesAtivas.Remove(conn);
             }
+        }
+
+        // ==================== MENU CIRCULAR / RADIAL (THE SIMS 4) ====================
+
+        private void AtualizarSuspensaoNavegadores()
+        {
+            bool suspenso = ModalOverlay.IsVisible 
+                || RadialMenuOverlay.IsVisible
+                || (_settingsWindow != null && _settingsWindow.IsVisible)
+                || (_notificationHistoryModal != null && _notificationHistoryModal.IsVisible)
+                || (_tutorialModal != null && _tutorialModal.IsVisible);
+
+            foreach (var win in _ativasJanelas)
+            {
+                win.SetModalOverlaySuspended(suspenso);
+            }
+        }
+
+        private void AbrirMenuCircularJanela(DraggableWindow win, Control anchor)
+        {
+            FecharMenuCircular();
+
+            Point anchorCenterLocal = new Point(anchor.Bounds.Width / 2.0, anchor.Bounds.Height / 2.0);
+            Point? ptNoCanvas = anchor.TranslatePoint(anchorCenterLocal, RadialMenuCanvas);
+
+            double overlayW = RadialMenuCanvas.Bounds.Width > 0 ? RadialMenuCanvas.Bounds.Width : WorkspaceViewport.Bounds.Width;
+            double overlayH = RadialMenuCanvas.Bounds.Height > 0 ? RadialMenuCanvas.Bounds.Height : WorkspaceViewport.Bounds.Height;
+            if (overlayW <= 0) overlayW = Bounds.Width > 0 ? Bounds.Width - 120 : 800;
+            if (overlayH <= 0) overlayH = Bounds.Height > 0 ? Bounds.Height - 120 : 600;
+
+            Point center = ptNoCanvas ?? new Point(overlayW / 2.0, overlayH / 2.0);
+
+            // Raio máximo do submenu: rx = 185px, ry = 125px.
+            // Com a largura média do botão (~130px -> metade ~65px) e respiro (~15px):
+            // Margem horizontal segura = 265px
+            // Margem vertical segura = 155px
+            double marginX = 265;
+            double marginY = 155;
+
+            double clampedX = overlayW >= marginX * 2
+                ? Math.Clamp(center.X, marginX, overlayW - marginX)
+                : overlayW / 2.0;
+
+            double clampedY = overlayH >= marginY * 2
+                ? Math.Clamp(center.Y, marginY, overlayH - marginY)
+                : overlayH / 2.0;
+
+            Point clampedCenter = new Point(clampedX, clampedY);
+
+            var radialMenu = new RadialWindowMenu(win, clampedCenter);
+            radialMenu.OnClosed += () => FecharMenuCircular();
+
+            RadialMenuCanvas.Children.Add(radialMenu);
+            RadialMenuOverlay.IsVisible = true;
+            AtualizarSuspensaoNavegadores();
+        }
+
+        private void FecharMenuCircular()
+        {
+            if (RadialMenuOverlay.IsVisible || RadialMenuCanvas.Children.Count > 0)
+            {
+                RadialMenuOverlay.IsVisible = false;
+                RadialMenuCanvas.Children.Clear();
+                AtualizarSuspensaoNavegadores();
+            }
+        }
+
+        private void PropagarCorParaConectadas(DraggableWindow janelaOrigem, string novaCorHex)
+        {
+            RegistrarEstadoUndo();
+
+            var visitadas = new HashSet<DraggableWindow>();
+            var fila = new Queue<DraggableWindow>();
+            var conexoesAfetadas = new HashSet<FlowchartConnectionVisual>();
+
+            visitadas.Add(janelaOrigem);
+            fila.Enqueue(janelaOrigem);
+
+            while (fila.Count > 0)
+            {
+                var atual = fila.Dequeue();
+
+                foreach (var conn in _conexoesAtivas)
+                {
+                    DraggableWindow? vizinha = null;
+                    if (conn.FromWindow == atual) vizinha = conn.ToWindow;
+                    else if (conn.ToWindow == atual) vizinha = conn.FromWindow;
+
+                    if (vizinha != null)
+                    {
+                        conexoesAfetadas.Add(conn);
+                        if (!visitadas.Contains(vizinha))
+                        {
+                            visitadas.Add(vizinha);
+                            fila.Enqueue(vizinha);
+                        }
+                    }
+                }
+            }
+
+            if (visitadas.Count <= 1 && conexoesAfetadas.Count == 0)
+                return;
+
+            string corLinha = !string.IsNullOrWhiteSpace(novaCorHex)
+                ? novaCorHex
+                : (string.IsNullOrWhiteSpace(_settings.DefaultFlowchartLineColor) ? "#3B82F6" : _settings.DefaultFlowchartLineColor);
+
+            foreach (var conn in conexoesAfetadas)
+            {
+                conn.DefinirCor(corLinha);
+            }
+
+            foreach (var win in visitadas)
+            {
+                if (win != janelaOrigem)
+                {
+                    win.DefinirCorJanela(novaCorHex ?? string.Empty, notificarMudanca: false);
+                }
+            }
+
+            SalvarTodosWorkspacesNoDisco();
         }
 
         // ==================== CONFIRMAÇÃO DE SAÍDA E MODAIS ====================
@@ -1053,7 +1542,7 @@ namespace AvaloniaMdiApp
             LeftSidebar.BorderBrush = borderBrush;
             BtnToggleSidebar.Foreground = textPrimary;
 
-            foreach (var sideBtn in new[] { BtnSideNotas, BtnSideListas, BtnSidePlanilhas, BtnSideGaleria, BtnSideNavegador, BtnSideFluxograma, BtnSideSalvarTudo, BtnSideExtrair, BtnSidePreferencias })
+            foreach (var sideBtn in new[] { BtnSideNotas, BtnSideListas, BtnSidePlanilhas, BtnSideGaleria, BtnSideNavegador, BtnSideFluxograma, BtnSideSalvarTudo, BtnSideExtrair, BtnSidePreferencias, BtnSideAjuda })
             {
                 if (sideBtn != null)
                 {
@@ -1061,6 +1550,16 @@ namespace AvaloniaMdiApp
                 }
             }
             AtualizarTemaCalendario();
+
+            if (BtnRightCalendario != null)
+            {
+                BtnRightCalendario.Foreground = textPrimary;
+            }
+            if (RightCalendarBar != null)
+            {
+                RightCalendarBar.Background = barBg;
+                RightCalendarBar.BorderBrush = borderBrush;
+            }
 
             BtnAddWorkspace.Background = btnBg;
             BtnAddWorkspace.Foreground = textPrimary;
@@ -1152,6 +1651,7 @@ namespace AvaloniaMdiApp
 
             string nomeAnterior = atual.Name;
 
+            CancelarModoVinculoLinha();
             CancelarModoConexao();
             SincronizarWorkspaceAtualEmMemoria();
             LimparJanelasVisuaisDoCanvas();
@@ -1179,6 +1679,7 @@ namespace AvaloniaMdiApp
 
         private void LimparJanelasVisuaisDoCanvas()
         {
+            FecharMenuCircular();
             _trocandoWorkspace = true;
             ZIndexManager.ClearActive();
 
@@ -1640,24 +2141,96 @@ namespace AvaloniaMdiApp
             _notificationHistoryModal = new NotificationHistoryModal(_isDarkMode);
             _notificationHistoryModal.OnClosed += () =>
             {
-                _notificationHistoryModal = null;
+                if (_notificationHistoryModal != null)
+                {
+                    MainRootGrid.Children.Remove(_notificationHistoryModal);
+                    _notificationHistoryModal = null;
+                }
+                AtualizarSuspensaoNavegadores();
             };
 
             MainRootGrid.Children.Add(_notificationHistoryModal);
+            AtualizarSuspensaoNavegadores();
+        }
+
+        private void AbrirAjudaTutorial_Click(object? sender, RoutedEventArgs e)
+        {
+            AbrirAjudaTutorial();
+        }
+
+        private void AbrirAjudaTutorial()
+        {
+            if (_tutorialModal != null)
+            {
+                MainRootGrid.Children.Remove(_tutorialModal);
+                _tutorialModal = null;
+            }
+
+            _tutorialModal = new InteractiveTutorialModal(_isDarkMode, this);
+            _tutorialModal.OnClosed += () =>
+            {
+                if (_tutorialModal != null)
+                {
+                    MainRootGrid.Children.Remove(_tutorialModal);
+                    _tutorialModal = null;
+                }
+                AtualizarSuspensaoNavegadores();
+            };
+
+            MainRootGrid.Children.Add(_tutorialModal);
+            AtualizarSuspensaoNavegadores();
+        }
+
+        public Control ObterBotaoNotas() => BtnSideNotas;
+        public Control ObterBotaoListas() => BtnSideListas;
+        public Control ObterBotaoFluxograma() => BtnSideFluxograma;
+
+        public DraggableWindow GarantirJanelaParaDemonstracao(string tipo = "notepad")
+        {
+            var existente = _ativasJanelas.FirstOrDefault(w => w.WindowType == tipo) ?? _ativasJanelas.FirstOrDefault();
+            if (existente != null)
+            {
+                ZIndexManager.BringToFront(existente);
+                return existente;
+            }
+
+            double f = ObterFatorTamanhoWidget();
+            if (tipo == "checklist")
+            {
+                var itens = new List<ChecklistItemData>
+                {
+                    new ChecklistItemData { Text = "Clique no ícone 🔗 ao lado para vincular a uma janela", ColorHex = "#38BDF8" }
+                };
+                return CriarJanelaInterna("Lista de Demonstração", 140, 90, Math.Round(380 * f), Math.Round(290 * f), "checklist", initialChecklist: itens);
+            }
+            else if (tipo == "shape_rect")
+            {
+                return CriarJanelaInterna("Etapa 1 (Início)", 140, 90, Math.Round(200 * f), Math.Round(120 * f), "shape_rect");
+            }
+            else
+            {
+                return CriarJanelaInterna("Bloco de Demonstração", 140, 90, Math.Round(360 * f), Math.Round(260 * f), "notepad", "Exemplo de anotação para demonstração!");
+            }
+        }
+
+        public (DraggableWindow win1, DraggableWindow win2) GarantirDuasJanelasConectadasParaDemonstracao()
+        {
+            double f = ObterFatorTamanhoWidget();
+            var win1 = _ativasJanelas.Count > 0 ? _ativasJanelas[0] : CriarJanelaInterna("Etapa A", 120, 90, Math.Round(200 * f), Math.Round(120 * f), "shape_rect");
+            var win2 = _ativasJanelas.Count > 1 ? _ativasJanelas[1] : CriarJanelaInterna("Etapa B", 450, 90, Math.Round(200 * f), Math.Round(120 * f), "shape_diamond");
+
+            CriarOuFocarConexaoFluxograma(win1, win2, mostrarToast: false, colorHex: "#38BDF8");
+            return (win1, win2);
         }
 
         private void MenuModulo_SubmenuOpened(object? sender, RoutedEventArgs e)
         {
-            var ws = ObterWorkspaceAtual();
-
-            PreencherSubmenuSalvos(ws, new[] { "gallery", "image", "video" }, MenuGaleriaSalvas);
-            PreencherSubmenuSalvos(ws, new[] { "browser" }, MenuNavegadorSalvos);
         }
 
         private void PreencherSubmenuSalvos(
             WorkspaceData ws,
             string[]? filtroTipos,
-            MenuItem menuSalvas)
+            MenuItem? menuSalvas)
         {
             if (menuSalvas == null) return;
             IEnumerable<WindowStateData> query = ws.SavedCatalog;
@@ -1957,8 +2530,166 @@ namespace AvaloniaMdiApp
             }
         }
 
+        private void IniciarVinculoLinhaComMouse(DraggableWindow checklistWin, ChecklistRowState row)
+        {
+            CancelarModoVinculoLinha();
+            CancelarModoConexao();
+            CancelarModoVinculoCalendario();
+
+            var outrasJanelas = _ativasJanelas.Where(w => w != checklistWin).ToList();
+            if (outrasJanelas.Count == 0)
+            {
+                if (_settings.EnableNotifications)
+                {
+                    ToastNotification.Mostrar(Workspace, "Abra ou crie outra janela no Workspace para vinculá-la a este item.", "info");
+                }
+                return;
+            }
+
+            _modoVinculoLinhaAtivo = true;
+            _checklistWinOrigemVinculo = checklistWin;
+            _linhaOrigemVinculo = row;
+
+            GarantirLinhaPreviewNoCanvas();
+            if (_previewConnectionPath != null)
+            {
+                string corBase = !string.IsNullOrWhiteSpace(row.ColorHex)
+                    ? row.ColorHex
+                    : checklistWin.ObterCorEfetiva();
+                _previewConnectionPath.Stroke = !string.IsNullOrWhiteSpace(corBase)
+                    ? new SolidColorBrush(Color.Parse(corBase))
+                    : ThemePalette.AccentLight;
+            }
+
+            Workspace.Cursor = new Cursor(StandardCursorType.Cross);
+
+            string nomeItem = !string.IsNullOrWhiteSpace(row.Input?.Text) ? $" \"{row.Input.Text}\"" : "";
+            if (_settings.EnableNotifications)
+            {
+                ToastNotification.Mostrar(Workspace, $"🔗 Vincular item{nomeItem}: aponte e clique na janela desejada no Workspace (ESC para cancelar)", "info");
+            }
+        }
+
+        private void AtualizarLinhaPreviewVinculo(Point mousePos)
+        {
+            if (_checklistWinOrigemVinculo == null || _linhaOrigemVinculo == null || _previewConnectionPath == null) return;
+
+            Point start;
+            if (_linhaOrigemVinculo.BtnLinkWindow != null)
+            {
+                var pt = _linhaOrigemVinculo.BtnLinkWindow.TranslatePoint(
+                    new Point(_linhaOrigemVinculo.BtnLinkWindow.Bounds.Width / 2, _linhaOrigemVinculo.BtnLinkWindow.Bounds.Height / 2),
+                    Workspace);
+                start = pt ?? ObterCentroJanelaWorkspace(_checklistWinOrigemVinculo);
+            }
+            else
+            {
+                start = ObterCentroJanelaWorkspace(_checklistWinOrigemVinculo);
+            }
+
+            var geo = new StreamGeometry();
+            using (var ctx = geo.Open())
+            {
+                ctx.BeginFigure(start, false);
+                ctx.LineTo(mousePos);
+            }
+            _previewConnectionPath.Data = geo;
+        }
+
+        private Point ObterCentroJanelaWorkspace(DraggableWindow win)
+        {
+            double x = Canvas.GetLeft(win);
+            double y = Canvas.GetTop(win);
+            return new Point(
+                (double.IsNaN(x) ? 0 : x) + win.Width / 2,
+                (double.IsNaN(y) ? 0 : y) + win.Height / 2);
+        }
+
+        private void ConcluirVinculoLinhaComJanela(DraggableWindow destino)
+        {
+            if (_checklistWinOrigemVinculo == null || _linhaOrigemVinculo == null)
+            {
+                CancelarModoVinculoLinha();
+                return;
+            }
+
+            if (destino == _checklistWinOrigemVinculo)
+            {
+                if (_settings.EnableNotifications)
+                {
+                    ToastNotification.Mostrar(Workspace, "Selecione uma janela diferente para vincular este item.", "info");
+                }
+                return;
+            }
+
+            var checklistWin = _checklistWinOrigemVinculo;
+            var row = _linhaOrigemVinculo;
+            CancelarModoVinculoLinha();
+
+            RegistrarEstadoUndo();
+
+            row.LinkedWindowId = destino.WindowId;
+            checklistWin.AtualizarIndicadorVinculoLinha(row);
+
+            string corBase = !string.IsNullOrWhiteSpace(row.ColorHex)
+                ? row.ColorHex
+                : checklistWin.ObterCorEfetiva();
+            string? corLinha = !string.IsNullOrWhiteSpace(corBase) ? corBase : null;
+
+            if (!string.IsNullOrWhiteSpace(corBase) && string.IsNullOrWhiteSpace(destino.ObterCorEfetiva()))
+            {
+                destino.DefinirCorJanela(corBase);
+            }
+
+            CriarOuFocarConexaoFluxograma(checklistWin, destino, colorHex: corLinha);
+            SalvarTodosWorkspacesNoDisco();
+
+            if (_settings.EnableNotifications)
+            {
+                string nomeItem = !string.IsNullOrWhiteSpace(row.Input?.Text) ? $" \"{row.Input.Text}\"" : "Item";
+                ToastNotification.Mostrar(Workspace, $"✓ {nomeItem} vinculado à janela \"{destino.WindowTitle}\" com sucesso!", "success");
+            }
+        }
+
+        private void CancelarModoVinculoLinha(bool notificar = false)
+        {
+            _modoVinculoLinhaAtivo = false;
+            _checklistWinOrigemVinculo = null;
+            _linhaOrigemVinculo = null;
+            Workspace.Cursor = Cursor.Default;
+
+            if (_previewConnectionPath != null)
+            {
+                Workspace.Children.Remove(_previewConnectionPath);
+                _previewConnectionPath.Data = null;
+            }
+
+            if (notificar && _settings.EnableNotifications)
+            {
+                ToastNotification.Mostrar(Workspace, "Seleção de vínculo cancelada.", "info");
+            }
+        }
+
         private void VincularOuFocarJanelaDaLinha(DraggableWindow checklistWin, ChecklistRowState row)
         {
+            // Se ainda não está vinculado a nenhuma janela, entra diretamente no modo de seleção com o mouse!
+            if (string.IsNullOrWhiteSpace(row.LinkedWindowId))
+            {
+                IniciarVinculoLinhaComMouse(checklistWin, row);
+                return;
+            }
+
+            // Se a janela vinculada não existe mais no workspace atual, permite selecionar nova com o mouse
+            var target = _ativasJanelas.FirstOrDefault(w => w.WindowId == row.LinkedWindowId);
+            if (target == null)
+            {
+                row.LinkedWindowId = string.Empty;
+                checklistWin.AtualizarIndicadorVinculoLinha(row);
+                IniciarVinculoLinhaComMouse(checklistWin, row);
+                return;
+            }
+
+            // Se já tem vínculo ativo, exibe menu rápido e direto
             var menu = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedRight };
 
             string corBase = !string.IsNullOrWhiteSpace(row.ColorHex)
@@ -1966,59 +2697,38 @@ namespace AvaloniaMdiApp
                 : checklistWin.ObterCorEfetiva();
             string? corLinha = !string.IsNullOrWhiteSpace(corBase) ? corBase : null;
 
-            if (!string.IsNullOrWhiteSpace(row.LinkedWindowId))
+            var miGo = new MenuItem { Header = $"Focar: {target.WindowTitle}" };
+            miGo.Click += (_, _) =>
             {
-                var target = _ativasJanelas.FirstOrDefault(w => w.WindowId == row.LinkedWindowId);
-                if (target != null)
+                if (target.IsMinimized) target.ToggleMinimize();
+                ZIndexManager.BringToFront(target);
+                if (!string.IsNullOrWhiteSpace(corBase) && string.IsNullOrWhiteSpace(target.ObterCorEfetiva()))
                 {
-                    var miGo = new MenuItem { Header = $"Focar: {target.WindowTitle}" };
-                    miGo.Click += (_, _) =>
-                    {
-                        if (target.IsMinimized) target.ToggleMinimize();
-                        ZIndexManager.BringToFront(target);
-                        if (!string.IsNullOrWhiteSpace(corBase) && string.IsNullOrWhiteSpace(target.ObterCorEfetiva()))
-                        {
-                            target.DefinirCorJanela(corBase);
-                        }
-                        CriarOuFocarConexaoFluxograma(checklistWin, target, colorHex: corLinha);
-                    };
-                    menu.Items.Add(miGo);
+                    target.DefinirCorJanela(corBase);
                 }
+                CriarOuFocarConexaoFluxograma(checklistWin, target, colorHex: corLinha);
+            };
+            menu.Items.Add(miGo);
 
-                var miUnlink = new MenuItem { Header = "Remover vínculo" };
-                miUnlink.Click += (_, _) =>
-                {
-                    row.LinkedWindowId = string.Empty;
-                    checklistWin.AtualizarIndicadorVinculoLinha(row);
-                };
-                menu.Items.Add(miUnlink);
-                menu.Items.Add(new Separator());
-            }
+            var miChange = new MenuItem { Header = "Alterar vínculo (selecionar com o mouse)..." };
+            miChange.Click += (_, _) =>
+            {
+                IniciarVinculoLinhaComMouse(checklistWin, row);
+            };
+            menu.Items.Add(miChange);
 
-            var outrasJanelas = _ativasJanelas.Where(w => w != checklistWin).ToList();
-            if (outrasJanelas.Count == 0)
+            var miUnlink = new MenuItem { Header = "Remover vínculo" };
+            miUnlink.Click += (_, _) =>
             {
-                menu.Items.Add(new MenuItem { Header = "Nenhuma outra janela aberta", IsEnabled = false });
-            }
-            else
-            {
-                foreach (var win in outrasJanelas)
+                row.LinkedWindowId = string.Empty;
+                checklistWin.AtualizarIndicadorVinculoLinha(row);
+                SalvarTodosWorkspacesNoDisco();
+                if (_settings.EnableNotifications)
                 {
-                    var targetWin = win;
-                    var miWin = new MenuItem { Header = $"Vincular a: {targetWin.WindowTitle}" };
-                    miWin.Click += (_, _) =>
-                    {
-                        row.LinkedWindowId = targetWin.WindowId;
-                        checklistWin.AtualizarIndicadorVinculoLinha(row);
-                        if (!string.IsNullOrWhiteSpace(corBase) && string.IsNullOrWhiteSpace(targetWin.ObterCorEfetiva()))
-                        {
-                            targetWin.DefinirCorJanela(corBase);
-                        }
-                        CriarOuFocarConexaoFluxograma(checklistWin, targetWin, colorHex: corLinha);
-                    };
-                    menu.Items.Add(miWin);
+                    ToastNotification.Mostrar(Workspace, "Vínculo removido.", "info");
                 }
-            }
+            };
+            menu.Items.Add(miUnlink);
 
             if (row.BtnLinkWindow != null)
             {
@@ -2911,6 +3621,7 @@ namespace AvaloniaMdiApp
             if (_settingsWindow != null)
             {
                 _settingsWindow.IsVisible = true;
+                AtualizarSuspensaoNavegadores();
                 return;
             }
 
@@ -3120,9 +3831,11 @@ namespace AvaloniaMdiApp
                     MainRootGrid.Children.Remove(_settingsWindow);
                     _settingsWindow = null;
                 }
+                AtualizarSuspensaoNavegadores();
             };
 
             MainRootGrid.Children.Add(_settingsWindow);
+            AtualizarSuspensaoNavegadores();
         }
 
         private DraggableWindow CriarJanelaInterna(
@@ -3174,9 +3887,18 @@ namespace AvaloniaMdiApp
                 criticalityLevel,
                 initialRichLines);
 
+            if (!_trocandoWorkspace && !_isRestoringUndoRedo)
+            {
+                RegistrarEstadoUndo();
+            }
+
             _ativasJanelas.Add(win);
             win.OnClosed += () =>
             {
+                if (!_trocandoWorkspace && !_isRestoringUndoRedo)
+                {
+                    RegistrarEstadoUndo();
+                }
                 RemoverConexoesDaJanela(win);
                 if (!_trocandoWorkspace)
                 {
@@ -3194,12 +3916,39 @@ namespace AvaloniaMdiApp
                     AoSelecionarAlvoParaCalendario(checklistWin, row.RowId);
                 }
             };
-            win.OnInteractionCompleted += (_) => RegistrarEstadoUndo();
+            win.OnInteractionStarted += (_) =>
+            {
+                _snapshotBeforeInteraction = CapturarSnapshotWorkspaceJson();
+            };
+            win.OnInteractionCompleted += (_) =>
+            {
+                if (!string.IsNullOrEmpty(_snapshotBeforeInteraction))
+                {
+                    string current = CapturarSnapshotWorkspaceJson();
+                    if (current != _snapshotBeforeInteraction)
+                    {
+                        if (_undoStack.Count == 0 || _undoStack.Peek() != _snapshotBeforeInteraction)
+                        {
+                            _undoStack.Push(_snapshotBeforeInteraction);
+                            if (_undoStack.Count > 35)
+                            {
+                                var trimmed = _undoStack.Take(35).Reverse().ToList();
+                                _undoStack.Clear();
+                                foreach (var s in trimmed) _undoStack.Push(s);
+                            }
+                        }
+                        _redoStack.Clear();
+                    }
+                    _snapshotBeforeInteraction = null;
+                }
+            };
             win.OnRequestOpenRowNotepad += (checklistWin, row) => AbrirOuFocarNotaDaLinha(checklistWin, row);
             win.OnRequestLinkRowWindow += (checklistWin, row) => VincularOuFocarJanelaDaLinha(checklistWin, row);
             win.OnRequestOpenGalleryImage += (galleryWin, card) => AbrirOuFocarImagemDaGaleria(galleryWin, card);
             win.OnRequestSetWorkspaceBackground += (filePath) => AlternarFundoWorkspace(filePath);
             win.OnSaveRequested += (janela) => SalvarJanelaNoCatalogo(janela, mostrarToast: true);
+            win.OnRequestRadialMenu += (janelaAlvo, anchor) => AbrirMenuCircularJanela(janelaAlvo, anchor);
+            win.OnColorChanged += (janelaAlvo, cor) => PropagarCorParaConectadas(janelaAlvo, cor);
 
             AppTaskBar.RegistrarJanela(win, title);
             Workspace.Children.Add(win);
