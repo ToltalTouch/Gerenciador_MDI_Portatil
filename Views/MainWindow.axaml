@@ -52,17 +52,37 @@
               <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" MaxWidth="520">
                 <StackPanel Name="WorkspaceTabsPanel" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center"/>
               </ScrollViewer>
-              <Button Name="BtnAddWorkspace"
+              <Button Name="BtnWorkspacesMenu"
                       Height="26"
                       Padding="8,0"
                       CornerRadius="5"
                       HorizontalContentAlignment="Center"
                       VerticalContentAlignment="Center"
-                      ToolTip.Tip="Criar novo Workspace"
-                      Click="NovoWorkspace_Click">
+                      ToolTip.Tip="Gerenciar Workspaces (Criar, Abrir ou Excluir)">
+                <Button.Flyout>
+                  <MenuFlyout Placement="BottomEdgeAlignedRight">
+                    <MenuItem Header="Criar Novo Workspace" Click="NovoWorkspace_Click">
+                      <MenuItem.Icon>
+                        <PathIcon Data="{x:Static local:AppIcons.Plus}" Width="12" Height="12" Foreground="#38BDF8"/>
+                      </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Name="MenuAbrirWorkspace" Header="Abrir Workspace...">
+                      <MenuItem.Icon>
+                        <PathIcon Data="{x:Static local:AppIcons.Folder}" Width="12" Height="12" Foreground="#CBD5E1"/>
+                      </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator/>
+                    <MenuItem Name="MenuExcluirWorkspace" Header="Excluir Workspace Permanentemente...">
+                      <MenuItem.Icon>
+                        <PathIcon Data="{x:Static local:AppIcons.Trash}" Width="12" Height="12" Foreground="#EF4444"/>
+                      </MenuItem.Icon>
+                    </MenuItem>
+                  </MenuFlyout>
+                </Button.Flyout>
                 <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
-                  <PathIcon Data="{x:Static local:AppIcons.Plus}" Width="10" Height="10" Foreground="#CBD5E1"/>
-                  <TextBlock Text="Novo Workspace" FontSize="11" FontWeight="SemiBold" Foreground="#CBD5E1" VerticalAlignment="Center"/>
+                  <PathIcon Data="{x:Static local:AppIcons.Workspace}" Width="11" Height="11" Foreground="#CBD5E1"/>
+                  <TextBlock Text="Workspaces" FontSize="11" FontWeight="SemiBold" Foreground="#CBD5E1" VerticalAlignment="Center"/>
+                  <PathIcon Data="{x:Static local:AppIcons.ChevronDown}" Width="9" Height="9" Foreground="#94A3B8"/>
                 </StackPanel>
               </Button>
             </StackPanel>

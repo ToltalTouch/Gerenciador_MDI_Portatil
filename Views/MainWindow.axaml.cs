@@ -133,6 +133,17 @@ namespace AvaloniaMdiApp
                 AplicarTamanhoJanelaPrincipal(_settings.MainWindowSizePreset);
                 InicializarFiltroCores();
                 AtualizarAbasWorkspaces();
+
+                var menuAbrir = this.FindControl<MenuItem>("MenuAbrirWorkspace");
+                if (menuAbrir != null)
+                {
+                    menuAbrir.SubmenuOpened += (s, e) => AtualizarMenuSuperiorWorkspaces();
+                }
+                var menuExcluir = this.FindControl<MenuItem>("MenuExcluirWorkspace");
+                if (menuExcluir != null)
+                {
+                    menuExcluir.SubmenuOpened += (s, e) => AtualizarMenuSuperiorWorkspaces();
+                }
                 CarregarJanelasDoWorkspace(wsAtual);
                 AplicarZoomWorkspace(_workspaceZoom);
 
@@ -1334,8 +1345,10 @@ namespace AvaloniaMdiApp
         private WorkspaceData ObterWorkspaceAtual()
         {
             SettingsManager.GarantirWorkspaces(_settings);
-            var ws = _settings.Workspaces.FirstOrDefault(w => w.Id == _settings.ActiveWorkspaceId)
+            var ws = _settings.Workspaces.FirstOrDefault(w => w.Id == _settings.ActiveWorkspaceId && !w.IsClosed)
+                     ?? _settings.Workspaces.FirstOrDefault(w => !w.IsClosed)
                      ?? _settings.Workspaces[0];
+            ws.IsClosed = false;
             _settings.ActiveWorkspaceId = ws.Id;
             return ws;
         }
@@ -1592,8 +1605,11 @@ namespace AvaloniaMdiApp
                 RightCalendarBar.BorderBrush = borderBrush;
             }
 
-            BtnAddWorkspace.Background = btnBg;
-            BtnAddWorkspace.Foreground = textPrimary;
+            if (BtnWorkspacesMenu != null)
+            {
+                BtnWorkspacesMenu.Background = btnBg;
+                BtnWorkspacesMenu.Foreground = textPrimary;
+            }
 
             BottomBar.Background = barBg;
             BottomBar.BorderBrush = borderBrush;
@@ -1632,7 +1648,14 @@ namespace AvaloniaMdiApp
             WorkspaceTabsPanel.Children.Clear();
             var wsAtual = ObterWorkspaceAtual();
 
-            foreach (var ws in _settings.Workspaces)
+            var abertos = _settings.Workspaces.Where(w => !w.IsClosed).ToList();
+            if (abertos.Count == 0)
+            {
+                wsAtual.IsClosed = false;
+                abertos.Add(wsAtual);
+            }
+
+            foreach (var ws in abertos)
             {
                 bool ativo = ws.Id == wsAtual.Id;
                 var btn = new Button
@@ -1663,7 +1686,7 @@ namespace AvaloniaMdiApp
                         : (_isDarkMode ? ThemePalette.DarkBorder : ThemePalette.LightBorder)
                 };
                 ToolTip.SetTip(btn, ativo
-                    ? $"Workspace ativo: {ws.Name} (Clique c/ botão direito para mudar nome ou fechar)"
+                    ? $"Workspace ativo: {ws.Name} (Clique c/ botão direito para mudar nome, fechar ou excluir)"
                     : $"{ws.Name} (Hibernado. Clique para ativar ou botão direito para opções)");
 
                 btn.ContextMenu = CriarMenuContextoWorkspace(ws);
@@ -1674,6 +1697,7 @@ namespace AvaloniaMdiApp
             }
 
             AtualizarMenuContextoCanvas();
+            AtualizarMenuSuperiorWorkspaces();
         }
 
         private void AlternarParaWorkspace(string workspaceId)
@@ -1888,24 +1912,6 @@ namespace AvaloniaMdiApp
             var menu = new ContextMenu();
             bool ativo = ws.Id == _settings.ActiveWorkspaceId;
 
-            if (!ativo)
-            {
-                var itemAtivar = new MenuItem
-                {
-                    Header = "Ativar este Workspace",
-                    Icon = new PathIcon
-                    {
-                        Data = AppIcons.Workspace,
-                        Width = 13,
-                        Height = 13,
-                        Foreground = ThemePalette.Accent
-                    }
-                };
-                itemAtivar.Click += (s, e) => AlternarParaWorkspace(ws.Id);
-                menu.Items.Add(itemAtivar);
-                menu.Items.Add(new Separator());
-            }
-
             var itemRenomear = new MenuItem
             {
                 Header = "Mudar Nome...",
@@ -1920,9 +1926,23 @@ namespace AvaloniaMdiApp
             itemRenomear.Click += (s, e) => SolicitarRenomearWorkspace(ws);
             menu.Items.Add(itemRenomear);
 
+            var itemFechar = new MenuItem
+            {
+                Header = "Fechar Workspace (Ocultar da Barra)",
+                Icon = new PathIcon
+                {
+                    Data = AppIcons.Exit,
+                    Width = 13,
+                    Height = 13,
+                    Foreground = ThemePalette.IconMutedGray
+                }
+            };
+            itemFechar.Click += (s, e) => SolicitarFecharWorkspace(ws);
+            menu.Items.Add(itemFechar);
+
             var itemExcluir = new MenuItem
             {
-                Header = "Fechar Workspace",
+                Header = "Excluir Workspace Permanentemente...",
                 Icon = new PathIcon
                 {
                     Data = AppIcons.Trash,
@@ -1987,9 +2007,23 @@ namespace AvaloniaMdiApp
             itemRenomear.Click += (s, e) => SolicitarRenomearWorkspace(ObterWorkspaceAtual());
             menu.Items.Add(itemRenomear);
 
+            var itemFechar = new MenuItem
+            {
+                Header = $"Fechar \"{wsAtual.Name}\" (Ocultar da Barra)",
+                Icon = new PathIcon
+                {
+                    Data = AppIcons.Exit,
+                    Width = 13,
+                    Height = 13,
+                    Foreground = ThemePalette.IconMutedGray
+                }
+            };
+            itemFechar.Click += (s, e) => SolicitarFecharWorkspace(ObterWorkspaceAtual());
+            menu.Items.Add(itemFechar);
+
             var itemExcluir = new MenuItem
             {
-                Header = $"Fechar Workspace \"{wsAtual.Name}\"",
+                Header = $"Excluir \"{wsAtual.Name}\" Permanentemente...",
                 Icon = new PathIcon
                 {
                     Data = AppIcons.Trash,
@@ -2047,6 +2081,131 @@ namespace AvaloniaMdiApp
             return menu;
         }
 
+        private void AtualizarMenuSuperiorWorkspaces()
+        {
+            var menuAbrir = this.FindControl<MenuItem>("MenuAbrirWorkspace");
+            var menuExcluir = this.FindControl<MenuItem>("MenuExcluirWorkspace");
+            if (menuAbrir == null || menuExcluir == null) return;
+
+            // 1. Menu Abrir Workspace...
+            menuAbrir.Items.Clear();
+
+            var fechados = _settings.Workspaces.Where(w => w.IsClosed).ToList();
+            var abertos = _settings.Workspaces.Where(w => !w.IsClosed).ToList();
+
+            if (fechados.Count > 0)
+            {
+                var lblFechados = new MenuItem
+                {
+                    Header = "Workspaces Fechados (Salvos):",
+                    IsEnabled = false,
+                    FontWeight = FontWeight.SemiBold
+                };
+                menuAbrir.Items.Add(lblFechados);
+
+                foreach (var ws in fechados)
+                {
+                    var item = new MenuItem
+                    {
+                        Header = ws.Name,
+                        Icon = new PathIcon
+                        {
+                            Data = AppIcons.Folder,
+                            Width = 13,
+                            Height = 13,
+                            Foreground = ThemePalette.AccentLight
+                        }
+                    };
+                    string idAlvo = ws.Id;
+                    item.Click += (s, e) => ReabrirWorkspace(idAlvo);
+                    menuAbrir.Items.Add(item);
+                }
+
+                if (abertos.Count > 0)
+                {
+                    menuAbrir.Items.Add(new Separator());
+                }
+            }
+
+            if (abertos.Count > 0)
+            {
+                var lblAbertos = new MenuItem
+                {
+                    Header = "Workspaces Abertos na Barra:",
+                    IsEnabled = false,
+                    FontWeight = FontWeight.SemiBold
+                };
+                menuAbrir.Items.Add(lblAbertos);
+
+                foreach (var ws in abertos)
+                {
+                    bool ativo = ws.Id == _settings.ActiveWorkspaceId;
+                    var item = new MenuItem
+                    {
+                        Header = ativo ? $"{ws.Name}  (Ativo no momento)" : ws.Name,
+                        Icon = new PathIcon
+                        {
+                            Data = AppIcons.Workspace,
+                            Width = 13,
+                            Height = 13,
+                            Foreground = ativo ? ThemePalette.Accent : ThemePalette.IconMutedGray
+                        }
+                    };
+                    string idAlvo = ws.Id;
+                    item.Click += (s, e) => AlternarParaWorkspace(idAlvo);
+                    menuAbrir.Items.Add(item);
+                }
+            }
+
+            // 2. Menu Excluir Workspace Permanentemente...
+            menuExcluir.Items.Clear();
+            if (_settings.Workspaces.Count <= 1)
+            {
+                var itemUnico = new MenuItem
+                {
+                    Header = "Mínimo de 1 Workspace necessário (não é possível excluir)",
+                    IsEnabled = false
+                };
+                menuExcluir.Items.Add(itemUnico);
+            }
+            else
+            {
+                foreach (var ws in _settings.Workspaces.ToList())
+                {
+                    var wsRef = ws;
+                    var item = new MenuItem
+                    {
+                        Header = $"Excluir \"{ws.Name}\"",
+                        Icon = new PathIcon
+                        {
+                            Data = AppIcons.Trash,
+                            Width = 13,
+                            Height = 13,
+                            Foreground = ThemePalette.Danger
+                        }
+                    };
+                    item.Click += (s, e) => SolicitarExcluirWorkspace(wsRef);
+                    menuExcluir.Items.Add(item);
+                }
+            }
+        }
+
+        private void ReabrirWorkspace(string workspaceId)
+        {
+            var ws = _settings.Workspaces.FirstOrDefault(w => w.Id == workspaceId);
+            if (ws == null) return;
+
+            ws.IsClosed = false;
+            SalvarTodosWorkspacesNoDisco();
+            AlternarParaWorkspace(ws.Id);
+            AtualizarAbasWorkspaces();
+
+            if (_settings.EnableNotifications)
+            {
+                ToastNotification.Mostrar(Workspace, $"Workspace \"{ws.Name}\" reaberto na barra!", "success");
+            }
+        }
+
         private void SolicitarRenomearWorkspace(WorkspaceData ws)
         {
             ModalTitle.Text = "Mudar Nome do Workspace";
@@ -2084,6 +2243,46 @@ namespace AvaloniaMdiApp
             ModalInputBox.SelectAll();
         }
 
+        private void SolicitarFecharWorkspace(WorkspaceData ws)
+        {
+            var abertos = _settings.Workspaces.Where(w => !w.IsClosed).ToList();
+            if (abertos.Count <= 1 && abertos.Contains(ws))
+            {
+                ToastNotification.Mostrar(Workspace, "É necessário manter pelo menos um Workspace aberto na barra.", "warning");
+                return;
+            }
+
+            bool eraAtivo = ws.Id == _settings.ActiveWorkspaceId;
+            ws.IsClosed = true;
+
+            if (eraAtivo)
+            {
+                CancelarModoVinculoLinha();
+                CancelarModoConexao();
+                SincronizarWorkspaceAtualEmMemoria();
+                LimparJanelasVisuaisDoCanvas();
+                ForcarLimpezaMemoriaHibernacao();
+
+                var proximo = _settings.Workspaces.FirstOrDefault(w => !w.IsClosed) ?? _settings.Workspaces[0];
+                proximo.IsClosed = false;
+                _settings.ActiveWorkspaceId = proximo.Id;
+                _workspaceBgImagePath = proximo.BackgroundImagePath ?? string.Empty;
+                _workspaceZoom = proximo.WorkspaceZoom > 0 ? proximo.WorkspaceZoom : 1.0;
+
+                AplicarFundoWorkspace(_isDarkMode ? ThemePalette.DarkWorkspaceBg : ThemePalette.LightWorkspaceBg);
+                CarregarJanelasDoWorkspace(proximo);
+                AplicarZoomWorkspace(_workspaceZoom);
+            }
+
+            AtualizarAbasWorkspaces();
+            SalvarTodosWorkspacesNoDisco();
+
+            if (_settings.EnableNotifications)
+            {
+                ToastNotification.Mostrar(Workspace, $"Workspace \"{ws.Name}\" fechado da barra. Reabra-o quando quiser no menu Workspaces.", "info");
+            }
+        }
+
         private void SolicitarExcluirWorkspace(WorkspaceData ws)
         {
             if (_settings.Workspaces.Count <= 1)
@@ -2092,8 +2291,8 @@ namespace AvaloniaMdiApp
                 return;
             }
 
-            ModalTitle.Text = "Fechar Workspace";
-            ModalMessage.Text = $"Tem certeza de que deseja fechar e apagar o workspace \"{ws.Name}\" e todas as janelas dele?";
+            ModalTitle.Text = "Excluir Workspace Permanentemente";
+            ModalMessage.Text = $"Tem certeza de que deseja EXCLUIR PERMANENTEMENTE o workspace \"{ws.Name}\"?\n\nTodas as janelas locais serão apagadas e o backup na nuvem (Google Drive) também será removido.";
             ModalInputBox.IsVisible = false;
             if (ModalCheckBox != null) ModalCheckBox.IsVisible = false;
             ModalButtonsPanel.Children.Clear();
@@ -2101,19 +2300,28 @@ namespace AvaloniaMdiApp
             var btnCancelar = CriarBotaoModal("Cancelar", isPrimary: false, isDanger: false);
             btnCancelar.Click += (s, ev) => ModalOverlay.IsVisible = false;
 
-            var btnExcluir = CriarBotaoModal("Fechar Workspace", isPrimary: false, isDanger: true);
+            var btnExcluir = CriarBotaoModal("Excluir Permanentemente", isPrimary: false, isDanger: true);
             btnExcluir.Click += (s, ev) =>
             {
                 ModalOverlay.IsVisible = false;
                 string nomeRemovido = ws.Name;
+                string idRemovido = ws.Id;
 
                 bool eraAtivo = ws.Id == _settings.ActiveWorkspaceId;
                 if (eraAtivo)
                 {
+                    CancelarModoVinculoLinha();
+                    CancelarModoConexao();
                     LimparJanelasVisuaisDoCanvas();
-                    _settings.Workspaces.Remove(ws);
+                    ForcarLimpezaMemoriaHibernacao();
+                }
 
-                    var proximo = _settings.Workspaces[0];
+                _settings.Workspaces.Remove(ws);
+
+                if (eraAtivo)
+                {
+                    var proximo = _settings.Workspaces.FirstOrDefault(w => !w.IsClosed) ?? _settings.Workspaces[0];
+                    proximo.IsClosed = false;
                     _settings.ActiveWorkspaceId = proximo.Id;
                     _workspaceBgImagePath = proximo.BackgroundImagePath ?? string.Empty;
                     _workspaceZoom = proximo.WorkspaceZoom > 0 ? proximo.WorkspaceZoom : 1.0;
@@ -2122,17 +2330,26 @@ namespace AvaloniaMdiApp
                     CarregarJanelasDoWorkspace(proximo);
                     AplicarZoomWorkspace(_workspaceZoom);
                 }
-                else
-                {
-                    _settings.Workspaces.Remove(ws);
-                }
 
                 AtualizarAbasWorkspaces();
                 SalvarTodosWorkspacesNoDisco();
 
+                // Exclui do Google Drive em segundo plano caso a sincronização na nuvem esteja configurada
+                if (!string.IsNullOrWhiteSpace(_settings.GoogleOAuthRefreshToken))
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await GoogleDriveCloudClient.ExcluirWorkspaceDaNuvemAsync(_settings, idRemovido);
+                        }
+                        catch { }
+                    });
+                }
+
                 if (_settings.EnableNotifications)
                 {
-                    ToastNotification.Mostrar(Workspace, $"Workspace \"{nomeRemovido}\" fechado com sucesso.", "info");
+                    ToastNotification.Mostrar(Workspace, $"Workspace \"{nomeRemovido}\" excluído do computador e do Google Drive.", "info");
                 }
             };
 

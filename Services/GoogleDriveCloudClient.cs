@@ -581,6 +581,35 @@ namespace AvaloniaMdiApp
             return "root";
         }
 
+        /// <summary>
+        /// Exclui o arquivo de backup de um workspace no Google Drive (se existir).
+        /// </summary>
+        public static async Task<bool> ExcluirWorkspaceDaNuvemAsync(AppSettings settings, string workspaceId)
+        {
+            try
+            {
+                string? token = await ObterAccessTokenValidoAsync(settings);
+                if (string.IsNullOrEmpty(token)) return false;
+
+                string folderId = await ObterOuCriarPastaMdiAsync(token);
+                string fileName = $"workspace_{workspaceId}.mdiws";
+
+                string? fileId = await LocalizarArquivoNoDriveAsync(token, folderId, fileName);
+                if (string.IsNullOrEmpty(fileId)) return false;
+
+                string url = $"https://www.googleapis.com/drive/v3/files/{fileId}";
+                using var req = new HttpRequestMessage(HttpMethod.Delete, url);
+                req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                var resp = await HttpClient.SendAsync(req);
+
+                return resp.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private static async Task<string?> LocalizarArquivoNoDriveAsync(string token, string folderId, string fileName)
         {
             try

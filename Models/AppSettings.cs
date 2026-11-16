@@ -112,6 +112,7 @@ namespace AvaloniaMdiApp
         public string BackgroundImagePath { get; set; } = string.Empty;
         public double WorkspaceZoom { get; set; } = 1.0;
         public DateTime LastModifiedUtc { get; set; } = DateTime.UtcNow;
+        public bool IsClosed { get; set; } = false;
         public List<WindowStateData> SavedWindows { get; set; } = new();
         public List<WindowStateData> SavedCatalog { get; set; } = new();
         public List<WindowConnectionData> Connections { get; set; } = new();
