@@ -291,7 +291,7 @@ namespace AvaloniaMdiApp
             {
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                HorizontalAlignment = HorizontalAlignment.Stretch
+                HorizontalAlignment = HorizontalAlignment.Center
             };
 
             _tabsPanel = new StackPanel
@@ -307,15 +307,17 @@ namespace AvaloniaMdiApp
                 var tabBtn = new Button
                 {
                     Content = $"{stepIdx + 1}. {step.TabLabel}",
-                    Height = 27,
-                    Padding = new Thickness(10, 0),
-                    CornerRadius = new CornerRadius(13),
+                    Height = 28,
+                    Padding = new Thickness(12, 0),
+                    CornerRadius = new CornerRadius(14),
                     FontSize = 11,
                     FontWeight = FontWeight.SemiBold,
                     Background = Brushes.Transparent,
                     BorderThickness = new Thickness(1),
                     BorderBrush = Brushes.Transparent,
                     Foreground = new SolidColorBrush(Color.Parse("#94A3B8")),
+                    HorizontalContentAlignment = HorizontalAlignment.Center,
+                    VerticalContentAlignment = VerticalAlignment.Center,
                     Cursor = new Cursor(StandardCursorType.Hand)
                 };
                 tabBtn.Click += (s, e) => IrParaPasso(stepIdx);
@@ -365,24 +367,26 @@ namespace AvaloniaMdiApp
             Grid.SetColumn(progressStack, 0);
             footerGrid.Children.Add(progressStack);
 
-            var navStack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right };
+            var navStack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
             _btnPrev = new Button
             {
-                Content = "◀ Anterior",
+                Content = AppIcons.WithText(AppIcons.ArrowLeft, "Anterior", 10, 6, new SolidColorBrush(Color.Parse("#CBD5E1"))),
                 Height = 30,
-                Padding = new Thickness(12, 0),
+                Padding = new Thickness(14, 0),
                 CornerRadius = new CornerRadius(6),
                 Background = new SolidColorBrush(_isDarkMode ? Color.Parse("#233044") : Color.Parse("#E2E8F0")),
                 Foreground = _isDarkMode ? Brushes.White : new SolidColorBrush(Color.Parse("#1E293B")),
                 FontSize = 11,
                 FontWeight = FontWeight.SemiBold,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
                 Cursor = new Cursor(StandardCursorType.Hand)
             };
             _btnPrev.Click += (s, e) => IrParaPasso(_currentStepIndex - 1);
 
             _btnNext = new Button
             {
-                Content = "Próximo ▶",
+                Content = AppIcons.WithText(AppIcons.ArrowRight, "Próximo", 10, 6, Brushes.White),
                 Height = 30,
                 Padding = new Thickness(14, 0),
                 CornerRadius = new CornerRadius(6),
@@ -390,6 +394,8 @@ namespace AvaloniaMdiApp
                 Foreground = Brushes.White,
                 FontSize = 11,
                 FontWeight = FontWeight.Bold,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
                 Cursor = new Cursor(StandardCursorType.Hand)
             };
             _btnNext.Click += (s, e) =>
@@ -431,8 +437,8 @@ namespace AvaloniaMdiApp
                 Width = 42,
                 Height = 42,
                 CornerRadius = new CornerRadius(21),
-                Background = new SolidColorBrush(_isDarkMode ? Color.Parse("#1E293B") : Color.Parse("#EFF6FF")),
-                BorderBrush = new SolidColorBrush(Color.Parse("#38BDF8")),
+                Background = new SolidColorBrush(_isDarkMode ? Color.Parse("#1E293B") : Color.Parse("#F1F5F9")),
+                BorderBrush = new SolidColorBrush(_isDarkMode ? Color.Parse("#475569") : Color.Parse("#CBD5E1")),
                 BorderThickness = new Thickness(1.5),
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 12, 0)
@@ -442,7 +448,7 @@ namespace AvaloniaMdiApp
                 Data = AppIcons.Note,
                 Width = 18,
                 Height = 18,
-                Foreground = new SolidColorBrush(Color.Parse("#38BDF8")),
+                Foreground = new SolidColorBrush(Color.Parse("#CBD5E1")),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -478,7 +484,7 @@ namespace AvaloniaMdiApp
                 TextWrapping = TextWrapping.Wrap,
                 Foreground = _isDarkMode ? new SolidColorBrush(Color.Parse("#E2E8F0")) : new SolidColorBrush(Color.Parse("#334155"))
             };
-            contentStack.Children.Add(CriarCardSecao("📍 ONDE CLICAR", Color.Parse("#3B82F6"), _txtOndeClicar));
+            contentStack.Children.Add(CriarCardSecao(AppIcons.Pin, "ONDE CLICAR", _txtOndeClicar));
 
             _txtOQueFazer = new TextBlock
             {
@@ -487,7 +493,7 @@ namespace AvaloniaMdiApp
                 TextWrapping = TextWrapping.Wrap,
                 Foreground = _isDarkMode ? new SolidColorBrush(Color.Parse("#E2E8F0")) : new SolidColorBrush(Color.Parse("#334155"))
             };
-            contentStack.Children.Add(CriarCardSecao("🛠️ O QUE FAZER", Color.Parse("#10B981"), _txtOQueFazer));
+            contentStack.Children.Add(CriarCardSecao(AppIcons.Settings, "O QUE FAZER", _txtOQueFazer));
 
             _txtDica = new TextBlock
             {
@@ -496,22 +502,23 @@ namespace AvaloniaMdiApp
                 TextWrapping = TextWrapping.Wrap,
                 Foreground = _isDarkMode ? new SolidColorBrush(Color.Parse("#E2E8F0")) : new SolidColorBrush(Color.Parse("#334155"))
             };
-            contentStack.Children.Add(CriarCardSecao("💡 DICA DE OURO", Color.Parse("#F59E0B"), _txtDica));
+            contentStack.Children.Add(CriarCardSecao(AppIcons.Sparkle, "DICA DE OURO", _txtDica));
 
-            // BOTÃO: BAIXAR A JANELA E MOSTRAR ONDE CLICAR NA TELA
+            // BOTÃO: BAIXAR A JANELA E MOSTRAR ONDE CLICAR NA TELA (CENTRALIZADO)
             _btnStartGuidedMode = new Button
             {
-                Content = "🎯 Baixar Janela & Mostrar Onde Clicar na Tela",
                 Height = 36,
-                Padding = new Thickness(18, 0),
+                Padding = new Thickness(24, 0),
                 CornerRadius = new CornerRadius(8),
                 Background = new SolidColorBrush(Color.Parse("#0284C7")),
                 Foreground = Brushes.White,
-                FontSize = 12,
+                FontSize = 11.5,
                 FontWeight = FontWeight.Bold,
-                HorizontalAlignment = HorizontalAlignment.Left,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
                 Cursor = new Cursor(StandardCursorType.Hand),
-                Margin = new Thickness(0, 4, 0, 0)
+                Margin = new Thickness(0, 8, 0, 4)
             };
             _btnStartGuidedMode.Click += (s, e) =>
             {
@@ -578,16 +585,17 @@ namespace AvaloniaMdiApp
             var topActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
             _btnGuidedExpandFull = new Button
             {
-                Content = "📖 Guia Completo",
-                Height = 22,
+                Content = AppIcons.WithText(AppIcons.Book, "Guia Completo", 10, 5, new SolidColorBrush(Color.Parse("#CBD5E1"))),
+                Height = 24,
                 Padding = new Thickness(8, 0),
                 CornerRadius = new CornerRadius(4),
                 Background = new SolidColorBrush(Color.Parse("#1E293B")),
                 BorderBrush = new SolidColorBrush(Color.Parse("#475569")),
                 BorderThickness = new Thickness(1),
-                Foreground = new SolidColorBrush(Color.Parse("#CBD5E1")),
                 FontSize = 10,
                 FontWeight = FontWeight.SemiBold,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
                 Cursor = new Cursor(StandardCursorType.Hand)
             };
             _btnGuidedExpandFull.Click += (s, e) => MostrarModoCompleto();
@@ -595,10 +603,10 @@ namespace AvaloniaMdiApp
             _btnGuidedClose = new Button
             {
                 Content = "✕",
-                Width = 22,
-                Height = 22,
+                Width = 24,
+                Height = 24,
                 Padding = new Thickness(0),
-                CornerRadius = new CornerRadius(11),
+                CornerRadius = new CornerRadius(12),
                 Background = Brushes.Transparent,
                 Foreground = new SolidColorBrush(Color.Parse("#94A3B8")),
                 FontSize = 11,
@@ -634,7 +642,7 @@ namespace AvaloniaMdiApp
 
             _btnGuidedDoAction = new Button
             {
-                Content = "✨ Abrir Bloco de Notas Agora",
+                Content = AppIcons.WithText(AppIcons.Sparkle, "Abrir Bloco de Notas Agora", 11, 6, Brushes.White),
                 Height = 28,
                 Padding = new Thickness(12, 0),
                 CornerRadius = new CornerRadius(6),
@@ -642,29 +650,33 @@ namespace AvaloniaMdiApp
                 Foreground = Brushes.White,
                 FontSize = 11,
                 FontWeight = FontWeight.Bold,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
                 Cursor = new Cursor(StandardCursorType.Hand)
             };
             _btnGuidedDoAction.Click += (s, e) => ExecutarAcaoGuiadaAutomatica();
             Grid.SetColumn(_btnGuidedDoAction, 0);
             bottomActionsGrid.Children.Add(_btnGuidedDoAction);
 
-            var navStack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, HorizontalAlignment = HorizontalAlignment.Right };
+            var navStack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
             _btnGuidedPrev = new Button
             {
-                Content = "◀ Anterior",
+                Content = AppIcons.WithText(AppIcons.ArrowLeft, "Anterior", 10, 6, new SolidColorBrush(Color.Parse("#CBD5E1"))),
                 Height = 28,
                 Padding = new Thickness(10, 0),
                 CornerRadius = new CornerRadius(6),
                 Background = new SolidColorBrush(Color.Parse("#1E293B")),
                 Foreground = Brushes.White,
                 FontSize = 11,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
                 Cursor = new Cursor(StandardCursorType.Hand)
             };
             _btnGuidedPrev.Click += (s, e) => IniciarModoGuiado(_currentGuidedStep - 1);
 
             _btnGuidedNext = new Button
             {
-                Content = "Próximo Passo ▶",
+                Content = AppIcons.WithText(AppIcons.ArrowRight, "Próximo Passo", 10, 6, Brushes.White),
                 Height = 28,
                 Padding = new Thickness(12, 0),
                 CornerRadius = new CornerRadius(6),
@@ -672,6 +684,8 @@ namespace AvaloniaMdiApp
                 Foreground = Brushes.White,
                 FontSize = 11,
                 FontWeight = FontWeight.Bold,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
                 Cursor = new Cursor(StandardCursorType.Hand)
             };
             _btnGuidedNext.Click += (s, e) =>
@@ -708,15 +722,15 @@ namespace AvaloniaMdiApp
                 Title = "1. Janelas Multitarefa & Widgets",
                 Subtitle = "A base do seu espaço de trabalho: notas, listas, planilhas e navegador.",
                 Icon = AppIcons.Note,
-                IconColorHex = "#38BDF8",
-                OndeClicar = "Na barra lateral esquerda, passe o mouse e clique no ícone do Bloco de Notas 📝, Lista de Tarefas ☑️, Planilha 📊, Galeria 🖼️ ou Navegador 🌐.",
+                IconColorHex = "#94A3B8",
+                OndeClicar = "Na barra lateral esquerda, passe o mouse e clique no ícone do Bloco de Notas, Lista de Tarefas, Planilha, Galeria ou Navegador.",
                 OQueFazer = "1. Uma janela surge imediatamente no Workspace.\n" +
                             "2. Segure pela barra de título para arrastar a janela para onde quiser.\n" +
                             "3. Redimensione puxando as bordas externas.\n" +
                             "4. Use os botões da janela: [—] minimiza para a barra inferior, [▢] maximiza e [✕] fecha.",
                 Dica = "Nos blocos de notas, formate o texto com Negrito, Itálico e tamanho de fonte. Tudo salva automaticamente ao fechar!",
                 GuidedStepTarget = 0,
-                GuidedButtonLabel = "🎯 Baixar Janela & Mostrar Onde Abrir Janelas na Tela"
+                GuidedButtonLabel = "Baixar Janela & Mostrar Onde Abrir Janelas na Tela"
             });
 
             // 2. Menu Circular & Cores
@@ -726,15 +740,15 @@ namespace AvaloniaMdiApp
                 Title = "2. Menu Circular (The Sims 4) & Cores em Cascata",
                 Subtitle = "Acesse opções rápidas em cápsulas radiais com propagação automática de cores.",
                 Icon = AppIcons.Palette,
-                IconColorHex = "#F43F5E",
-                OndeClicar = "Na barra superior de qualquer janela, clique no botão de engrenagem ⚙️.",
+                IconColorHex = "#94A3B8",
+                OndeClicar = "Na barra superior de qualquer janela, clique no botão de engrenagem.",
                 OQueFazer = "1. O Menu Circular em cápsulas se abre ao redor da janela.\n" +
                             "2. Clique em 'Mudar Cor ▶': o anel concêntrico de cores se abre!\n" +
                             "3. SUPER EFEITO CASCATA: Ao trocar a cor de uma janela, todas as janelas e conexões ligadas a ela mudam de cor juntas automaticamente!\n" +
                             "4. Clique em 'Criticidade ▶' para definir o nível de urgência da tarefa.",
                 Dica = "Clicar em qualquer ponto fora do menu ou apertar ESC fecha o menu circular imediatamente.",
                 GuidedStepTarget = 1,
-                GuidedButtonLabel = "🎯 Baixar Janela & Mostrar Menu Circular e Cores na Tela"
+                GuidedButtonLabel = "Baixar Janela & Mostrar Menu Circular e Cores na Tela"
             });
 
             // 3. Conexões de Fluxograma
@@ -744,15 +758,15 @@ namespace AvaloniaMdiApp
                 Title = "3. Criar Conexões no Fluxograma",
                 Subtitle = "Ligue janelas e processos com curvas suaves Bézier e setas direcionais.",
                 Icon = AppIcons.ShapeDiamond,
-                IconColorHex = "#A855F7",
-                OndeClicar = "Na barra lateral esquerda em 'Fluxograma' (Retângulos, Losangos ou Círculos), ou clique na engrenagem ⚙️ de qualquer janela > 'Conectar'.",
+                IconColorHex = "#94A3B8",
+                OndeClicar = "Na barra lateral esquerda em 'Fluxograma' (Retângulos, Losangos ou Círculos), ou clique na engrenagem de qualquer janela > 'Conectar'.",
                 OQueFazer = "1. O modo de ligação é ativado.\n" +
                             "2. Clique na Janela de Origem e depois na Janela de Destino.\n" +
                             "3. Uma curva elegante com seta direcional é traçada ligando as duas janelas!\n" +
                             "4. Ao arrastar as janelas pelo Workspace, a linha de conexão segue os blocos dinamicamente.",
                 Dica = "Passe o cursor sobre a bolinha no centro da linha para mudar a cor da ligação ou removê-la.",
                 GuidedStepTarget = 2,
-                GuidedButtonLabel = "🎯 Baixar Janela & Mostrar Como Fazer Ligação na Tela"
+                GuidedButtonLabel = "Baixar Janela & Mostrar Como Fazer Ligação na Tela"
             });
 
             // 4. Vínculo com Mouse
@@ -762,14 +776,14 @@ namespace AvaloniaMdiApp
                 Title = "4. Vincular Tarefas a Janelas com o Mouse",
                 Subtitle = "Conecte diretamente cada item do seu checklist a qualquer janela com apenas um clique.",
                 Icon = AppIcons.Link,
-                IconColorHex = "#06B6D4",
-                OndeClicar = "Em qualquer 'Lista de Marcação' (Checklist), clique no ícone de corrente 🔗 ao lado da tarefa.",
+                IconColorHex = "#94A3B8",
+                OndeClicar = "Em qualquer 'Lista de Marcação' (Checklist), clique no ícone de corrente ao lado da tarefa.",
                 OQueFazer = "1. Uma linha tracejada guia o seu mouse pela tela.\n" +
                             "2. Aponte para qualquer janela do Workspace (nota, planilha, etc.) e clique nela!\n" +
                             "3. Pronto! A tarefa fica vinculada com um pontinho colorido.",
                 Dica = "Clicar no ícone de link a qualquer momento traz aquela janela imediatamente para a frente da tela!",
                 GuidedStepTarget = 3,
-                GuidedButtonLabel = "🎯 Baixar Janela & Mostrar Como Vincular Tarefas na Tela"
+                GuidedButtonLabel = "Baixar Janela & Mostrar Como Vincular Tarefas na Tela"
             });
 
             // 5. Calendário
@@ -779,15 +793,15 @@ namespace AvaloniaMdiApp
                 Title = "5. Calendário de Etapas, Horários e Prazos",
                 Subtitle = "Planeje sprints, marque horários de reuniões e consulte feriados nacionais.",
                 Icon = AppIcons.Calendar,
-                IconColorHex = "#10B981",
-                OndeClicar = "Na barra lateral direita, passe o mouse e clique no ícone de Calendário 📅.",
+                IconColorHex = "#94A3B8",
+                OndeClicar = "Na barra lateral direita, passe o mouse e clique no ícone de Calendário.",
                 OQueFazer = "1. O painel retrátil do calendário se abre suavemente.\n" +
                             "2. Clique em um dia para adicionar uma etapa com descrição e horário.\n" +
                             "3. Ou arraste o mouse por múltiplos dias para criar um período contínuo!\n" +
                             "4. Vincule tarefas de listas ou janelas inteiras a datas no calendário.",
                 Dica = "Feriados nacionais são destacados automaticamente na grade mensal.",
                 GuidedStepTarget = 0,
-                GuidedButtonLabel = "🎯 Baixar Janela & Ver Barra de Acesso Rápido"
+                GuidedButtonLabel = "Baixar Janela & Ver Barra de Acesso Rápido"
             });
 
             // 6. Atalhos & Nuvem
@@ -797,21 +811,21 @@ namespace AvaloniaMdiApp
                 Title = "6. Atalhos Rápidos e Sincronização em Nuvem",
                 Subtitle = "Produtividade máxima com comandos de teclado e backup no Google Drive.",
                 Icon = AppIcons.Upload,
-                IconColorHex = "#3B82F6",
+                IconColorHex = "#94A3B8",
                 OndeClicar = "Use os atalhos no teclado durante o uso do programa.",
                 OQueFazer = "• Ctrl + Z: Desfaz a última ação (mover janela, criar, excluir, mudar cor, conexões).\n" +
                             "• Ctrl + Y (ou Ctrl + Shift + Z): Refaz a alteração.\n" +
                             "• Ctrl + Roda do Mouse: Zoom In e Zoom Out fluido em todo o Workspace.\n" +
                             "• Arrastar com Botão Direito ou Meio do mouse no fundo: Move a visão da tela (Pan).\n" +
                             "• Filtro de Cores (topo): Clique nas bolinhas de cores para filtrar instantaneamente apenas as janelas daquela categoria!\n" +
-                            "• Sincronização Google Drive: Em Preferências ⚙️ conecte sua conta Google para salvar backups na nuvem automaticamente.",
+                            "• Sincronização Google Drive: Em Preferências (engrenagem) conecte sua conta Google para salvar backups na nuvem automaticamente.",
                 Dica = "No menu 'Exportar / Extrair' você pode gerar relatórios em PDF, imagens PNG do Workspace ou pacotes .zip portáteis para levar em um pendrive!",
                 GuidedStepTarget = 0,
-                GuidedButtonLabel = "🎯 Baixar Janela & Testar no Workspace"
+                GuidedButtonLabel = "Baixar Janela & Testar no Workspace"
             });
         }
 
-        private Border CriarCardSecao(string tituloSecao, Color accentColor, Control conteudo)
+        private Border CriarCardSecao(StreamGeometry iconData, string tituloSecao, Control conteudo)
         {
             var border = new Border
             {
@@ -822,15 +836,30 @@ namespace AvaloniaMdiApp
                 Padding = new Thickness(14, 9, 14, 10)
             };
 
-            var stack = new StackPanel { Spacing = 5 };
-            stack.Children.Add(new TextBlock
+            var stack = new StackPanel { Spacing = 6 };
+
+            var headerStack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
+            var icon = new PathIcon
+            {
+                Data = iconData,
+                Width = 12,
+                Height = 12,
+                Foreground = new SolidColorBrush(Color.Parse("#94A3B8")),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var headerText = new TextBlock
             {
                 Text = tituloSecao,
-                FontSize = 10,
+                FontSize = 10.5,
                 FontWeight = FontWeight.Bold,
-                Foreground = new SolidColorBrush(accentColor),
+                Foreground = new SolidColorBrush(Color.Parse("#94A3B8")),
+                VerticalAlignment = VerticalAlignment.Center,
                 LetterSpacing = 0.5
-            });
+            };
+            headerStack.Children.Add(icon);
+            headerStack.Children.Add(headerText);
+
+            stack.Children.Add(headerStack);
             stack.Children.Add(conteudo);
             border.Child = stack;
             return border;
@@ -854,15 +883,18 @@ namespace AvaloniaMdiApp
             _txtOQueFazer.Text = step.OQueFazer;
             _txtDica.Text = step.Dica;
 
-            _btnStartGuidedMode.Content = !string.IsNullOrEmpty(step.GuidedButtonLabel)
+            var btnLabel = !string.IsNullOrEmpty(step.GuidedButtonLabel)
                 ? step.GuidedButtonLabel
-                : "🎯 Baixar Janela & Mostrar Onde Clicar na Tela";
+                : "Baixar Janela & Mostrar Onde Clicar na Tela";
+            _btnStartGuidedMode.Content = AppIcons.WithText(AppIcons.Target, btnLabel, 13, 8, new SolidColorBrush(Color.Parse("#CBD5E1")));
 
             _btnPrev.IsEnabled = _currentStepIndex > 0;
             _btnPrev.Opacity = _btnPrev.IsEnabled ? 1.0 : 0.4;
 
             bool isLast = _currentStepIndex == _steps.Count - 1;
-            _btnNext.Content = isLast ? "Concluir ✓" : "Próximo ▶";
+            _btnNext.Content = isLast 
+                ? AppIcons.WithText(AppIcons.Check, "Concluir", 11, 6, Brushes.White) 
+                : AppIcons.WithText(AppIcons.ArrowRight, "Próximo", 10, 6, Brushes.White);
             _btnNext.Background = new SolidColorBrush(isLast ? Color.Parse("#10B981") : Color.Parse("#2563EB"));
 
             for (int i = 0; i < _tabButtons.Count; i++)
@@ -912,7 +944,9 @@ namespace AvaloniaMdiApp
             _btnGuidedPrev.Opacity = _btnGuidedPrev.IsEnabled ? 1.0 : 0.4;
 
             bool isLast = step == 3;
-            _btnGuidedNext.Content = isLast ? "🎉 Concluir" : "Próximo Passo ▶";
+            _btnGuidedNext.Content = isLast 
+                ? AppIcons.WithText(AppIcons.Check, "Concluir", 11, 6, Brushes.White) 
+                : AppIcons.WithText(AppIcons.ArrowRight, "Próximo Passo", 10, 6, Brushes.White);
             _btnGuidedNext.Background = new SolidColorBrush(isLast ? Color.Parse("#10B981") : Color.Parse("#2563EB"));
 
             switch (step)
@@ -920,8 +954,8 @@ namespace AvaloniaMdiApp
                 case 0:
                     // 1. Onde abrir uma janela (aponta para o Bloco de Notas na barra lateral)
                     _lblGuidedStepBadge.Text = "PASSO 1 DE 4: ONDE ABRIR UMA JANELA";
-                    _lblGuidedInstruction.Text = "Passe o mouse no menu lateral esquerdo para expandi-lo e clique no Bloco de Notas 📝 para criar uma nova janela no Workspace.";
-                    _btnGuidedDoAction.Content = "✨ Abrir Bloco de Notas Agora";
+                    _lblGuidedInstruction.Text = "Passe o mouse no menu lateral esquerdo para expandi-lo e clique no Bloco de Notas para criar uma nova janela no Workspace.";
+                    _btnGuidedDoAction.Content = AppIcons.WithText(AppIcons.Sparkle, "Abrir Bloco de Notas Agora", 11, 6, Brushes.White);
                     _btnGuidedDoAction.IsVisible = true;
                     PosicionarPonteiroNoElemento(_mainWindow.ObterBotaoNotas(), "1. ABRIR JANELAS", "Passe o mouse e clique aqui para abrir uma janela!", "left");
                     break;
@@ -930,11 +964,11 @@ namespace AvaloniaMdiApp
                     // 2. Menu Circular & Cores (aponta para a engrenagem da janela)
                     var win = _mainWindow.GarantirJanelaParaDemonstracao("notepad");
                     _lblGuidedStepBadge.Text = "PASSO 2 DE 4: MENU CIRCULAR & MUDAR COR";
-                    _lblGuidedInstruction.Text = "Clique na engrenagem ⚙️ da janela para abrir o Menu Circular. Em 'Mudar Cor ▶' você escolhe uma cor e toda a cadeia conectada muda de cor em cascata!";
-                    _btnGuidedDoAction.Content = "✨ Abrir Menu Circular Agora";
+                    _lblGuidedInstruction.Text = "Clique na engrenagem da janela para abrir o Menu Circular. Em 'Mudar Cor ▶' você escolhe uma cor e toda a cadeia conectada muda de cor em cascata!";
+                    _btnGuidedDoAction.Content = AppIcons.WithText(AppIcons.Sparkle, "Abrir Menu Circular Agora", 11, 6, Brushes.White);
                     _btnGuidedDoAction.IsVisible = true;
                     win.ForcarExibirBotaoConfig(true);
-                    PosicionarPonteiroNoElemento(win.ObterBotaoConfig(), "2. MENU CIRCULAR & CORES", "Clique na engrenagem ⚙️ para abrir o menu e mudar cores!", "top");
+                    PosicionarPonteiroNoElemento(win.ObterBotaoConfig(), "2. MENU CIRCULAR & CORES", "Clique na engrenagem para abrir o menu e mudar cores!", "top");
                     break;
 
                 case 2:
@@ -942,7 +976,7 @@ namespace AvaloniaMdiApp
                     var (winA, winB) = _mainWindow.GarantirDuasJanelasConectadasParaDemonstracao();
                     _lblGuidedStepBadge.Text = "PASSO 3 DE 4: LIGAÇÃO NO FLUXOGRAMA";
                     _lblGuidedInstruction.Text = "Para ligar duas janelas no fluxograma, abra o menu circular da primeira janela, clique em 'Conectar' e depois clique na janela de destino!";
-                    _btnGuidedDoAction.Content = "✨ Conectar Janelas de Exemplo";
+                    _btnGuidedDoAction.Content = AppIcons.WithText(AppIcons.Sparkle, "Conectar Janelas de Exemplo", 11, 6, Brushes.White);
                     _btnGuidedDoAction.IsVisible = true;
                     PosicionarPonteiroNoElemento(winA, "3. FLUXOGRAMA & LIGAÇÕES", "Janelas conectadas formam um fluxo contínuo com cores sincronizadas!", "left");
                     break;
@@ -951,10 +985,10 @@ namespace AvaloniaMdiApp
                     // 4. Vincular item de checklist com mouse
                     var checklistWin = _mainWindow.GarantirJanelaParaDemonstracao("checklist");
                     _lblGuidedStepBadge.Text = "PASSO 4 DE 4: VINCULAR TAREFA COM O MOUSE";
-                    _lblGuidedInstruction.Text = "Nas Listas de Tarefas, clique no ícone de corrente 🔗 do item e depois clique com o mouse em qualquer janela para vinculá-las!";
-                    _btnGuidedDoAction.Content = "✨ Criar Janela de Apoio";
+                    _lblGuidedInstruction.Text = "Nas Listas de Tarefas, clique no ícone de corrente do item e depois clique com o mouse em qualquer janela para vinculá-las!";
+                    _btnGuidedDoAction.Content = AppIcons.WithText(AppIcons.Sparkle, "Criar Janela de Apoio", 11, 6, Brushes.White);
                     _btnGuidedDoAction.IsVisible = true;
-                    PosicionarPonteiroNoElemento(checklistWin, "4. VÍNCULO COM O MOUSE", "Clique no ícone de corrente 🔗 para ligar uma tarefa à janela desejada!", "left");
+                    PosicionarPonteiroNoElemento(checklistWin, "4. VÍNCULO COM O MOUSE", "Clique no ícone de corrente para ligar uma tarefa à janela desejada!", "left");
                     break;
             }
         }
