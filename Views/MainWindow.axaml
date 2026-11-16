@@ -452,6 +452,11 @@
                      Padding="10,7"
                      CornerRadius="6"
                      FontSize="13"/>
+            <CheckBox Name="ModalCheckBox"
+                      IsVisible="False"
+                      Content="Salvar minha resposta"
+                      FontSize="12"
+                      Margin="0,4,0,0"/>
             <StackPanel Name="ModalButtonsPanel"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"

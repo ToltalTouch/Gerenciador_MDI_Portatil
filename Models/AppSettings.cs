@@ -150,6 +150,8 @@ namespace AvaloniaMdiApp
         public string GoogleUserEmail { get; set; } = string.Empty;
         public bool GoogleDriveCloudSyncEnabled { get; set; } = false;
         public string LastCloudSyncUtc { get; set; } = string.Empty;
+        public bool AutoDownloadCloudWorkspaces { get; set; } = false;
+        public bool RememberCloudDownloadChoice { get; set; } = false;
 
         // Propriedades legadas mantidas para migração automática ao carregar settings antigos
         public string WorkspaceBackgroundImagePath { get; set; } = string.Empty;

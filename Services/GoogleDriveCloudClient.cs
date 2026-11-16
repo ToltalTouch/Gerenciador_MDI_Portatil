@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -16,6 +17,7 @@ namespace AvaloniaMdiApp
     {
         public string FileId { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
+        public string WorkspaceId { get; set; } = string.Empty;
         public DateTime ModifiedTimeUtc { get; set; }
         public bool IsCloudNewer { get; set; }
         public bool ExistsInCloud => !string.IsNullOrWhiteSpace(FileId);
@@ -420,6 +422,122 @@ namespace AvaloniaMdiApp
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Lista todos os arquivos de workspace salvos na pasta 'Gerenciador MDI' do Google Drive.
+        /// </summary>
+        public static async Task<List<CloudFileInfo>> ListarWorkspacesNaNuvemAsync(AppSettings settings)
+        {
+            var result = new List<CloudFileInfo>();
+            try
+            {
+                string? token = await ObterAccessTokenValidoAsync(settings);
+                if (string.IsNullOrEmpty(token)) return result;
+
+                string folderId = await ObterOuCriarPastaMdiAsync(token);
+                string query = $"'{folderId}' in parents and (name contains 'workspace_' or name contains '.mdiws') and trashed = false";
+                string url = $"https://www.googleapis.com/drive/v3/files?q={Uri.EscapeDataString(query)}&fields=files(id,name,modifiedTime,appProperties)&pageSize=100";
+
+                using var req = new HttpRequestMessage(HttpMethod.Get, url);
+                req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                var resp = await HttpClient.SendAsync(req);
+                if (!resp.IsSuccessStatusCode) return result;
+
+                using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+                if (doc.RootElement.TryGetProperty("files", out var filesProp) && filesProp.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var file in filesProp.EnumerateArray())
+                    {
+                        string fileId = file.GetProperty("id").GetString() ?? "";
+                        string fileName = file.GetProperty("name").GetString() ?? "";
+
+                        string wsName = fileName.Replace("workspace_", "").Replace(".mdiws", "");
+                        string wsId = "";
+                        DateTime cloudModified = DateTime.MinValue;
+
+                        if (file.TryGetProperty("appProperties", out var appProps))
+                        {
+                            if (appProps.TryGetProperty("workspaceName", out var nameProp))
+                                wsName = nameProp.GetString() ?? wsName;
+                            if (appProps.TryGetProperty("workspaceId", out var idProp))
+                                wsId = idProp.GetString() ?? "";
+                            if (appProps.TryGetProperty("lastModifiedUtc", out var modProp) &&
+                                DateTime.TryParse(modProp.GetString(), out var dt))
+                                cloudModified = dt;
+                        }
+
+                        if (cloudModified == DateTime.MinValue &&
+                            file.TryGetProperty("modifiedTime", out var mtProp) &&
+                            DateTime.TryParse(mtProp.GetString(), out var dtMod))
+                        {
+                            cloudModified = dtMod;
+                        }
+
+                        result.Add(new CloudFileInfo
+                        {
+                            FileId = fileId,
+                            Name = wsName,
+                            WorkspaceId = wsId,
+                            ModifiedTimeUtc = cloudModified
+                        });
+                    }
+                }
+            }
+            catch { }
+            return result;
+        }
+
+        /// <summary>
+        /// Baixa todos os workspaces salvos no Google Drive.
+        /// </summary>
+        public static async Task<List<WorkspaceData>> BaixarTodosWorkspacesDaNuvemAsync(AppSettings settings)
+        {
+            var list = new List<WorkspaceData>();
+            var cloudFiles = await ListarWorkspacesNaNuvemAsync(settings);
+            foreach (var file in cloudFiles)
+            {
+                var ws = await BaixarWorkspaceDaNuvemAsync(settings, file.FileId);
+                if (ws != null)
+                {
+                    if (string.IsNullOrWhiteSpace(ws.Id) && !string.IsNullOrWhiteSpace(file.WorkspaceId))
+                    {
+                        ws.Id = file.WorkspaceId;
+                    }
+                    if (string.IsNullOrWhiteSpace(ws.Name) && !string.IsNullOrWhiteSpace(file.Name))
+                    {
+                        ws.Name = file.Name;
+                    }
+                    list.Add(ws);
+                }
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// Faz upload de todos os workspaces locais para o Google Drive.
+        /// </summary>
+        public static async Task<(int Sucessos, int Falhas, string UltimoErro)> UploadTodosWorkspacesAsync(AppSettings settings)
+        {
+            int sucessos = 0;
+            int falhas = 0;
+            string ultimoErro = "";
+
+            foreach (var ws in settings.Workspaces.ToList())
+            {
+                var res = await UploadWorkspaceAsync(settings, ws);
+                if (res.Success)
+                {
+                    sucessos++;
+                }
+                else
+                {
+                    falhas++;
+                    ultimoErro = res.Error;
+                }
+            }
+
+            return (sucessos, falhas, ultimoErro);
         }
 
         private static async Task<string> ObterOuCriarPastaMdiAsync(string token)

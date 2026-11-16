@@ -24,6 +24,7 @@ namespace AvaloniaMdiApp
         public event Action? OnUploadCloudRequested;
         public event Action? OnDownloadCloudRequested;
         public event Action<bool>? OnCloudAutoSyncChanged;
+        public event Action<bool>? OnAutoDownloadCloudChanged;
         public event Action? OnClosed;
 
         private readonly AppSettings _settings;
@@ -59,6 +60,7 @@ namespace AvaloniaMdiApp
         private readonly Button _btnUploadCloud;
         private readonly Button _btnDownloadCloud;
         private readonly ToggleSwitch _cloudAutoSyncToggle;
+        private readonly ToggleSwitch _autoDownloadCloudToggle;
         private readonly Border _advancedApiCard;
 
         private readonly Dictionary<string, (Button Button, Border Indicator, TextBlock Label)> _navItems = new();
@@ -558,6 +560,20 @@ namespace AvaloniaMdiApp
                 if (!_suppressEvents) OnCloudAutoSyncChanged?.Invoke(_cloudAutoSyncToggle.IsChecked == true);
             };
 
+            _autoDownloadCloudToggle = new ToggleSwitch
+            {
+                IsChecked = settings.AutoDownloadCloudWorkspaces,
+                OnContent = "Ativo",
+                OffContent = "Perguntar",
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                IsEnabled = isConnected
+            };
+            _autoDownloadCloudToggle.IsCheckedChanged += (s, e) =>
+            {
+                if (!_suppressEvents) OnAutoDownloadCloudChanged?.Invoke(_autoDownloadCloudToggle.IsChecked == true);
+            };
+
             _btnUploadCloud = new Button
             {
                 Content = AppIcons.WithText(AppIcons.Upload, "Enviar para Nuvem", 11.5, 6, Brushes.White),
@@ -631,7 +647,9 @@ namespace AvaloniaMdiApp
                 panelCloud.Children.Add(CriarCardAgrupado(
                     CriarLinhaItem("Conta Google Conectada", "Autenticado via Google OAuth 2.0 seguro", accountStatusRow),
                     CriarDivisor(),
-                    CriarLinhaItem("Sincronização Automática", "Envia à nuvem no 'Salvar Tudo' e atualiza na inicialização se outro PC salvou", _cloudAutoSyncToggle),
+                    CriarLinhaItem("Sincronização Automática", "Envia à nuvem no 'Salvar Tudo' e ao fechar o app", _cloudAutoSyncToggle),
+                    CriarDivisor(),
+                    CriarLinhaItem("Baixar da Nuvem Automaticamente", "Ao conectar em outro computador, baixa os workspaces da nuvem sem perguntar", _autoDownloadCloudToggle),
                     CriarDivisor(),
                     CriarLinhaItem("Sincronização Manual", "Forçar envio do workspace atual ou baixar a versão do Google Drive", cloudManualActions)
                 ));

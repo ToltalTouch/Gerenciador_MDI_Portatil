@@ -855,6 +855,13 @@ namespace AvaloniaMdiApp
             {
                 var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
 
+                if (e.Key == Key.S)
+                {
+                    SalvarTodasJanelas_Click(null, new RoutedEventArgs());
+                    e.Handled = true;
+                    return;
+                }
+
                 if (e.Key == Key.Z && !isShift)
                 {
                     if (focused is TextBox tb && tb.CanUndo)
@@ -1362,6 +1369,7 @@ namespace AvaloniaMdiApp
             ModalTitle.Text = "Salvar antes de fechar?";
             ModalMessage.Text = "Deseja salvar as janelas abertas, fluxogramas e informações dos seus Workspaces antes de encerrar o aplicativo?";
             ModalInputBox.IsVisible = false;
+            if (ModalCheckBox != null) ModalCheckBox.IsVisible = false;
             ModalButtonsPanel.Children.Clear();
 
             var btnCancelar = CriarBotaoModal("Cancelar", isPrimary: false, isDanger: false);
@@ -1377,10 +1385,29 @@ namespace AvaloniaMdiApp
             };
 
             var btnSalvarESair = CriarBotaoModal("Salvar e Sair", isPrimary: true, isDanger: false, AppIcons.Save);
-            btnSalvarESair.Click += (s, e) =>
+            btnSalvarESair.Click += async (s, e) =>
             {
-                ModalOverlay.IsVisible = false;
                 SalvarTodosWorkspacesNoDisco();
+
+                if (!string.IsNullOrWhiteSpace(_settings.GoogleOAuthRefreshToken))
+                {
+                    _settings.GoogleDriveCloudSyncEnabled = true;
+                    ModalTitle.Text = "Sincronizando Nuvem...";
+                    ModalMessage.Text = "Salvando seus workspaces diretamente no Google Drive antes de fechar...";
+                    ModalButtonsPanel.Children.Clear();
+                    ModalInputBox.IsVisible = false;
+                    if (ModalCheckBox != null) ModalCheckBox.IsVisible = false;
+                    AplicarEstiloModal();
+
+                    try
+                    {
+                        var uploadTask = GoogleDriveCloudClient.UploadTodosWorkspacesAsync(_settings);
+                        await Task.WhenAny(uploadTask, Task.Delay(4000));
+                    }
+                    catch { }
+                }
+
+                ModalOverlay.IsVisible = false;
                 _saidaConfirmada = true;
                 LiberarRecursosAntesDeFechar();
                 Close();
@@ -1439,6 +1466,10 @@ namespace AvaloniaMdiApp
             ModalInputBox.Background = _isDarkMode ? ThemePalette.DarkContentBg : ThemePalette.LightContentBg;
             ModalInputBox.Foreground = _isDarkMode ? ThemePalette.DarkTextPrimary : ThemePalette.LightTextPrimary;
             ModalInputBox.BorderBrush = _isDarkMode ? ThemePalette.DarkBorder : ThemePalette.LightBorder;
+            if (ModalCheckBox != null)
+            {
+                ModalCheckBox.Foreground = _isDarkMode ? ThemePalette.DarkTextPrimary : ThemePalette.LightTextPrimary;
+            }
         }
 
         // ==================== TEMA E LAYOUT ====================
@@ -1855,6 +1886,7 @@ namespace AvaloniaMdiApp
             ModalMessage.Text = $"Digite o novo nome para \"{wsAtual.Name}\":";
             ModalInputBox.Text = wsAtual.Name;
             ModalInputBox.IsVisible = true;
+            if (ModalCheckBox != null) ModalCheckBox.IsVisible = false;
             ModalButtonsPanel.Children.Clear();
 
             var btnCancelar = CriarBotaoModal("Cancelar", isPrimary: false, isDanger: false);
@@ -1893,6 +1925,7 @@ namespace AvaloniaMdiApp
             ModalTitle.Text = "Excluir Workspace";
             ModalMessage.Text = $"Tem certeza de que deseja excluir o workspace \"{wsAtual.Name}\" e todas as janelas dele?";
             ModalInputBox.IsVisible = false;
+            if (ModalCheckBox != null) ModalCheckBox.IsVisible = false;
             ModalButtonsPanel.Children.Clear();
 
             var btnCancelar = CriarBotaoModal("Cancelar", isPrimary: false, isDanger: false);
@@ -2012,25 +2045,30 @@ namespace AvaloniaMdiApp
 
         private void TentarSincronizarGoogleDriveNuvemAutomatico()
         {
-            if (!_settings.GoogleDriveCloudSyncEnabled || string.IsNullOrWhiteSpace(_settings.GoogleOAuthRefreshToken))
+            if (string.IsNullOrWhiteSpace(_settings.GoogleOAuthRefreshToken))
                 return;
+
+            _settings.GoogleDriveCloudSyncEnabled = true;
 
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    var ws = ObterWorkspaceAtual();
-                    var (ok, fileId, msg) = await GoogleDriveCloudClient.UploadWorkspaceAsync(_settings, ws);
+                    var (sucessos, falhas, ultimoErro) = await GoogleDriveCloudClient.UploadTodosWorkspacesAsync(_settings);
                     await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                     {
-                        if (ok)
+                        if (sucessos > 0)
                         {
                             _settings.LastCloudSyncUtc = DateTime.UtcNow.ToString("o");
                             SalvarTodosWorkspacesNoDisco();
                             if (_settings.EnableNotifications)
                             {
-                                ToastNotification.Mostrar(Workspace, $"☁ Workspace '{ws.Name}' sincronizado diretamente no Google Drive!", "success");
+                                ToastNotification.Mostrar(Workspace, $"☁ {sucessos} workspace(s) sincronizado(s) no Google Drive!", "success");
                             }
+                        }
+                        else if (falhas > 0 && _settings.EnableNotifications)
+                        {
+                            ToastNotification.Mostrar(Workspace, $"Aviso Google Drive: {ultimoErro}", "danger");
                         }
                     });
                 }
@@ -2040,43 +2078,127 @@ namespace AvaloniaMdiApp
 
         private async Task VerificarEAtualizarNuvemNaInicializacaoAsync()
         {
-            if (!_settings.GoogleDriveCloudSyncEnabled || string.IsNullOrWhiteSpace(_settings.GoogleOAuthRefreshToken))
+            if (string.IsNullOrWhiteSpace(_settings.GoogleOAuthRefreshToken))
                 return;
 
             try
             {
-                var wsAtual = ObterWorkspaceAtual();
-                var cloudInfo = await GoogleDriveCloudClient.VerificarVersaoNuvemAsync(_settings, wsAtual);
+                var cloudFiles = await GoogleDriveCloudClient.ListarWorkspacesNaNuvemAsync(_settings);
+                if (cloudFiles.Count == 0) return;
 
-                if (cloudInfo != null && cloudInfo.ExistsInCloud && cloudInfo.IsCloudNewer)
+                bool temNovosOuAtualizados = cloudFiles.Any(cf =>
+                    !_settings.Workspaces.Any(w => w.Id == cf.WorkspaceId) ||
+                    _settings.Workspaces.Any(w => w.Id == cf.WorkspaceId && cf.ModifiedTimeUtc > w.LastModifiedUtc.AddSeconds(5))
+                );
+
+                if (temNovosOuAtualizados)
                 {
-                    var cloudWs = await GoogleDriveCloudClient.BaixarWorkspaceDaNuvemAsync(_settings, wsAtual.Id);
-                    if (cloudWs != null)
+                    if (_settings.AutoDownloadCloudWorkspaces)
+                    {
+                        var baixados = await GoogleDriveCloudClient.BaixarTodosWorkspacesDaNuvemAsync(_settings);
+                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            MesclarWorkspacesDaNuvem(baixados);
+                            ToastNotification.Mostrar(Workspace, $"☁ {baixados.Count} workspace(s) atualizados da nuvem!", "success");
+                        });
+                    }
+                    else if (!_settings.RememberCloudDownloadChoice)
                     {
                         await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                         {
-                            int idx = _settings.Workspaces.FindIndex(w => w.Id == cloudWs.Id);
-                            if (idx >= 0)
-                            {
-                                _settings.Workspaces[idx] = cloudWs;
-                            }
-                            else
-                            {
-                                _settings.Workspaces.Add(cloudWs);
-                            }
-                            SalvarTodosWorkspacesNoDisco();
-
-                            if (_settings.ActiveWorkspaceId == cloudWs.Id)
-                            {
-                                CarregarJanelasDoWorkspace(cloudWs);
-                            }
-
-                            ToastNotification.Mostrar(Workspace, $"☁ Versão mais recente do Google Drive carregada com sucesso!", "success");
+                            MostrarModalDownloadWorkspacesNuvem(cloudFiles);
                         });
                     }
                 }
             }
             catch { }
+        }
+
+        private void MostrarModalDownloadWorkspacesNuvem(List<CloudFileInfo> cloudFiles)
+        {
+            if (cloudFiles.Count == 0) return;
+
+            var nomes = string.Join(", ", cloudFiles.Select(c => $"\"{c.Name}\"").Take(3));
+            if (cloudFiles.Count > 3) nomes += $", e mais {cloudFiles.Count - 3}";
+
+            ModalTitle.Text = "☁ Workspaces Encontrados no Google Drive";
+            ModalMessage.Text = $"Detectamos {cloudFiles.Count} workspace(s) salvo(s) na sua conta do Google Drive ({nomes}).\n\nDeseja fazer o download dos workspaces da nuvem agora neste computador?";
+            ModalInputBox.IsVisible = false;
+            ModalCheckBox.IsVisible = true;
+            ModalCheckBox.Content = "Salvar resposta (baixar sempre automaticamente)";
+            ModalCheckBox.IsChecked = _settings.AutoDownloadCloudWorkspaces;
+            ModalButtonsPanel.Children.Clear();
+
+            var btnManter = CriarBotaoModal("Manter Locais", isPrimary: false, isDanger: false);
+            btnManter.Click += (_, _) =>
+            {
+                if (ModalCheckBox.IsChecked == true)
+                {
+                    _settings.AutoDownloadCloudWorkspaces = false;
+                    _settings.RememberCloudDownloadChoice = true;
+                    SalvarTodosWorkspacesNoDisco();
+                }
+                ModalOverlay.IsVisible = false;
+                ModalCheckBox.IsVisible = false;
+            };
+
+            var btnBaixar = CriarBotaoModal("Baixar Workspaces da Nuvem", isPrimary: true, isDanger: false, AppIcons.Download);
+            btnBaixar.Click += async (_, _) =>
+            {
+                bool salvarEscolha = ModalCheckBox.IsChecked == true;
+                if (salvarEscolha)
+                {
+                    _settings.AutoDownloadCloudWorkspaces = true;
+                    _settings.RememberCloudDownloadChoice = true;
+                }
+
+                ModalTitle.Text = "Baixando da Nuvem...";
+                ModalMessage.Text = "Transferindo e configurando seus workspaces do Google Drive...";
+                ModalButtonsPanel.Children.Clear();
+                ModalCheckBox.IsVisible = false;
+
+                try
+                {
+                    var baixados = await GoogleDriveCloudClient.BaixarTodosWorkspacesDaNuvemAsync(_settings);
+                    if (baixados.Count > 0)
+                    {
+                        MesclarWorkspacesDaNuvem(baixados);
+                        ToastNotification.Mostrar(Workspace, $"☁ {baixados.Count} workspace(s) carregados do Google Drive!", "success");
+                    }
+                }
+                catch { }
+
+                ModalOverlay.IsVisible = false;
+            };
+
+            ModalButtonsPanel.Children.Add(btnManter);
+            ModalButtonsPanel.Children.Add(btnBaixar);
+
+            AplicarEstiloModal();
+            ModalOverlay.IsVisible = true;
+        }
+
+        private void MesclarWorkspacesDaNuvem(List<WorkspaceData> baixados)
+        {
+            if (baixados.Count == 0) return;
+
+            foreach (var cloudWs in baixados)
+            {
+                int idx = _settings.Workspaces.FindIndex(w => w.Id == cloudWs.Id);
+                if (idx >= 0)
+                {
+                    _settings.Workspaces[idx] = cloudWs;
+                }
+                else
+                {
+                    _settings.Workspaces.Add(cloudWs);
+                }
+            }
+
+            SalvarTodosWorkspacesNoDisco();
+
+            var targetWs = _settings.Workspaces.FirstOrDefault(w => w.Id == _settings.ActiveWorkspaceId) ?? _settings.Workspaces.First();
+            AlternarParaWorkspace(targetWs.Id);
         }
 
         private bool TentarSincronizarGoogleDriveAutomatico()
@@ -3729,6 +3851,38 @@ namespace AvaloniaMdiApp
                             _settingsWindow = null;
                         }
                         AbrirConfiguracoes_Click(null, new RoutedEventArgs());
+
+                        // Verifica se há workspaces salvos no Google Drive em outro computador
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                var cloudFiles = await GoogleDriveCloudClient.ListarWorkspacesNaNuvemAsync(_settings);
+                                if (cloudFiles.Count > 0)
+                                {
+                                    await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                                    {
+                                        if (_settings.AutoDownloadCloudWorkspaces)
+                                        {
+                                            _ = Task.Run(async () =>
+                                            {
+                                                var baixados = await GoogleDriveCloudClient.BaixarTodosWorkspacesDaNuvemAsync(_settings);
+                                                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                                                {
+                                                    MesclarWorkspacesDaNuvem(baixados);
+                                                    ToastNotification.Mostrar(Workspace, $"☁ {baixados.Count} workspace(s) baixados do Google Drive!", "success");
+                                                });
+                                            });
+                                        }
+                                        else
+                                        {
+                                            MostrarModalDownloadWorkspacesNuvem(cloudFiles);
+                                        }
+                                    });
+                                }
+                            }
+                            catch { }
+                        });
                     }
                     else
                     {
@@ -3765,6 +3919,16 @@ namespace AvaloniaMdiApp
                 _settings.GoogleDriveCloudSyncEnabled = enabled;
                 SalvarTodosWorkspacesNoDisco();
                 ToastNotification.Mostrar(Workspace, enabled ? "Sincronização em nuvem ativada" : "Sincronização em nuvem desativada", "info");
+            };
+
+            _settingsWindow.OnAutoDownloadCloudChanged += (autoDownload) =>
+            {
+                _settings.AutoDownloadCloudWorkspaces = autoDownload;
+                _settings.RememberCloudDownloadChoice = autoDownload;
+                SalvarTodosWorkspacesNoDisco();
+                ToastNotification.Mostrar(Workspace, autoDownload
+                    ? "Download automático de workspaces da nuvem ativado"
+                    : "Perguntar antes de baixar workspaces da nuvem ao logar", "info");
             };
 
             _settingsWindow.OnUploadCloudRequested += async () =>
@@ -3804,7 +3968,7 @@ namespace AvaloniaMdiApp
                         return;
                     }
 
-                    var cloudWs = await GoogleDriveCloudClient.BaixarWorkspaceDaNuvemAsync(_settings, ws.Id);
+                    var cloudWs = await GoogleDriveCloudClient.BaixarWorkspaceDaNuvemAsync(_settings, cloudInfo.FileId);
                     if (cloudWs != null)
                     {
                         int idx = _settings.Workspaces.FindIndex(w => w.Id == cloudWs.Id);
