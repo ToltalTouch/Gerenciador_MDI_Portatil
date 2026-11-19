@@ -23,7 +23,13 @@ namespace AvaloniaMdiApp
         public event Action<DraggableWindow>? OnInteractionStarted;
         public event Action<DraggableWindow>? OnInteractionCompleted;
         public event Action<DraggableWindow, string>? OnColorChanged;
+        public event Action<DraggableWindow, string>? OnRequestPropagateColor;
         public event Action<DraggableWindow, Button>? OnRequestRadialMenu;
+        public event Action<DraggableWindow, KeyModifiers>? OnWindowSelectionRequested;
+        public event Action<DraggableWindow>? OnGroupDragStarted;
+        public event Action<DraggableWindow, Vector>? OnGroupDragDelta;
+        public event Action<DraggableWindow>? OnGroupDragCompleted;
+        public event Action<DraggableWindow>? OnWindowSingleClickedWithoutDrag;
 
         public string WindowId { get; }
         public string WindowTitle { get; private set; }
@@ -33,6 +39,7 @@ namespace AvaloniaMdiApp
         public int AccessCount { get; set; }
         public bool IsMinimized => _isMinimized;
         public bool IsMaximized => _isMaximized;
+        public bool IsSelected => _isSelected;
 
         private readonly Action<string, string, TextFormatData>? _onLinkedRowSave;
         public DraggableWindow? ParentChecklistWindow { get; }
@@ -41,6 +48,8 @@ namespace AvaloniaMdiApp
 
         private bool _isDragging;
         private bool _pressedOnTitleText;
+        private bool _isSelected;
+        private bool _mouseMovedDuringPress;
         private ResizeMode _resizeMode = ResizeMode.None;
 
         private Point _pointerStart;
@@ -820,6 +829,12 @@ namespace AvaloniaMdiApp
             }
         }
 
+        public void PropagarCorParaConectadas(string? hexColor = null)
+        {
+            string cor = hexColor ?? ObterCorEfetiva();
+            OnRequestPropagateColor?.Invoke(this, cor);
+        }
+
         public void IniciarConexao()
         {
             OnConnectRequested?.Invoke(this);
@@ -902,6 +917,25 @@ namespace AvaloniaMdiApp
             _taskBar.AtualizarEstadoAtivo(this, isActive);
         }
 
+        public void SetSelected(bool isSelected)
+        {
+            if (_isSelected == isSelected) return;
+            _isSelected = isSelected;
+            AtualizarCores();
+        }
+
+        public void MoverPara(double newX, double newY)
+        {
+            Canvas.SetLeft(this, newX);
+            Canvas.SetTop(this, newY);
+            _browserHost?.AtualizarLimitesNativos();
+            if (_isMinimized)
+            {
+                _normalRect = new Rect(newX, newY, _normalRect.Width, _normalRect.Height);
+            }
+            OnBoundsChanged?.Invoke(this);
+        }
+
         private void SincronizarEstadoHibernacaoRecursos()
         {
             bool deveHibernar = !_isActive || _isMinimized;
@@ -948,10 +982,32 @@ namespace AvaloniaMdiApp
                 catch { }
             }
 
+            if (_isSelected)
+            {
+                BorderBrush = SolidColorBrush.Parse("#38BDF8");
+                BorderThickness = IsFlowchartShape ? new Thickness(0) : new Thickness(2.5);
+                BoxShadow = new BoxShadows(new BoxShadow
+                {
+                    Color = Color.FromArgb(170, 56, 189, 248),
+                    Blur = 14,
+                    Spread = 2
+                });
+            }
+            else
+            {
+                BorderThickness = IsFlowchartShape ? new Thickness(0) : new Thickness(1);
+                BoxShadow = _isActive
+                    ? new BoxShadows(new BoxShadow { Color = Color.FromArgb(90, 0, 0, 0), Blur = 16, OffsetY = 6 })
+                    : new BoxShadows(new BoxShadow { Color = Color.FromArgb(50, 0, 0, 0), Blur = 10, OffsetY = 3 });
+            }
+
             if (_isDarkMode)
             {
                 Background = IsFlowchartShape ? Brushes.Transparent : ThemePalette.DarkWindowBg;
-                BorderBrush = IsFlowchartShape ? Brushes.Transparent : (customBrush ?? (_isActive ? ThemePalette.DarkBorderActive : ThemePalette.DarkBorder));
+                if (!_isSelected)
+                {
+                    BorderBrush = IsFlowchartShape ? Brushes.Transparent : (customBrush ?? (_isActive ? ThemePalette.DarkBorderActive : ThemePalette.DarkBorder));
+                }
                 _titleBar.Background = customBrush ?? (_isActive ? ThemePalette.DarkWindowHeaderActiveBg : ThemePalette.DarkWindowHeaderBg);
                 _statusDot.Background = _isActive ? Brushes.White : (customBrush ?? ThemePalette.AccentLight);
                 _lblTitle.Foreground = ThemePalette.DarkTextPrimary;
@@ -980,7 +1036,10 @@ namespace AvaloniaMdiApp
             else
             {
                 Background = IsFlowchartShape ? Brushes.Transparent : ThemePalette.LightWindowBg;
-                BorderBrush = IsFlowchartShape ? Brushes.Transparent : (customBrush ?? (_isActive ? ThemePalette.LightBorderActive : ThemePalette.LightBorder));
+                if (!_isSelected)
+                {
+                    BorderBrush = IsFlowchartShape ? Brushes.Transparent : (customBrush ?? (_isActive ? ThemePalette.LightBorderActive : ThemePalette.LightBorder));
+                }
                 _titleBar.Background = customBrush ?? (_isActive ? ThemePalette.LightWindowHeaderActiveBg : ThemePalette.LightWindowHeaderBg);
                 _statusDot.Background = (_isActive || customBrush != null) ? Brushes.White : ThemePalette.Accent;
                 var headerTextBrush = (_isActive || customBrush != null) ? Brushes.White : ThemePalette.LightTextPrimary;
@@ -1241,6 +1300,42 @@ namespace AvaloniaMdiApp
             }
             flyout.Items.Add(menuCores);
 
+            var menuCoresConectadas = new MenuItem
+            {
+                Icon = AppIcons.Create(AppIcons.Flowchart, 11, ThemePalette.IconLightGray),
+                Header = "Mudar Cor das Conectadas"
+            };
+            foreach (var cor in PaletaCoresJanela)
+            {
+                IBrush dotBrush = ThemePalette.IconMutedGray;
+                if (!string.IsNullOrWhiteSpace(cor.Hex))
+                {
+                    try { dotBrush = SolidColorBrush.Parse(cor.Hex); }
+                    catch { }
+                }
+
+                var item = new MenuItem
+                {
+                    Icon = new Avalonia.Controls.Shapes.Ellipse
+                    {
+                        Width = 10,
+                        Height = 10,
+                        Fill = dotBrush,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Center
+                    },
+                    Header = cor.Nome
+                };
+                string hex = cor.Hex;
+                item.Click += (s, e) =>
+                {
+                    DefinirCorJanela(hex, notificarMudanca: false);
+                    PropagarCorParaConectadas(hex);
+                };
+                menuCoresConectadas.Items.Add(item);
+            }
+            flyout.Items.Add(menuCoresConectadas);
+
             var menuCriticidade = new MenuItem
             {
                 Icon = AppIcons.Create(AppIcons.Warning, 11, ThemePalette.IconLightGray),
@@ -1347,6 +1442,12 @@ namespace AvaloniaMdiApp
                 return;
             }
 
+            bool ctrlPressed = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+            if (ctrlPressed)
+            {
+                OnWindowSelectionRequested?.Invoke(this, e.KeyModifiers);
+            }
+
             if (IsFlowchartShape)
             {
                 bool clicouConfig = _btnShapeConfig != null && (source == _btnShapeConfig || source?.Parent == _btnShapeConfig);
@@ -1362,12 +1463,22 @@ namespace AvaloniaMdiApp
                             return;
                         }
 
+                        if (!ctrlPressed)
+                        {
+                            OnWindowSelectionRequested?.Invoke(this, e.KeyModifiers);
+                        }
+
                         Focus();
                         _isDragging = true;
+                        _mouseMovedDuringPress = false;
                         OnInteractionStarted?.Invoke(this);
                         _pointerStart = e.GetPosition(Workspace);
                         _windowStart = new Point(Canvas.GetLeft(this), Canvas.GetTop(this));
                         e.Pointer.Capture(this);
+                        if (_isSelected)
+                        {
+                            OnGroupDragStarted?.Invoke(this);
+                        }
                     }
                 }
                 return;
@@ -1389,6 +1500,11 @@ namespace AvaloniaMdiApp
                     return;
                 }
 
+                if (!ctrlPressed)
+                {
+                    OnWindowSelectionRequested?.Invoke(this, e.KeyModifiers);
+                }
+
                 var props = e.GetCurrentPoint(this);
                 if (props.Properties.IsLeftButtonPressed)
                 {
@@ -1397,10 +1513,15 @@ namespace AvaloniaMdiApp
                     {
                         Focus();
                         _isDragging = true;
+                        _mouseMovedDuringPress = false;
                         OnInteractionStarted?.Invoke(this);
                         _pointerStart = e.GetPosition(Workspace);
                         _windowStart = new Point(Canvas.GetLeft(this), Canvas.GetTop(this));
                         e.Pointer.Capture(this);
+                        if (_isSelected)
+                        {
+                            OnGroupDragStarted?.Invoke(this);
+                        }
                     }
                     else if (clicouTextoTitulo)
                     {
@@ -1501,18 +1622,21 @@ namespace AvaloniaMdiApp
             if (_isDragging)
             {
                 var diff = currentPoint - _pointerStart;
-                double newX = Math.Max(0, _windowStart.X + diff.X);
-                double newY = Math.Max(0, _windowStart.Y + diff.Y);
-
-                Canvas.SetLeft(this, newX);
-                Canvas.SetTop(this, newY);
-                _browserHost?.AtualizarLimitesNativos();
-
-                if (_isMinimized)
+                if (Math.Abs(diff.X) > 2 || Math.Abs(diff.Y) > 2)
                 {
-                    _normalRect = new Rect(newX, newY, _normalRect.Width, _normalRect.Height);
+                    _mouseMovedDuringPress = true;
                 }
-                OnBoundsChanged?.Invoke(this);
+
+                if (_isSelected && OnGroupDragDelta != null)
+                {
+                    OnGroupDragDelta.Invoke(this, diff);
+                }
+                else
+                {
+                    double newX = Math.Max(0, _windowStart.X + diff.X);
+                    double newY = Math.Max(0, _windowStart.Y + diff.Y);
+                    MoverPara(newX, newY);
+                }
             }
             else if (_resizeMode != ResizeMode.None)
             {
@@ -1572,10 +1696,21 @@ namespace AvaloniaMdiApp
 
             if (_isDragging || _resizeMode != ResizeMode.None)
             {
+                bool wasDragging = _isDragging;
                 _isDragging = false;
                 _resizeMode = ResizeMode.None;
                 e.Pointer.Capture(null);
+
+                if (wasDragging && _isSelected)
+                {
+                    OnGroupDragCompleted?.Invoke(this);
+                }
                 OnInteractionCompleted?.Invoke(this);
+
+                if (!_mouseMovedDuringPress && !e.KeyModifiers.HasFlag(KeyModifiers.Control) && _isSelected)
+                {
+                    OnWindowSingleClickedWithoutDrag?.Invoke(this);
+                }
             }
 
             if (abrirEdicaoTitulo)

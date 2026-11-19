@@ -67,6 +67,7 @@ namespace AvaloniaMdiApp
         public static readonly StreamGeometry Video = StreamGeometry.Parse("M 1.5 3.5 L 10.5 3.5 L 10.5 12.5 L 1.5 12.5 Z M 11.2 6 L 14.5 4 L 14.5 12 L 11.2 10 Z");
         public static readonly StreamGeometry Upload = StreamGeometry.Parse("M 8 2 L 12.5 6.5 L 11.4 7.6 L 8.8 5 L 8.8 11.5 L 7.2 11.5 L 7.2 5 L 4.6 7.6 L 3.5 6.5 Z M 2.5 12.5 L 13.5 12.5 L 13.5 14 L 2.5 14 Z");
         public static readonly StreamGeometry PdfFile = StreamGeometry.Parse("M 3 1.5 L 10.5 1.5 L 13.5 4.5 L 13.5 14.5 L 3 14.5 Z M 4.8 7 L 11.2 7 L 11.2 8.4 L 4.8 8.4 Z M 4.8 9.8 L 11.2 9.8 L 11.2 11.2 L 4.8 11.2 Z");
+        public static readonly StreamGeometry Flowchart = StreamGeometry.Parse("M 2 2 L 6 2 L 6 6 L 2 6 Z M 10 2 L 14 2 L 14 6 L 10 6 Z M 6 10 L 10 10 L 10 14 L 6 14 Z M 4 6 L 4 8 L 12 8 L 12 6 M 8 8 L 8 10");
 
         public static readonly StreamGeometry Bell = StreamGeometry.Parse("M 8 2 A 4 4 0 0 0 4 6 L 4 9.5 L 2.5 11.5 L 2.5 12.5 L 13.5 12.5 L 13.5 11.5 L 12 9.5 L 12 6 A 4 4 0 0 0 8 2 Z M 6.5 13.5 A 1.5 1.5 0 0 0 9.5 13.5 Z");
         public static readonly StreamGeometry Check = StreamGeometry.Parse("M 2.5 8 L 6.5 12 L 13.5 4 L 12.2 2.8 L 6.5 9.4 L 3.8 6.8 Z");

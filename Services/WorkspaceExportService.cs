@@ -521,8 +521,14 @@ namespace AvaloniaMdiApp
                         json = reader.ReadToEnd();
                     }
 
-                    var imported = JsonSerializer.Deserialize<WorkspaceData>(json);
+                    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    var imported = JsonSerializer.Deserialize<WorkspaceData>(json, options);
                     if (imported == null) return null;
+
+                    imported.SavedWindows ??= new();
+                    imported.SavedCatalog ??= new();
+                    imported.Connections ??= new();
+                    imported.CalendarLinks ??= new();
 
                     imported.Id = Guid.NewGuid().ToString("N");
                     string mediaDir = Path.Combine(AppContext.BaseDirectory, "ImportedMedia", imported.Id);
@@ -570,8 +576,14 @@ namespace AvaloniaMdiApp
                 else
                 {
                     string json = File.ReadAllText(filePath, Encoding.UTF8);
-                    var imported = JsonSerializer.Deserialize<WorkspaceData>(json);
+                    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    var imported = JsonSerializer.Deserialize<WorkspaceData>(json, options);
                     if (imported == null) return null;
+
+                    imported.SavedWindows ??= new();
+                    imported.SavedCatalog ??= new();
+                    imported.Connections ??= new();
+                    imported.CalendarLinks ??= new();
                     imported.Id = Guid.NewGuid().ToString("N");
                     return imported;
                 }

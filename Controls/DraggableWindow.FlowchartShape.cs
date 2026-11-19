@@ -198,10 +198,12 @@ namespace AvaloniaMdiApp
         {
             if (_shapeVectorPath == null) return;
 
-            var strokeBrush = customOrCritBrush
-                ?? (_isActive ? ThemePalette.AccentLight : (_isDarkMode ? ThemePalette.IconLightGray : ThemePalette.Accent));
+            var strokeBrush = _isSelected
+                ? SolidColorBrush.Parse("#38BDF8")
+                : (customOrCritBrush ?? (_isActive ? ThemePalette.AccentLight : (_isDarkMode ? ThemePalette.IconLightGray : ThemePalette.Accent)));
 
             _shapeVectorPath.Stroke = strokeBrush;
+            _shapeVectorPath.StrokeThickness = _isSelected ? 4.0 : 2.5;
 
             // Preenchimento interno sutil combinando com a cor da forma ou criticidade
             if (customOrCritBrush is ISolidColorBrush solid)

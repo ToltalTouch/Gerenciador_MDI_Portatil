@@ -37,13 +37,15 @@ namespace AvaloniaMdiApp
         private readonly Border _centerHub;
         private readonly TextBlock _centerHubText;
         private readonly PathIcon _centerHubIcon;
+        private readonly bool _hasConnections;
 
         public event Action? OnClosed;
 
-        public RadialWindowMenu(DraggableWindow targetWindow, Point centerPoint)
+        public RadialWindowMenu(DraggableWindow targetWindow, Point centerPoint, bool hasConnections = false)
         {
             _targetWindow = targetWindow;
             _center = centerPoint;
+            _hasConnections = hasConnections;
 
             ClipToBounds = false;
             IsHitTestVisible = true;
@@ -122,7 +124,7 @@ namespace AvaloniaMdiApp
         {
             _mainItems.Clear();
 
-            // 1. Mudar Cor (Submenu)
+            // 1. Mudar Cor (Submenu) - altera apenas esta janela
             _mainItems.Add(new RadialMenuItem
             {
                 Id = "color",
@@ -131,6 +133,19 @@ namespace AvaloniaMdiApp
                 IconBrush = new SolidColorBrush(Color.Parse("#F43F5E")),
                 HasSubmenu = true
             });
+
+            // Opção extra: Mudar cor de todas as janelas conectadas no fluxo
+            if (_hasConnections)
+            {
+                _mainItems.Add(new RadialMenuItem
+                {
+                    Id = "color_connected",
+                    Label = "Cor Conectadas",
+                    Icon = AppIcons.Flowchart,
+                    IconBrush = new SolidColorBrush(Color.Parse("#38BDF8")),
+                    HasSubmenu = true
+                });
+            }
 
             // 2. Criticidade (Submenu)
             _mainItems.Add(new RadialMenuItem
@@ -307,6 +322,7 @@ namespace AvaloniaMdiApp
             _centerHubText.Text = submenuId switch
             {
                 "color" => "Cores",
+                "color_connected" => "Conectadas",
                 "criticality" => "Criticidade",
                 "shape" => "Formato",
                 _ => "Voltar"
@@ -318,6 +334,10 @@ namespace AvaloniaMdiApp
             if (submenuId == "color")
             {
                 MontarSubmenuCores();
+            }
+            else if (submenuId == "color_connected")
+            {
+                MontarSubmenuCoresConectadas();
             }
             else if (submenuId == "criticality")
             {
@@ -351,6 +371,50 @@ namespace AvaloniaMdiApp
                     OnExecute = () =>
                     {
                         _targetWindow.DefinirCorJanela(hex, notificarMudanca: true);
+                        FecharMenu();
+                    }
+                });
+            }
+
+            if (_hasConnections)
+            {
+                _subItems.Add(new RadialMenuItem
+                {
+                    Id = "replicate_connected",
+                    Label = "🔗 Replicar para Conectadas",
+                    Icon = AppIcons.Flowchart,
+                    IconBrush = new SolidColorBrush(Color.Parse("#38BDF8")),
+                    HasSubmenu = false,
+                    OnExecute = () =>
+                    {
+                        _targetWindow.PropagarCorParaConectadas(_targetWindow.ObterCorEfetiva());
+                        FecharMenu();
+                    }
+                });
+            }
+        }
+
+        private void MontarSubmenuCoresConectadas()
+        {
+            foreach (var cor in DraggableWindow.PaletaCoresJanela)
+            {
+                string hex = cor.Hex;
+                string nome = cor.Nome;
+                IBrush dotBrush = string.IsNullOrWhiteSpace(hex)
+                    ? new SolidColorBrush(Color.Parse("#94A3B8"))
+                    : new SolidColorBrush(Color.Parse(hex));
+
+                _subItems.Add(new RadialMenuItem
+                {
+                    Id = "conn_" + hex,
+                    Label = nome,
+                    Icon = AppIcons.CircleDot,
+                    IconBrush = dotBrush,
+                    HasSubmenu = false,
+                    OnExecute = () =>
+                    {
+                        _targetWindow.DefinirCorJanela(hex, notificarMudanca: false);
+                        _targetWindow.PropagarCorParaConectadas(hex);
                         FecharMenu();
                     }
                 });

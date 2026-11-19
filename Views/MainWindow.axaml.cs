@@ -10,6 +10,7 @@ using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -59,6 +60,16 @@ namespace AvaloniaMdiApp
         private Point _panPointerStart;
         private Vector _panOffsetStart;
         private string? _snapshotBeforeInteraction;
+
+        // Seleção Múltipla de Janelas (Caixa Rubberband / Marquee e Ctrl+Clique)
+        private readonly HashSet<DraggableWindow> _selectedWindows = new();
+        private readonly Dictionary<DraggableWindow, Point> _dragGroupStartPositions = new();
+        private Border? _selectionMarquee;
+        private bool _isRubberbandSelecting = false;
+        private Point _rubberbandStart;
+        private bool _rubberbandCtrlHeld = false;
+        private HashSet<DraggableWindow> _snapshotSelectedBeforeRubberband = new();
+        private bool _isSpaceKeyDown = false;
 
         // Timers para expansão e retração dos menus laterais com delay
         private DispatcherTimer? _leftSidebarOpenTimer;
@@ -673,10 +684,27 @@ namespace AvaloniaMdiApp
                 }
             }, RoutingStrategies.Tunnel);
 
-            // Movimento do mouse no Workspace (linha de pré-visualização de conexão e Pan do fundo)
+            // Inicializa a caixa visual de seleção retangular (marquee / rubberband)
+            _selectionMarquee = new Border
+            {
+                Background = SolidColorBrush.Parse("#2638BDF8"),
+                BorderBrush = SolidColorBrush.Parse("#38BDF8"),
+                BorderThickness = new Thickness(1.5),
+                CornerRadius = new CornerRadius(2),
+                IsHitTestVisible = false,
+                IsVisible = false,
+                ZIndex = 999999
+            };
+            Workspace.Children.Add(_selectionMarquee);
+
+            // Interação no Workspace: Seleção Múltipla Retangular, Pan e Pré-visualização de conexões
             Workspace.PointerPressed += (s, e) =>
             {
-                if (e.Source == Workspace)
+                var sourceCtrl = e.Source as Control;
+                bool isDirectWorkspace = e.Source == Workspace || e.Source == _selectionMarquee;
+                bool isInsideWindow = sourceCtrl != null && sourceCtrl.FindAncestorOfType<DraggableWindow>() != null;
+
+                if (isDirectWorkspace || !isInsideWindow)
                 {
                     Workspace.Focus();
                     if (_modoVinculoLinhaAtivo)
@@ -689,19 +717,45 @@ namespace AvaloniaMdiApp
                     if (_modoConexaoAtivo)
                     {
                         CancelarModoVinculoLinha();
-            CancelarModoConexao();
+                        CancelarModoConexao();
                         e.Handled = true;
                         return;
                     }
 
-                    var props = e.GetCurrentPoint(WorkspaceViewport);
-                    if (props.Properties.IsLeftButtonPressed || props.Properties.IsMiddleButtonPressed)
+                    var props = e.GetCurrentPoint(Workspace);
+                    bool isMiddle = props.Properties.IsMiddleButtonPressed;
+                    bool isLeft = props.Properties.IsLeftButtonPressed;
+
+                    if (isMiddle || (isLeft && _isSpaceKeyDown))
                     {
                         _isPanningWorkspace = true;
-                        _panPointerStart = props.Position;
+                        _panPointerStart = e.GetCurrentPoint(WorkspaceViewport).Position;
                         _panOffsetStart = WorkspaceScroller.Offset;
                         Workspace.Cursor = new Cursor(StandardCursorType.Hand);
                         e.Pointer.Capture(Workspace);
+                        e.Handled = true;
+                        return;
+                    }
+
+                    if (isLeft)
+                    {
+                        _isRubberbandSelecting = true;
+                        _rubberbandStart = e.GetPosition(Workspace);
+                        _rubberbandCtrlHeld = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+
+                        if (!_rubberbandCtrlHeld)
+                        {
+                            LimparSelecaoJanelas();
+                        }
+
+                        _snapshotSelectedBeforeRubberband = new HashSet<DraggableWindow>(_selectedWindows);
+
+                        GarantirCaixaSelecaoNoCanvas();
+                        AtualizarVisualCaixaSelecao(_rubberbandStart, _rubberbandStart);
+                        _selectionMarquee.IsVisible = true;
+                        e.Pointer.Capture(Workspace);
+                        e.Handled = true;
+                        return;
                     }
                 }
             };
@@ -725,6 +779,45 @@ namespace AvaloniaMdiApp
                     WorkspaceScroller.Offset = new Vector(
                         Math.Max(0, _panOffsetStart.X - diff.X),
                         Math.Max(0, _panOffsetStart.Y - diff.Y));
+                    return;
+                }
+
+                if (_isRubberbandSelecting && _selectionMarquee != null)
+                {
+                    var currentPos = e.GetPosition(Workspace);
+                    AtualizarVisualCaixaSelecao(_rubberbandStart, currentPos);
+
+                    double left = Math.Min(_rubberbandStart.X, currentPos.X);
+                    double top = Math.Min(_rubberbandStart.Y, currentPos.Y);
+                    double width = Math.Abs(currentPos.X - _rubberbandStart.X);
+                    double height = Math.Abs(currentPos.Y - _rubberbandStart.Y);
+                    var selRect = new Rect(left, top, width, height);
+
+                    foreach (var win in _ativasJanelas)
+                    {
+                        if (win.IsMinimized) continue;
+
+                        double wx = Canvas.GetLeft(win);
+                        double wy = Canvas.GetTop(win);
+                        if (double.IsNaN(wx)) wx = 0;
+                        if (double.IsNaN(wy)) wy = 0;
+                        double ww = win.Bounds.Width > 0 ? win.Bounds.Width : win.Width;
+                        double wh = win.Bounds.Height > 0 ? win.Bounds.Height : win.Height;
+                        var winRect = new Rect(wx, wy, ww, wh);
+
+                        bool intersects = selRect.Intersects(winRect) || selRect.Contains(winRect);
+
+                        if (_rubberbandCtrlHeld)
+                        {
+                            bool wasSelectedBefore = _snapshotSelectedBeforeRubberband.Contains(win);
+                            DefinirSelecaoJanela(win, wasSelectedBefore || intersects);
+                        }
+                        else
+                        {
+                            DefinirSelecaoJanela(win, intersects);
+                        }
+                    }
+                    e.Handled = true;
                 }
             };
 
@@ -736,9 +829,27 @@ namespace AvaloniaMdiApp
                     Workspace.Cursor = Cursor.Default;
                     e.Pointer.Capture(null);
                 }
+
+                if (_isRubberbandSelecting)
+                {
+                    _isRubberbandSelecting = false;
+                    if (_selectionMarquee != null)
+                    {
+                        _selectionMarquee.IsVisible = false;
+                    }
+                    e.Pointer.Capture(null);
+
+                    var endPos = e.GetPosition(Workspace);
+                    if (Math.Abs(endPos.X - _rubberbandStart.X) < 4 && Math.Abs(endPos.Y - _rubberbandStart.Y) < 4 && !_rubberbandCtrlHeld)
+                    {
+                        LimparSelecaoJanelas();
+                    }
+                    e.Handled = true;
+                }
             };
 
             AddHandler(InputElement.KeyDownEvent, MainWindow_KeyDown, RoutingStrategies.Tunnel);
+            AddHandler(InputElement.KeyUpEvent, MainWindow_KeyUp, RoutingStrategies.Tunnel);
 
             // Expansão suave dos menus laterais ao passar o mouse com delays (1,0s abrir, 1,7s fechar)
             LeftSidebar.PointerEntered += (s, e) =>
@@ -859,12 +970,42 @@ namespace AvaloniaMdiApp
                 }
             }
 
+            if (e.Key == Key.Space && !ModalOverlay.IsVisible)
+            {
+                var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
+                if (focused is not TextBox)
+                {
+                    _isSpaceKeyDown = true;
+                    if (!_isRubberbandSelecting)
+                    {
+                        Workspace.Cursor = new Cursor(StandardCursorType.Hand);
+                    }
+                }
+            }
+
+            if (e.Key == Key.Escape)
+            {
+                if (_selectedWindows.Count > 0)
+                {
+                    LimparSelecaoJanelas();
+                    e.Handled = true;
+                    return;
+                }
+            }
+
             bool isCtrl = (e.KeyModifiers & KeyModifiers.Control) != 0;
             bool isShift = (e.KeyModifiers & KeyModifiers.Shift) != 0;
 
             if (isCtrl && !ModalOverlay.IsVisible)
             {
                 var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
+
+                if (e.Key == Key.A && focused is not TextBox)
+                {
+                    SelecionarTodasJanelas();
+                    e.Handled = true;
+                    return;
+                }
 
                 if (e.Key == Key.S)
                 {
@@ -909,12 +1050,111 @@ namespace AvaloniaMdiApp
                     return;
                 }
 
+                if (_selectedWindows.Count > 0)
+                {
+                    RegistrarEstadoUndo();
+                    var toClose = _selectedWindows.ToList();
+                    LimparSelecaoJanelas();
+                    foreach (var win in toClose)
+                    {
+                        win.Fechar();
+                    }
+                    e.Handled = true;
+                    return;
+                }
+
                 var ativa = ZIndexManager.ActiveWindow;
                 if (ativa != null && _ativasJanelas.Contains(ativa))
                 {
                     RegistrarEstadoUndo();
                     ativa.Fechar();
                     e.Handled = true;
+                }
+            }
+        }
+
+        private void MainWindow_KeyUp(object? sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Space)
+            {
+                _isSpaceKeyDown = false;
+                if (!_isPanningWorkspace && !_isRubberbandSelecting)
+                {
+                    Workspace.Cursor = Cursor.Default;
+                }
+            }
+        }
+
+        private void GarantirCaixaSelecaoNoCanvas()
+        {
+            if (_selectionMarquee != null && !Workspace.Children.Contains(_selectionMarquee))
+            {
+                Workspace.Children.Add(_selectionMarquee);
+            }
+        }
+
+        private void AtualizarVisualCaixaSelecao(Point p1, Point p2)
+        {
+            if (_selectionMarquee == null) return;
+            double left = Math.Min(p1.X, p2.X);
+            double top = Math.Min(p1.Y, p2.Y);
+            double width = Math.Abs(p2.X - p1.X);
+            double height = Math.Abs(p2.Y - p1.Y);
+
+            Canvas.SetLeft(_selectionMarquee, left);
+            Canvas.SetTop(_selectionMarquee, top);
+            _selectionMarquee.Width = width;
+            _selectionMarquee.Height = height;
+        }
+
+        private void DefinirSelecaoJanela(DraggableWindow win, bool select)
+        {
+            if (select)
+            {
+                if (_selectedWindows.Add(win))
+                {
+                    win.SetSelected(true);
+                }
+            }
+            else
+            {
+                if (_selectedWindows.Remove(win))
+                {
+                    win.SetSelected(false);
+                }
+            }
+        }
+
+        private void SelecionarJanela(DraggableWindow win) => DefinirSelecaoJanela(win, true);
+
+        private void DeselecionarJanela(DraggableWindow win) => DefinirSelecaoJanela(win, false);
+
+        private void SelecionarApenasJanela(DraggableWindow win)
+        {
+            var toDeselect = _selectedWindows.Where(w => w != win).ToList();
+            foreach (var w in toDeselect)
+            {
+                DeselecionarJanela(w);
+            }
+            SelecionarJanela(win);
+        }
+
+        private void LimparSelecaoJanelas()
+        {
+            foreach (var win in _selectedWindows.ToList())
+            {
+                win.SetSelected(false);
+            }
+            _selectedWindows.Clear();
+        }
+
+        private void SelecionarTodasJanelas()
+        {
+            foreach (var win in _ativasJanelas)
+            {
+                if (!win.IsMinimized)
+                {
+                    SelecionarJanela(win);
                 }
             }
         }
@@ -1266,7 +1506,8 @@ namespace AvaloniaMdiApp
 
             Point clampedCenter = new Point(clampedX, clampedY);
 
-            var radialMenu = new RadialWindowMenu(win, clampedCenter);
+            bool hasConnections = _conexoesAtivas.Any(c => c.FromWindow == win || c.ToWindow == win);
+            var radialMenu = new RadialWindowMenu(win, clampedCenter, hasConnections);
             radialMenu.OnClosed += () => FecharMenuCircular();
 
             RadialMenuCanvas.Children.Add(radialMenu);
@@ -1338,6 +1579,10 @@ namespace AvaloniaMdiApp
             }
 
             SalvarTodosWorkspacesNoDisco();
+            if (_settings.EnableNotifications && visitadas.Count > 1)
+            {
+                ToastNotification.Mostrar(Workspace, $"Cor propagada para {visitadas.Count} janelas conectadas!", "info");
+            }
         }
 
         // ==================== CONFIRMAÇÃO DE SAÍDA E MODAIS ====================
@@ -1758,7 +2003,10 @@ namespace AvaloniaMdiApp
             _settingsWindow = null;
             _workspaceBgBitmap?.Dispose();
             _workspaceBgBitmap = null;
+            LimparSelecaoJanelas();
+            _dragGroupStartPositions.Clear();
             Workspace.Children.Clear();
+            GarantirCaixaSelecaoNoCanvas();
 
             _trocandoWorkspace = false;
         }
@@ -2489,7 +2737,7 @@ namespace AvaloniaMdiApp
 
             try
             {
-                var cloudFiles = await GoogleDriveCloudClient.ListarWorkspacesNaNuvemAsync(_settings);
+                var (cloudFiles, _) = await GoogleDriveCloudClient.ListarWorkspacesNaNuvemAsync(_settings);
                 if (cloudFiles.Count == 0) return;
 
                 bool temNovosOuAtualizados = cloudFiles.Any(cf =>
@@ -2501,12 +2749,15 @@ namespace AvaloniaMdiApp
                 {
                     if (_settings.AutoDownloadCloudWorkspaces)
                     {
-                        var baixados = await GoogleDriveCloudClient.BaixarTodosWorkspacesDaNuvemAsync(_settings);
-                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                        var (baixados, _) = await GoogleDriveCloudClient.BaixarTodosWorkspacesDaNuvemAsync(_settings);
+                        if (baixados.Count > 0)
                         {
-                            MesclarWorkspacesDaNuvem(baixados);
-                            ToastNotification.Mostrar(Workspace, $"☁ {baixados.Count} workspace(s) atualizados da nuvem!", "success");
-                        });
+                            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                            {
+                                MesclarWorkspacesDaNuvem(baixados);
+                                ToastNotification.Mostrar(Workspace, $"☁ {baixados.Count} workspace(s) atualizados da nuvem!", "success");
+                            });
+                        }
                     }
                     else if (!_settings.RememberCloudDownloadChoice)
                     {
@@ -2565,14 +2816,21 @@ namespace AvaloniaMdiApp
 
                 try
                 {
-                    var baixados = await GoogleDriveCloudClient.BaixarTodosWorkspacesDaNuvemAsync(_settings);
+                    var (baixados, dlErr) = await GoogleDriveCloudClient.BaixarTodosWorkspacesDaNuvemAsync(_settings);
                     if (baixados.Count > 0)
                     {
                         MesclarWorkspacesDaNuvem(baixados);
                         ToastNotification.Mostrar(Workspace, $"☁ {baixados.Count} workspace(s) carregados do Google Drive!", "success");
                     }
+                    else if (!string.IsNullOrEmpty(dlErr))
+                    {
+                        ToastNotification.Mostrar(Workspace, dlErr, "warning");
+                    }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    ToastNotification.Mostrar(Workspace, $"Erro ao baixar workspaces: {ex.Message}", "danger");
+                }
 
                 ModalOverlay.IsVisible = false;
             };
@@ -4265,7 +4523,7 @@ namespace AvaloniaMdiApp
                         {
                             try
                             {
-                                var cloudFiles = await GoogleDriveCloudClient.ListarWorkspacesNaNuvemAsync(_settings);
+                                var (cloudFiles, _) = await GoogleDriveCloudClient.ListarWorkspacesNaNuvemAsync(_settings);
                                 if (cloudFiles.Count > 0)
                                 {
                                     await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
@@ -4274,12 +4532,15 @@ namespace AvaloniaMdiApp
                                         {
                                             _ = Task.Run(async () =>
                                             {
-                                                var baixados = await GoogleDriveCloudClient.BaixarTodosWorkspacesDaNuvemAsync(_settings);
-                                                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                                                var (baixados, _) = await GoogleDriveCloudClient.BaixarTodosWorkspacesDaNuvemAsync(_settings);
+                                                if (baixados.Count > 0)
                                                 {
-                                                    MesclarWorkspacesDaNuvem(baixados);
-                                                    ToastNotification.Mostrar(Workspace, $"☁ {baixados.Count} workspace(s) baixados do Google Drive!", "success");
-                                                });
+                                                    await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                                                    {
+                                                        MesclarWorkspacesDaNuvem(baixados);
+                                                        ToastNotification.Mostrar(Workspace, $"☁ {baixados.Count} workspace(s) baixados do Google Drive!", "success");
+                                                    });
+                                                }
                                             });
                                         }
                                         else
@@ -4367,27 +4628,43 @@ namespace AvaloniaMdiApp
             {
                 try
                 {
-                    ToastNotification.Mostrar(Workspace, "Verificando versão no Google Drive...", "info");
+                    ToastNotification.Mostrar(Workspace, "Verificando arquivos no Google Drive...", "info");
                     var ws = ObterWorkspaceAtual();
-                    var cloudInfo = await GoogleDriveCloudClient.VerificarVersaoNuvemAsync(_settings, ws);
-                    if (cloudInfo == null || !cloudInfo.ExistsInCloud)
+                    var (cloudInfo, checkErr) = await GoogleDriveCloudClient.VerificarVersaoNuvemAsync(_settings, ws);
+
+                    if (cloudInfo != null && cloudInfo.ExistsInCloud)
                     {
-                        ToastNotification.Mostrar(Workspace, "Nenhum arquivo deste workspace encontrado na nuvem ainda.", "info");
-                        return;
+                        var (cloudWs, dlErr) = await GoogleDriveCloudClient.BaixarWorkspaceDaNuvemAsync(_settings, cloudInfo.FileId);
+                        if (cloudWs != null)
+                        {
+                            int idx = _settings.Workspaces.FindIndex(w => w.Id == cloudWs.Id);
+                            if (idx >= 0) _settings.Workspaces[idx] = cloudWs;
+                            else _settings.Workspaces.Add(cloudWs);
+                            SalvarTodosWorkspacesNoDisco();
+                            CarregarJanelasDoWorkspace(cloudWs);
+                            ToastNotification.Mostrar(Workspace, $"✓ Workspace '{cloudWs.Name}' atualizado com a versão da nuvem!", "success");
+                            return;
+                        }
+                        else
+                        {
+                            ToastNotification.Mostrar(Workspace, $"Falha ao baixar da nuvem: {dlErr}", "danger");
+                            return;
+                        }
                     }
 
-                    var cloudWs = await GoogleDriveCloudClient.BaixarWorkspaceDaNuvemAsync(_settings, cloudInfo.FileId);
-                    if (cloudWs != null)
+                    // Se não encontrou pelo ID específico do workspace atual, busca todos os workspaces salvos no Google Drive
+                    var (baixados, listErr) = await GoogleDriveCloudClient.BaixarTodosWorkspacesDaNuvemAsync(_settings);
+                    if (baixados.Count > 0)
                     {
-                        int idx = _settings.Workspaces.FindIndex(w => w.Id == cloudWs.Id);
-                        if (idx >= 0) _settings.Workspaces[idx] = cloudWs;
-                        SalvarTodosWorkspacesNoDisco();
-                        CarregarJanelasDoWorkspace(cloudWs);
-                        ToastNotification.Mostrar(Workspace, $"✓ Workspace '{cloudWs.Name}' atualizado com a versão da nuvem!", "success");
+                        MesclarWorkspacesDaNuvem(baixados);
+                        ToastNotification.Mostrar(Workspace, $"✓ {baixados.Count} workspace(s) baixado(s) do Google Drive com sucesso!", "success");
                     }
                     else
                     {
-                        ToastNotification.Mostrar(Workspace, "Não foi possível baixar o workspace da nuvem.", "danger");
+                        string msg = !string.IsNullOrEmpty(listErr)
+                            ? $"Aviso: {listErr}"
+                            : "Nenhum arquivo de workspace (.mdiws) foi encontrado na sua pasta do Google Drive.";
+                        ToastNotification.Mostrar(Workspace, msg, "warning");
                     }
                 }
                 catch (Exception ex)
@@ -4471,6 +4748,8 @@ namespace AvaloniaMdiApp
                 {
                     RegistrarEstadoUndo();
                 }
+                _selectedWindows.Remove(win);
+                _dragGroupStartPositions.Remove(win);
                 RemoverConexoesDaJanela(win);
                 if (!_trocandoWorkspace)
                 {
@@ -4481,6 +4760,79 @@ namespace AvaloniaMdiApp
             win.OnBoundsChanged += (_) => AtualizarDimensoesCanvasWorkspace();
             win.OnConnectRequested += (janelaOrigem) => IniciarConexaoAPartirDeJanela(janelaOrigem);
             win.OnWindowClicked += (janelaClicada) => AoClicarEmJanela(janelaClicada);
+
+            win.OnWindowSelectionRequested += (w, modifiers) =>
+            {
+                bool ctrl = modifiers.HasFlag(KeyModifiers.Control);
+                if (ctrl)
+                {
+                    if (w.IsSelected) DeselecionarJanela(w);
+                    else SelecionarJanela(w);
+                }
+                else
+                {
+                    if (!w.IsSelected)
+                    {
+                        SelecionarApenasJanela(w);
+                    }
+                }
+            };
+
+            win.OnWindowSingleClickedWithoutDrag += (w) =>
+            {
+                if (_selectedWindows.Count > 1)
+                {
+                    SelecionarApenasJanela(w);
+                }
+            };
+
+            win.OnGroupDragStarted += (leadWin) =>
+            {
+                _dragGroupStartPositions.Clear();
+                if (!leadWin.IsSelected)
+                {
+                    SelecionarApenasJanela(leadWin);
+                }
+
+                foreach (var w in _selectedWindows)
+                {
+                    double wx = Canvas.GetLeft(w);
+                    double wy = Canvas.GetTop(w);
+                    if (double.IsNaN(wx)) wx = 0;
+                    if (double.IsNaN(wy)) wy = 0;
+                    _dragGroupStartPositions[w] = new Point(wx, wy);
+                }
+            };
+
+            win.OnGroupDragDelta += (leadWin, rawDiff) =>
+            {
+                if (_dragGroupStartPositions.Count == 0) return;
+
+                double minX = double.MaxValue;
+                double minY = double.MaxValue;
+                foreach (var pos in _dragGroupStartPositions.Values)
+                {
+                    if (pos.X < minX) minX = pos.X;
+                    if (pos.Y < minY) minY = pos.Y;
+                }
+
+                double clampedDiffX = Math.Max(-minX, rawDiff.X);
+                double clampedDiffY = Math.Max(-minY, rawDiff.Y);
+
+                foreach (var kvp in _dragGroupStartPositions)
+                {
+                    var w = kvp.Key;
+                    var start = kvp.Value;
+                    w.MoverPara(start.X + clampedDiffX, start.Y + clampedDiffY);
+                }
+            };
+
+            win.OnGroupDragCompleted += (leadWin) =>
+            {
+                _dragGroupStartPositions.Clear();
+                AtualizarDimensoesCanvasWorkspace();
+            };
+
             win.OnChecklistRowClicked += (checklistWin, row) =>
             {
                 if (_isPickingCalendarTarget)
@@ -4520,7 +4872,12 @@ namespace AvaloniaMdiApp
             win.OnRequestSetWorkspaceBackground += (filePath) => AlternarFundoWorkspace(filePath);
             win.OnSaveRequested += (janela) => SalvarJanelaNoCatalogo(janela, mostrarToast: true);
             win.OnRequestRadialMenu += (janelaAlvo, anchor) => AbrirMenuCircularJanela(janelaAlvo, anchor);
-            win.OnColorChanged += (janelaAlvo, cor) => PropagarCorParaConectadas(janelaAlvo, cor);
+            win.OnColorChanged += (janelaAlvo, cor) =>
+            {
+                RegistrarEstadoUndo();
+                SalvarTodosWorkspacesNoDisco();
+            };
+            win.OnRequestPropagateColor += (janelaAlvo, cor) => PropagarCorParaConectadas(janelaAlvo, cor);
 
             AppTaskBar.RegistrarJanela(win, title);
             Workspace.Children.Add(win);

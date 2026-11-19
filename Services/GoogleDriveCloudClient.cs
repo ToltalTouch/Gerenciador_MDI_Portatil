@@ -343,29 +343,36 @@ namespace AvaloniaMdiApp
         /// <summary>
         /// Verifica se há uma versão mais recente do Workspace na nuvem do Google Drive.
         /// </summary>
-        public static async Task<CloudFileInfo?> VerificarVersaoNuvemAsync(
+        public static async Task<(CloudFileInfo? Info, string Error)> VerificarVersaoNuvemAsync(
             AppSettings settings,
             WorkspaceData wsData)
         {
             try
             {
                 string? token = await ObterAccessTokenValidoAsync(settings);
-                if (string.IsNullOrEmpty(token)) return null;
+                if (string.IsNullOrEmpty(token))
+                    return (null, "Não conectado à conta Google ou token de acesso expirado. Faça login novamente nas Configurações.");
 
                 string folderId = await ObterOuCriarPastaMdiAsync(token);
-                string fileName = $"workspace_{wsData.Id}.mdiws";
+                if (string.IsNullOrEmpty(folderId))
+                    return (null, "Não foi possível acessar a pasta 'Gerenciador MDI' no Google Drive.");
 
+                string fileName = $"workspace_{wsData.Id}.mdiws";
                 string query = $"'{folderId}' in parents and name = '{fileName}' and trashed = false";
                 string url = $"https://www.googleapis.com/drive/v3/files?q={Uri.EscapeDataString(query)}&fields=files(id,name,modifiedTime,appProperties)";
 
                 using var req = new HttpRequestMessage(HttpMethod.Get, url);
                 req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 var resp = await HttpClient.SendAsync(req);
-                if (!resp.IsSuccessStatusCode) return null;
+                if (!resp.IsSuccessStatusCode)
+                {
+                    string errContent = await resp.Content.ReadAsStringAsync();
+                    return (null, $"Erro da API Google Drive (HTTP {(int)resp.StatusCode}): {errContent}");
+                }
 
                 using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
                 var files = doc.RootElement.GetProperty("files");
-                if (files.GetArrayLength() == 0) return null;
+                if (files.GetArrayLength() == 0) return (null, string.Empty);
 
                 var file = files[0];
                 string fileId = file.GetProperty("id").GetString() ?? "";
@@ -385,64 +392,91 @@ namespace AvaloniaMdiApp
 
                 bool isNewer = cloudModified > wsData.LastModifiedUtc.AddSeconds(5);
 
-                return new CloudFileInfo
+                return (new CloudFileInfo
                 {
                     FileId = fileId,
                     Name = wsData.Name,
+                    WorkspaceId = wsData.Id,
                     ModifiedTimeUtc = cloudModified,
                     IsCloudNewer = isNewer
-                };
+                }, string.Empty);
             }
-            catch
+            catch (Exception ex)
             {
-                return null;
+                return (null, $"Exceção ao verificar versão na nuvem: {ex.Message}");
             }
         }
 
         /// <summary>
         /// Baixa a versão mais recente do Workspace diretamente do Google Drive.
         /// </summary>
-        public static async Task<WorkspaceData?> BaixarWorkspaceDaNuvemAsync(AppSettings settings, string fileId)
+        public static async Task<(WorkspaceData? Workspace, string Error)> BaixarWorkspaceDaNuvemAsync(AppSettings settings, string fileId)
         {
             try
             {
                 string? token = await ObterAccessTokenValidoAsync(settings);
-                if (string.IsNullOrEmpty(token)) return null;
+                if (string.IsNullOrEmpty(token))
+                    return (null, "Não conectado à conta Google ou token expirado. Faça login novamente nas Configurações.");
 
                 string url = $"https://www.googleapis.com/drive/v3/files/{fileId}?alt=media";
                 using var req = new HttpRequestMessage(HttpMethod.Get, url);
                 req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 var resp = await HttpClient.SendAsync(req);
-                if (!resp.IsSuccessStatusCode) return null;
+                if (!resp.IsSuccessStatusCode)
+                {
+                    string errContent = await resp.Content.ReadAsStringAsync();
+                    return (null, $"Erro da API Google Drive ao baixar (HTTP {(int)resp.StatusCode}): {errContent}");
+                }
 
                 string json = await resp.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<WorkspaceData>(json);
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var ws = JsonSerializer.Deserialize<WorkspaceData>(json, options);
+                if (ws == null)
+                {
+                    return (null, "O arquivo foi baixado, mas não continha uma estrutura de Workspace válida.");
+                }
+
+                ws.SavedWindows ??= new();
+                ws.SavedCatalog ??= new();
+                ws.Connections ??= new();
+                ws.CalendarLinks ??= new();
+
+                return (ws, string.Empty);
             }
-            catch
+            catch (Exception ex)
             {
-                return null;
+                return (null, $"Falha ao baixar da nuvem: {ex.Message}");
             }
         }
 
         /// <summary>
         /// Lista todos os arquivos de workspace salvos na pasta 'Gerenciador MDI' do Google Drive.
         /// </summary>
-        public static async Task<List<CloudFileInfo>> ListarWorkspacesNaNuvemAsync(AppSettings settings)
+        public static async Task<(List<CloudFileInfo> Files, string Error)> ListarWorkspacesNaNuvemAsync(AppSettings settings)
         {
             var result = new List<CloudFileInfo>();
             try
             {
                 string? token = await ObterAccessTokenValidoAsync(settings);
-                if (string.IsNullOrEmpty(token)) return result;
+                if (string.IsNullOrEmpty(token))
+                    return (result, "Não conectado à conta Google ou token expirado.");
 
                 string folderId = await ObterOuCriarPastaMdiAsync(token);
-                string query = $"'{folderId}' in parents and (name contains 'workspace_' or name contains '.mdiws') and trashed = false";
+                if (string.IsNullOrEmpty(folderId))
+                    return (result, "Não foi possível acessar a pasta 'Gerenciador MDI' no Google Drive.");
+
+                // Busca sem cláusulas 'contains' com pontuação que causam erro 400 Bad Request na API v3 do Google Drive
+                string query = $"'{folderId}' in parents and trashed = false";
                 string url = $"https://www.googleapis.com/drive/v3/files?q={Uri.EscapeDataString(query)}&fields=files(id,name,modifiedTime,appProperties)&pageSize=100";
 
                 using var req = new HttpRequestMessage(HttpMethod.Get, url);
                 req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 var resp = await HttpClient.SendAsync(req);
-                if (!resp.IsSuccessStatusCode) return result;
+                if (!resp.IsSuccessStatusCode)
+                {
+                    string errContent = await resp.Content.ReadAsStringAsync();
+                    return (result, $"Erro ao listar arquivos no Google Drive (HTTP {(int)resp.StatusCode}): {errContent}");
+                }
 
                 using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
                 if (doc.RootElement.TryGetProperty("files", out var filesProp) && filesProp.ValueKind == JsonValueKind.Array)
@@ -451,6 +485,13 @@ namespace AvaloniaMdiApp
                     {
                         string fileId = file.GetProperty("id").GetString() ?? "";
                         string fileName = file.GetProperty("name").GetString() ?? "";
+
+                        // Filtra arquivos de workspace do Gerenciador MDI
+                        if (!fileName.EndsWith(".mdiws", StringComparison.OrdinalIgnoreCase) &&
+                            !fileName.StartsWith("workspace_", StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
 
                         string wsName = fileName.Replace("workspace_", "").Replace(".mdiws", "");
                         string wsId = "";
@@ -465,6 +506,11 @@ namespace AvaloniaMdiApp
                             if (appProps.TryGetProperty("lastModifiedUtc", out var modProp) &&
                                 DateTime.TryParse(modProp.GetString(), out var dt))
                                 cloudModified = dt;
+                        }
+
+                        if (string.IsNullOrWhiteSpace(wsId) && fileName.StartsWith("workspace_", StringComparison.OrdinalIgnoreCase))
+                        {
+                            wsId = fileName.Substring("workspace_".Length).Replace(".mdiws", "");
                         }
 
                         if (cloudModified == DateTime.MinValue &&
@@ -483,21 +529,36 @@ namespace AvaloniaMdiApp
                         });
                     }
                 }
+
+                return (result, string.Empty);
             }
-            catch { }
-            return result;
+            catch (Exception ex)
+            {
+                return (result, $"Exceção ao listar arquivos na nuvem: {ex.Message}");
+            }
         }
 
         /// <summary>
         /// Baixa todos os workspaces salvos no Google Drive.
         /// </summary>
-        public static async Task<List<WorkspaceData>> BaixarTodosWorkspacesDaNuvemAsync(AppSettings settings)
+        public static async Task<(List<WorkspaceData> Workspaces, string Error)> BaixarTodosWorkspacesDaNuvemAsync(AppSettings settings)
         {
             var list = new List<WorkspaceData>();
-            var cloudFiles = await ListarWorkspacesNaNuvemAsync(settings);
+            var (cloudFiles, listErr) = await ListarWorkspacesNaNuvemAsync(settings);
+            if (!string.IsNullOrEmpty(listErr))
+            {
+                return (list, listErr);
+            }
+
+            if (cloudFiles.Count == 0)
+            {
+                return (list, "Nenhum arquivo de workspace (.mdiws) encontrado na pasta do Google Drive.");
+            }
+
+            string lastErr = string.Empty;
             foreach (var file in cloudFiles)
             {
-                var ws = await BaixarWorkspaceDaNuvemAsync(settings, file.FileId);
+                var (ws, err) = await BaixarWorkspaceDaNuvemAsync(settings, file.FileId);
                 if (ws != null)
                 {
                     if (string.IsNullOrWhiteSpace(ws.Id) && !string.IsNullOrWhiteSpace(file.WorkspaceId))
@@ -510,8 +571,18 @@ namespace AvaloniaMdiApp
                     }
                     list.Add(ws);
                 }
+                else
+                {
+                    lastErr = err;
+                }
             }
-            return list;
+
+            if (list.Count == 0 && !string.IsNullOrEmpty(lastErr))
+            {
+                return (list, lastErr);
+            }
+
+            return (list, string.Empty);
         }
 
         /// <summary>
