@@ -5,8 +5,11 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace AvaloniaMdiApp
 {
@@ -30,6 +33,7 @@ namespace AvaloniaMdiApp
         public event Action<DraggableWindow, Vector>? OnGroupDragDelta;
         public event Action<DraggableWindow>? OnGroupDragCompleted;
         public event Action<DraggableWindow>? OnWindowSingleClickedWithoutDrag;
+        public event Action<DraggableWindow>? OnWindowStateChanged;
 
         public string WindowId { get; }
         public string WindowTitle { get; private set; }
@@ -94,6 +98,9 @@ namespace AvaloniaMdiApp
         private readonly Button _btnConfig;
         private readonly Button? _btnShapeConfig;
         private readonly Border? _shapeMoveHandle;
+        private readonly Button _btnMin;
+        private readonly Button _btnMax;
+        private readonly Button _btnClose;
         private readonly TextBlock _btnMinText;
         private readonly TextBlock _btnMaxText;
         private readonly TextBlock _btnCloseText;
@@ -337,14 +344,19 @@ namespace AvaloniaMdiApp
             _btnConfig.IsVisible = false;
             ToolTip.SetTip(_btnConfig, "Opções da janela (Menu Circular)");
 
-            var btnMin = CreateControlButton("—", out _btnMinText, (s, e) => ToggleMinimize());
-            var btnMax = CreateControlButton("▢", out _btnMaxText, (s, e) => ToggleMaximize());
-            var btnClose = CreateControlButton("✕", out _btnCloseText, (s, e) => Fechar());
+            _btnMin = CreateControlButton("—", out _btnMinText, (s, e) => ToggleMinimize());
+            ToolTip.SetTip(_btnMin, "Minimizar Janela");
+
+            _btnMax = CreateControlButton("▢", out _btnMaxText, (s, e) => ToggleMaximize());
+            ToolTip.SetTip(_btnMax, "Maximizar Janela");
+
+            _btnClose = CreateControlButton("✕", out _btnCloseText, (s, e) => Fechar());
+            ToolTip.SetTip(_btnClose, "Fechar Janela");
 
             btnPanel.Children.Add(_btnConfig);
-            btnPanel.Children.Add(btnMin);
-            btnPanel.Children.Add(btnMax);
-            btnPanel.Children.Add(btnClose);
+            btnPanel.Children.Add(_btnMin);
+            btnPanel.Children.Add(_btnMax);
+            btnPanel.Children.Add(_btnClose);
             grid.Children.Add(btnPanel);
 
             DockPanel.SetDock(_titleBar, Dock.Top);
@@ -567,6 +579,19 @@ namespace AvaloniaMdiApp
                 AtualizarVisibilidadeControlesHover();
             };
 
+            // Garante que QUALQUER clique ou foco em qualquer parte da janela (texto, botões, barras, bordas)
+            // ative e traga imediatamente esta janela para a frente de todas as outras (sobreposição total)
+            AddHandler(InputElement.PointerPressedEvent, (s, e) =>
+            {
+                ZIndexManager.BringToFront(this);
+                OnWindowClicked?.Invoke(this);
+            }, RoutingStrategies.Tunnel, handledEventsToo: true);
+
+            AddHandler(InputElement.GotFocusEvent, (s, e) =>
+            {
+                ZIndexManager.BringToFront(this);
+            }, RoutingStrategies.Bubble | RoutingStrategies.Tunnel, handledEventsToo: true);
+
             PointerPressed += OnWindowPointerPressed;
             PointerMoved += OnWindowPointerMoved;
             PointerReleased += OnWindowPointerReleased;
@@ -707,6 +732,8 @@ namespace AvaloniaMdiApp
                 Y = bounds.Y,
                 Width = bounds.Width,
                 Height = bounds.Height,
+                IsMinimized = _isMinimized,
+                IsMaximized = _isMaximized,
                 NoteContent = WindowType == "browser"
                     ? (_browserHost?.CurrentUrl ?? _txtBrowserUrl?.Text ?? "https://www.google.com")
                     : WindowType == "image"
@@ -933,6 +960,10 @@ namespace AvaloniaMdiApp
             {
                 _normalRect = new Rect(newX, newY, _normalRect.Width, _normalRect.Height);
             }
+            else if (!_isMaximized)
+            {
+                _normalRect = new Rect(newX, newY, Width, Height);
+            }
             OnBoundsChanged?.Invoke(this);
         }
 
@@ -995,11 +1026,17 @@ namespace AvaloniaMdiApp
             }
             else
             {
-                BorderThickness = IsFlowchartShape ? new Thickness(0) : new Thickness(1);
+                BorderThickness = IsFlowchartShape ? new Thickness(0) : (_isActive ? new Thickness(1.5) : new Thickness(1));
                 BoxShadow = _isActive
-                    ? new BoxShadows(new BoxShadow { Color = Color.FromArgb(90, 0, 0, 0), Blur = 16, OffsetY = 6 })
-                    : new BoxShadows(new BoxShadow { Color = Color.FromArgb(50, 0, 0, 0), Blur = 10, OffsetY = 3 });
+                    ? new BoxShadows(new BoxShadow { Color = Color.FromArgb(130, 0, 0, 0), Blur = 20, OffsetY = 8, Spread = 1 })
+                    : new BoxShadows(new BoxShadow { Color = Color.FromArgb(40, 0, 0, 0), Blur = 8, OffsetY = 2 });
             }
+
+            _titleBar.Opacity = _isActive ? 1.0 : 0.85;
+            if (_btnMin != null) _btnMin.Opacity = _isActive ? 1.0 : 0.65;
+            if (_btnMax != null) _btnMax.Opacity = _isActive ? 1.0 : 0.65;
+            if (_btnClose != null) _btnClose.Opacity = _isActive ? 1.0 : 0.65;
+            if (_btnEditTitle != null) _btnEditTitle.Opacity = _isActive ? 0.85 : 0.50;
 
             if (_isDarkMode)
             {
@@ -1011,7 +1048,7 @@ namespace AvaloniaMdiApp
                 _titleBar.Background = customBrush ?? (_isActive ? ThemePalette.DarkWindowHeaderActiveBg : ThemePalette.DarkWindowHeaderBg);
                 _statusDot.Background = _isActive ? Brushes.White : (customBrush ?? ThemePalette.AccentLight);
                 _lblTitle.Foreground = ThemePalette.DarkTextPrimary;
-                _btnEditTitle.Foreground = ThemePalette.DarkTextPrimary;
+                if (_btnEditTitle != null) _btnEditTitle.Foreground = ThemePalette.DarkTextPrimary;
                 _txtTitleEditor.Background = ThemePalette.DarkContentBg;
                 _txtTitleEditor.Foreground = ThemePalette.DarkTextPrimary;
                 _txtTitleEditor.BorderBrush = customBrush ?? ThemePalette.DarkBorderActive;
@@ -1044,7 +1081,7 @@ namespace AvaloniaMdiApp
                 _statusDot.Background = (_isActive || customBrush != null) ? Brushes.White : ThemePalette.Accent;
                 var headerTextBrush = (_isActive || customBrush != null) ? Brushes.White : ThemePalette.LightTextPrimary;
                 _lblTitle.Foreground = headerTextBrush;
-                _btnEditTitle.Foreground = headerTextBrush;
+                if (_btnEditTitle != null) _btnEditTitle.Foreground = headerTextBrush;
                 _txtTitleEditor.Background = ThemePalette.LightWindowBg;
                 _txtTitleEditor.Foreground = ThemePalette.LightTextPrimary;
                 _txtTitleEditor.BorderBrush = customBrush ?? ThemePalette.LightBorderActive;
@@ -1152,9 +1189,7 @@ namespace AvaloniaMdiApp
         {
             if (_isMaximized)
             {
-                Width = Math.Max(220, e.NewSize.Width);
-                Height = Math.Max(140, e.NewSize.Height);
-                AtualizarTextoDimensoes();
+                AtualizarTamanhoSeMaximizado();
             }
         }
 
@@ -1493,9 +1528,16 @@ namespace AvaloniaMdiApp
 
             if (clicouBarraTitulo)
             {
-                if (e.ClickCount == 2 && !_isMinimized && !clicouTextoTitulo)
+                if (e.ClickCount == 2 && !clicouTextoTitulo)
                 {
-                    ToggleMaximize();
+                    if (_isMinimized)
+                    {
+                        ToggleMinimize();
+                    }
+                    else
+                    {
+                        ToggleMaximize();
+                    }
                     e.Handled = true;
                     return;
                 }
@@ -1675,6 +1717,10 @@ namespace AvaloniaMdiApp
                 Canvas.SetTop(this, newTop);
                 Width = newWidth;
                 Height = newHeight;
+                if (!_isMinimized && !_isMaximized)
+                {
+                    _normalRect = new Rect(newLeft, newTop, newWidth, newHeight);
+                }
                 _browserHost?.AtualizarLimitesNativos();
                 AtualizarTextoDimensoes();
                 OnBoundsChanged?.Invoke(this);
@@ -1727,6 +1773,82 @@ namespace AvaloniaMdiApp
             }
         }
 
+        private Rect ObterLimitesMaximizados()
+        {
+            var scroller = this.FindAncestorOfType<ScrollViewer>();
+            if (scroller != null && scroller.Viewport.Width > 0 && scroller.Viewport.Height > 0)
+            {
+                double x = scroller.Offset.X;
+                double y = scroller.Offset.Y;
+                double w = Math.Max(220, scroller.Viewport.Width);
+                double h = Math.Max(140, scroller.Viewport.Height);
+                return new Rect(x, y, w, h);
+            }
+
+            double canvasW = Workspace.Bounds.Width > 0 ? Workspace.Bounds.Width : (Workspace.Width > 0 ? Workspace.Width : 1000);
+            double canvasH = Workspace.Bounds.Height > 0 ? Workspace.Bounds.Height : (Workspace.Height > 0 ? Workspace.Height : 700);
+            return new Rect(0, 0, Math.Max(220, canvasW), Math.Max(140, canvasH));
+        }
+
+        public void AtualizarTamanhoSeMaximizado()
+        {
+            if (!_isMaximized) return;
+            var bounds = ObterLimitesMaximizados();
+            Canvas.SetLeft(this, bounds.X);
+            Canvas.SetTop(this, bounds.Y);
+            Width = bounds.Width;
+            if (!_isMinimized)
+            {
+                Height = bounds.Height;
+            }
+            AtualizarTextoDimensoes();
+        }
+
+        public void AplicarEstadoMinimizadoInicial()
+        {
+            _normalRect = new Rect(Canvas.GetLeft(this), Canvas.GetTop(this), Width, Height);
+            _contentPanel.IsVisible = false;
+            Height = 34;
+            _isMinimized = true;
+            _btnMinText.Text = "▲";
+            _btnMinText.FontSize = 11;
+            _btnMinText.FontWeight = FontWeight.Bold;
+            ToolTip.SetTip(_btnMin, "Restaurar Janela ao Tamanho Normal");
+            ZIndex = 1;
+            _browserHost?.SetBrowserVisible(false);
+            AtualizarHibernacaoGaleriaEImagem(true);
+            SincronizarEstadoHibernacaoRecursos();
+            _taskBar.AtualizarEstadoMinimizado(this, true);
+            OnBoundsChanged?.Invoke(this);
+        }
+
+        public void AplicarEstadoMaximizadoInicial()
+        {
+            _normalRect = new Rect(Canvas.GetLeft(this), Canvas.GetTop(this), Width, Height);
+            _isMaximized = true;
+            _btnMaxText.Text = "❐";
+            ToolTip.SetTip(_btnMax, "Restaurar Janela ao Tamanho Normal");
+            CornerRadius = new CornerRadius(0);
+            _titleBar.CornerRadius = new CornerRadius(0);
+
+            var bounds = ObterLimitesMaximizados();
+            Canvas.SetLeft(this, bounds.X);
+            Canvas.SetTop(this, bounds.Y);
+            Width = bounds.Width;
+            Height = bounds.Height;
+            AtualizarTextoDimensoes();
+            OnBoundsChanged?.Invoke(this);
+
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (_isMaximized)
+                {
+                    AtualizarTamanhoSeMaximizado();
+                    OnBoundsChanged?.Invoke(this);
+                }
+            }, DispatcherPriority.Loaded);
+        }
+
         public void ToggleMinimize()
         {
             if (!_isMinimized)
@@ -1738,20 +1860,47 @@ namespace AvaloniaMdiApp
                 _contentPanel.IsVisible = false;
                 Height = 34;
                 _isMinimized = true;
-                _btnMinText.Text = "▫";
+                _btnMinText.Text = "▲";
+                _btnMinText.FontSize = 11;
+                _btnMinText.FontWeight = FontWeight.Bold;
+                ToolTip.SetTip(_btnMin, "Restaurar Janela ao Tamanho Normal");
+
+                // Reduz Z-Index da janela minimizada para que janelas ativas sobreponham-a
+                ZIndex = Math.Max(1, ZIndex - 2);
+
+                // Ativa a próxima janela aberta mais recente no workspace, se houver
+                var proximaAberta = Workspace.Children
+                    .OfType<DraggableWindow>()
+                    .Where(w => w != this && !w.IsMinimized)
+                    .OrderByDescending(w => w.ZIndex)
+                    .FirstOrDefault();
+
+                if (proximaAberta != null)
+                {
+                    ZIndexManager.BringToFront(proximaAberta);
+                }
+                else
+                {
+                    ZIndexManager.ClearActive(this);
+                }
             }
             else
             {
                 _contentPanel.IsVisible = true;
-                Height = _isMaximized ? Math.Max(140, Workspace.Bounds.Height) : _normalRect.Height;
+                Height = _isMaximized ? Math.Max(140, ObterLimitesMaximizados().Height) : _normalRect.Height;
                 _isMinimized = false;
                 _btnMinText.Text = "—";
+                _btnMinText.FontSize = 11;
+                _btnMinText.FontWeight = FontWeight.Normal;
+                ToolTip.SetTip(_btnMin, "Minimizar Janela");
+                ZIndexManager.BringToFront(this);
             }
             _browserHost?.SetBrowserVisible(!_isMinimized);
             AtualizarHibernacaoGaleriaEImagem(_isMinimized);
             SincronizarEstadoHibernacaoRecursos();
             _taskBar.AtualizarEstadoMinimizado(this, _isMinimized);
             OnBoundsChanged?.Invoke(this);
+            OnWindowStateChanged?.Invoke(this);
         }
 
         public void ToggleMaximize()
@@ -1765,15 +1914,17 @@ namespace AvaloniaMdiApp
             {
                 _normalRect = new Rect(Canvas.GetLeft(this), Canvas.GetTop(this), Width, Height);
 
-                Canvas.SetLeft(this, 0);
-                Canvas.SetTop(this, 0);
-                Width = Math.Max(220, Workspace.Bounds.Width);
-                Height = Math.Max(140, Workspace.Bounds.Height);
+                var bounds = ObterLimitesMaximizados();
+                Canvas.SetLeft(this, bounds.X);
+                Canvas.SetTop(this, bounds.Y);
+                Width = bounds.Width;
+                Height = bounds.Height;
                 CornerRadius = new CornerRadius(0);
                 _titleBar.CornerRadius = new CornerRadius(0);
 
                 _isMaximized = true;
                 _btnMaxText.Text = "❐";
+                ToolTip.SetTip(_btnMax, "Restaurar Janela ao Tamanho Normal");
             }
             else
             {
@@ -1786,9 +1937,11 @@ namespace AvaloniaMdiApp
 
                 _isMaximized = false;
                 _btnMaxText.Text = "▢";
+                ToolTip.SetTip(_btnMax, "Maximizar Janela");
             }
             AtualizarTextoDimensoes();
             OnBoundsChanged?.Invoke(this);
+            OnWindowStateChanged?.Invoke(this);
         }
     }
 }

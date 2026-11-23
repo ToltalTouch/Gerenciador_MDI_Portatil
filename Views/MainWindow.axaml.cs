@@ -671,7 +671,14 @@ namespace AvaloniaMdiApp
 
         private void ConfigurarEventosWorkspaceZoomEPan()
         {
-            WorkspaceViewport.SizeChanged += (s, e) => AtualizarDimensoesCanvasWorkspace();
+            WorkspaceViewport.SizeChanged += (s, e) =>
+            {
+                AtualizarDimensoesCanvasWorkspace();
+                foreach (var win in _ativasJanelas)
+                {
+                    win.AtualizarTamanhoSeMaximizado();
+                }
+            };
 
             // Atalho Ctrl + Roda do Mouse para Zoom In / Zoom Out no Workspace
             WorkspaceViewport.AddHandler(PointerWheelChangedEvent, (s, e) =>
@@ -2048,7 +2055,7 @@ namespace AvaloniaMdiApp
                     else if (DraggableWindow.EhTipoFormaFluxograma(winData.WindowType)) _contadorFormas++;
                     else _contadorJanelas++;
 
-                    CriarJanelaInterna(
+                    var createdWin = CriarJanelaInterna(
                         winData.Title,
                         Math.Max(0, winData.X),
                         Math.Max(0, winData.Y),
@@ -2070,6 +2077,19 @@ namespace AvaloniaMdiApp
                         winData.ConditionalRules,
                         winData.CriticalityLevel,
                         winData.RichLines);
+
+                    if (winData.IsMaximized)
+                    {
+                        createdWin.AplicarEstadoMaximizadoInicial();
+                        if (winData.IsMinimized)
+                        {
+                            createdWin.AplicarEstadoMinimizadoInicial();
+                        }
+                    }
+                    else if (winData.IsMinimized)
+                    {
+                        createdWin.AplicarEstadoMinimizadoInicial();
+                    }
                 }
             }
 
@@ -2084,6 +2104,12 @@ namespace AvaloniaMdiApp
                         CriarOuFocarConexaoFluxograma(fromWin, toWin, connData.Id, connData.Label, mostrarToast: false, connData.ColorHex);
                     }
                 }
+            }
+
+            var ultimaAberta = _ativasJanelas.LastOrDefault(w => !w.IsMinimized) ?? _ativasJanelas.LastOrDefault();
+            if (ultimaAberta != null)
+            {
+                ZIndexManager.BringToFront(ultimaAberta);
             }
 
             AtualizarDimensoesCanvasWorkspace();
@@ -4876,6 +4902,14 @@ namespace AvaloniaMdiApp
             {
                 RegistrarEstadoUndo();
                 SalvarTodosWorkspacesNoDisco();
+            };
+            win.OnWindowStateChanged += (janelaAlvo) =>
+            {
+                if (!_trocandoWorkspace && !_isRestoringUndoRedo)
+                {
+                    RegistrarEstadoUndo();
+                    SalvarTodosWorkspacesNoDisco();
+                }
             };
             win.OnRequestPropagateColor += (janelaAlvo, cor) => PropagarCorParaConectadas(janelaAlvo, cor);
 

@@ -73,6 +73,8 @@ namespace AvaloniaMdiApp
         public double Y { get; set; }
         public double Width { get; set; }
         public double Height { get; set; }
+        public bool IsMinimized { get; set; } = false;
+        public bool IsMaximized { get; set; } = false;
         public string NoteContent { get; set; } = string.Empty;
         public TextFormatData TextFormat { get; set; } = new();
         public List<RichTextLineData> RichLines { get; set; } = new();
