@@ -395,19 +395,36 @@
                         Click="WorkspaceZoomOut_Click">
                   <PathIcon Data="{x:Static local:AppIcons.Minus}" Width="11" Height="11" Foreground="#CBD5E1"/>
                 </Button>
-                <Button Name="BtnHudZoomReset"
-                        Content="100%"
-                        MinWidth="52"
-                        Height="26"
-                        Padding="6,0"
-                        CornerRadius="5"
-                        BorderThickness="1"
-                        FontSize="11.5"
-                        FontWeight="SemiBold"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        ToolTip.Tip="Clique para redefinir o zoom do Workspace para 100%"
-                        Click="WorkspaceZoomReset_Click"/>
+                <Panel MinWidth="54" Height="26">
+                  <Button Name="BtnHudZoomReset"
+                          Content="100%"
+                          MinWidth="54"
+                          Height="26"
+                          Padding="6,0"
+                          CornerRadius="5"
+                          BorderThickness="1"
+                          FontSize="11.5"
+                          FontWeight="SemiBold"
+                          HorizontalContentAlignment="Center"
+                          VerticalContentAlignment="Center"
+                          ToolTip.Tip="Clique para digitar a porcentagem do zoom ou duplo clique para 100%"
+                          Click="WorkspaceZoomButton_Click"/>
+                  <TextBox Name="TxtHudZoomInput"
+                           IsVisible="False"
+                           MinWidth="54"
+                           Height="26"
+                           Padding="4,2"
+                           CornerRadius="5"
+                           FontSize="11.5"
+                           FontWeight="SemiBold"
+                           HorizontalContentAlignment="Center"
+                           VerticalContentAlignment="Center"
+                           TextAlignment="Center"
+                           Background="#0F172A"
+                           Foreground="#F8FAFC"
+                           BorderBrush="#38BDF8"
+                           BorderThickness="1.5"/>
+                </Panel>
                 <Button Name="BtnHudZoomIn"
                         Width="26"
                         Height="26"
@@ -433,7 +450,7 @@
             <LayoutTransformControl Name="WorkspaceZoomHost"
                                     HorizontalAlignment="Left"
                                     VerticalAlignment="Top">
-              <Canvas Name="Workspace" Background="#0F172A" ClipToBounds="True" Focusable="True"/>
+              <Canvas Name="Workspace" Background="#0F172A" ClipToBounds="True" Focusable="False"/>
             </LayoutTransformControl>
           </ScrollViewer>
 

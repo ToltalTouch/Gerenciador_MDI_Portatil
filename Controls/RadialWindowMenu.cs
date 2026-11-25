@@ -30,6 +30,7 @@ namespace AvaloniaMdiApp
 
         private readonly DraggableWindow _targetWindow;
         private readonly Point _center;
+        private readonly Size _viewportSize;
         private string? _activeSubmenu = null;
 
         private readonly List<RadialMenuItem> _mainItems = new();
@@ -41,11 +42,12 @@ namespace AvaloniaMdiApp
 
         public event Action? OnClosed;
 
-        public RadialWindowMenu(DraggableWindow targetWindow, Point centerPoint, bool hasConnections = false)
+        public RadialWindowMenu(DraggableWindow targetWindow, Point centerPoint, bool hasConnections = false, Size? viewportSize = null)
         {
             _targetWindow = targetWindow;
             _center = centerPoint;
             _hasConnections = hasConnections;
+            _viewportSize = viewportSize ?? new Size(1600, 1000);
 
             ClipToBounds = false;
             IsHitTestVisible = true;
@@ -234,44 +236,7 @@ namespace AvaloniaMdiApp
 
         private void RenderizarMenuPrincipal()
         {
-            double rx = 115;
-            double ry = 75;
-            int total = _mainItems.Count;
-
-            for (int i = 0; i < total; i++)
-            {
-                var item = _mainItems[i];
-                double angulo = -Math.PI / 2.0 + (i * 2.0 * Math.PI / total);
-
-                double px = _center.X + rx * Math.Cos(angulo);
-                double py = _center.Y + ry * Math.Sin(angulo);
-
-                var pill = CriarPillButton(
-                    item.Label,
-                    item.Icon,
-                    item.IconBrush,
-                    item.HasSubmenu,
-                    isSubitem: false);
-
-                item.VisualElement = pill;
-
-                pill.PointerPressed += (s, e) =>
-                {
-                    e.Handled = true;
-                    AoClicarItemPrincipal(item);
-                };
-
-                // Medição dinâmica para centralizar pill
-                pill.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                double w = pill.DesiredSize.Width > 0 ? pill.DesiredSize.Width : 110;
-                double h = pill.DesiredSize.Height > 0 ? pill.DesiredSize.Height : 32;
-
-                Canvas.SetLeft(pill, px - w / 2.0);
-                Canvas.SetTop(pill, py - h / 2.0);
-                pill.ZIndex = 20;
-
-                Children.Add(pill);
-            }
+            PosicionarItensRadiais(_mainItems, isSubmenu: false);
         }
 
         private void AoClicarItemPrincipal(RadialMenuItem item)
@@ -302,19 +267,12 @@ namespace AvaloniaMdiApp
             _activeSubmenu = submenuId;
             LimparItensSubmenuVisual();
 
-            // Atualiza atenuação do anel principal (deixa os outros itens meio invisíveis)
+            // Oculta os itens do menu principal para que o submenu tenha espaço radial limpo e sem sobreposição
             foreach (var main in _mainItems)
             {
                 if (main.VisualElement != null)
                 {
-                    bool isSelected = main.Id == submenuId;
-                    main.VisualElement.Opacity = isSelected ? 1.0 : 0.22;
-                    main.VisualElement.BorderBrush = isSelected
-                        ? new SolidColorBrush(Color.Parse("#38BDF8"))
-                        : new SolidColorBrush(Color.Parse("#475569"));
-                    main.VisualElement.Background = isSelected
-                        ? new SolidColorBrush(Color.Parse("#F02563EB"))
-                        : new SolidColorBrush(Color.Parse("#CC1E293B"));
+                    main.VisualElement.IsVisible = false;
                 }
             }
 
@@ -494,44 +452,7 @@ namespace AvaloniaMdiApp
 
         private void RenderizarItensSubmenu()
         {
-            double rx = 185;
-            double ry = 125;
-            int total = _subItems.Count;
-            if (total == 0) return;
-
-            for (int i = 0; i < total; i++)
-            {
-                var sub = _subItems[i];
-                double angulo = -Math.PI / 2.0 + (i * 2.0 * Math.PI / total);
-
-                double px = _center.X + rx * Math.Cos(angulo);
-                double py = _center.Y + ry * Math.Sin(angulo);
-
-                var pill = CriarPillButton(
-                    sub.Label,
-                    sub.Icon,
-                    sub.IconBrush,
-                    hasSubmenu: false,
-                    isSubitem: true);
-
-                sub.VisualElement = pill;
-
-                pill.PointerPressed += (s, e) =>
-                {
-                    e.Handled = true;
-                    sub.OnExecute?.Invoke();
-                };
-
-                pill.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                double w = pill.DesiredSize.Width > 0 ? pill.DesiredSize.Width : 105;
-                double h = pill.DesiredSize.Height > 0 ? pill.DesiredSize.Height : 28;
-
-                Canvas.SetLeft(pill, px - w / 2.0);
-                Canvas.SetTop(pill, py - h / 2.0);
-                pill.ZIndex = 25;
-
-                Children.Add(pill);
-            }
+            PosicionarItensRadiais(_subItems, isSubmenu: true);
         }
 
         private void LimparItensSubmenuVisual()
@@ -552,11 +473,12 @@ namespace AvaloniaMdiApp
             _activeSubmenu = null;
             LimparItensSubmenuVisual();
 
-            // Restaura opacidade do anel principal
+            // Restaura visibilidade e opacidade do anel principal
             foreach (var main in _mainItems)
             {
                 if (main.VisualElement != null)
                 {
+                    main.VisualElement.IsVisible = true;
                     main.VisualElement.Opacity = 1.0;
                     main.VisualElement.Background = new SolidColorBrush(Color.Parse("#EE1E293B"));
                     main.VisualElement.BorderBrush = new SolidColorBrush(Color.Parse("#475569"));
@@ -565,6 +487,193 @@ namespace AvaloniaMdiApp
 
             _centerHubText.Text = "Opções";
             _centerHubIcon.Data = AppIcons.Settings;
+            Canvas.SetLeft(_centerHub, _center.X - 50);
+            Canvas.SetTop(_centerHub, _center.Y - 18);
+        }
+
+        private void PosicionarItensRadiais(List<RadialMenuItem> items, bool isSubmenu)
+        {
+            int total = items.Count;
+            if (total == 0) return;
+
+            // 1. Cria e mede individualmente cada botão para saber a largura e altura exatas do texto e ícone
+            var pillSizes = new List<Size>();
+            double sumWidths = 0;
+            double maxW = 0;
+            double maxH = 0;
+
+            for (int i = 0; i < total; i++)
+            {
+                var item = items[i];
+                var pill = CriarPillButton(
+                    item.Label,
+                    item.Icon,
+                    item.IconBrush,
+                    item.HasSubmenu,
+                    isSubitem: isSubmenu);
+
+                item.VisualElement = pill;
+
+                pill.PointerPressed += (s, e) =>
+                {
+                    e.Handled = true;
+                    if (isSubmenu)
+                    {
+                        item.OnExecute?.Invoke();
+                    }
+                    else
+                    {
+                        AoClicarItemPrincipal(item);
+                    }
+                };
+
+                pill.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                double w = pill.DesiredSize.Width > 0 ? Math.Ceiling(pill.DesiredSize.Width) : (isSubmenu ? 110 : 120);
+                double h = pill.DesiredSize.Height > 0 ? Math.Ceiling(pill.DesiredSize.Height) : (isSubmenu ? 29 : 33);
+
+                pillSizes.Add(new Size(w, h));
+                sumWidths += w;
+                if (w > maxW) maxW = w;
+                if (h > maxH) maxH = h;
+            }
+
+            // 2. Calcula os ângulos proporcionais para cada item de acordo com a largura do texto
+            // Isso garante que botões mais largos (ex: "Replicar para Conectadas") recebam uma fatia angular proporcionalmente maior
+            double gapPerItem = isSubmenu ? 22.0 : 20.0;
+            double totalAllocated = sumWidths + (total * gapPerItem);
+
+            var angles = new List<double>();
+            double currentAngle = -Math.PI / 2.0; // Inicia no topo (-90 graus)
+
+            for (int i = 0; i < total; i++)
+            {
+                double itemSlice = (pillSizes[i].Width + gapPerItem) / totalAllocated * (2.0 * Math.PI);
+                double midAngle = currentAngle + (itemSlice / 2.0);
+                angles.Add(midAngle);
+                currentAngle += itemSlice;
+            }
+
+            // 3. Calcula o perímetro mínimo necessário e os raios horizontal (rx) e vertical (ry) da elipse
+            double aspect = 1.45; // Formato elíptico harmonioso para telas widescreen
+            double cFactor = 7.59; // Fator de perímetro aproximado para elipse com proporção 1.45
+            double requiredPerimeter = totalAllocated;
+
+            double ry = Math.Max(isSubmenu ? 110.0 : 85.0, requiredPerimeter / cFactor);
+            double rx = ry * aspect;
+
+            // Garante folga segura em relação ao hub central (hub mede 100x36)
+            double minRx = 55.0 + (maxW / 2.0) + (isSubmenu ? 25.0 : 18.0);
+            double minRy = 22.0 + (maxH / 2.0) + (isSubmenu ? 22.0 : 16.0);
+
+            rx = Math.Max(rx, minRx);
+            ry = Math.Max(ry, minRy);
+
+            // 4. Verificação e relaxamento iterativo de colisões entre os retângulos dos botões
+            var positions = new List<Point>();
+            for (int pass = 0; pass < 12; pass++)
+            {
+                positions.Clear();
+                for (int i = 0; i < total; i++)
+                {
+                    double a = angles[i];
+                    double px = _center.X + rx * Math.Cos(a);
+                    double py = _center.Y + ry * Math.Sin(a);
+                    positions.Add(new Point(px, py));
+                }
+
+                bool hasOverlap = false;
+                double marginH = 10.0;
+                double marginV = 6.0;
+
+                for (int i = 0; i < total; i++)
+                {
+                    Rect r1 = new Rect(
+                        positions[i].X - pillSizes[i].Width / 2.0 - marginH / 2.0,
+                        positions[i].Y - pillSizes[i].Height / 2.0 - marginV / 2.0,
+                        pillSizes[i].Width + marginH,
+                        pillSizes[i].Height + marginV);
+
+                    for (int j = i + 1; j < total; j++)
+                    {
+                        Rect r2 = new Rect(
+                            positions[j].X - pillSizes[j].Width / 2.0 - marginH / 2.0,
+                            positions[j].Y - pillSizes[j].Height / 2.0 - marginV / 2.0,
+                            pillSizes[j].Width + marginH,
+                            pillSizes[j].Height + marginV);
+
+                        if (r1.Intersects(r2))
+                        {
+                            hasOverlap = true;
+                            break;
+                        }
+                    }
+                    if (hasOverlap) break;
+                }
+
+                if (!hasOverlap)
+                {
+                    break;
+                }
+
+                // Expande os raios suavemente até que nenhum botão encoste no outro
+                rx *= 1.07;
+                ry *= 1.07;
+            }
+
+            // 5. Ajuste de translação do conjunto para garantir que nenhum botão vaze para fora da tela
+            double minBoundX = double.PositiveInfinity;
+            double maxBoundX = double.NegativeInfinity;
+            double minBoundY = double.PositiveInfinity;
+            double maxBoundY = double.NegativeInfinity;
+
+            for (int i = 0; i < total; i++)
+            {
+                double x1 = positions[i].X - pillSizes[i].Width / 2.0;
+                double x2 = positions[i].X + pillSizes[i].Width / 2.0;
+                double y1 = positions[i].Y - pillSizes[i].Height / 2.0;
+                double y2 = positions[i].Y + pillSizes[i].Height / 2.0;
+
+                if (x1 < minBoundX) minBoundX = x1;
+                if (x2 > maxBoundX) maxBoundX = x2;
+                if (y1 < minBoundY) minBoundY = y1;
+                if (y2 > maxBoundY) maxBoundY = y2;
+            }
+
+            double shiftX = 0;
+            double shiftY = 0;
+            double pad = 14.0;
+
+            if (minBoundX < pad) shiftX = pad - minBoundX;
+            else if (maxBoundX > _viewportSize.Width - pad) shiftX = (_viewportSize.Width - pad) - maxBoundX;
+
+            if (minBoundY < pad) shiftY = pad - minBoundY;
+            else if (maxBoundY > _viewportSize.Height - pad) shiftY = (_viewportSize.Height - pad) - maxBoundY;
+
+            // Se houve deslocamento da borda da tela, translada o hub central também para manter o equilíbrio visual
+            if (Math.Abs(shiftX) > 0.1 || Math.Abs(shiftY) > 0.1)
+            {
+                Canvas.SetLeft(_centerHub, _center.X - 50 + shiftX);
+                Canvas.SetTop(_centerHub, _center.Y - 18 + shiftY);
+            }
+            else
+            {
+                Canvas.SetLeft(_centerHub, _center.X - 50);
+                Canvas.SetTop(_centerHub, _center.Y - 18);
+            }
+
+            // 6. Posiciona visualmente cada botão no Canvas
+            for (int i = 0; i < total; i++)
+            {
+                var pill = items[i].VisualElement!;
+                double left = positions[i].X - (pillSizes[i].Width / 2.0) + shiftX;
+                double top = positions[i].Y - (pillSizes[i].Height / 2.0) + shiftY;
+
+                Canvas.SetLeft(pill, left);
+                Canvas.SetTop(pill, top);
+                pill.ZIndex = isSubmenu ? 26 : 20;
+
+                Children.Add(pill);
+            }
         }
 
         private Border CriarPillButton(

@@ -13,6 +13,7 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime;
@@ -35,6 +36,9 @@ namespace AvaloniaMdiApp
         private bool _isDarkMode = true;
         private string _widgetSizePreset = "normal";
         private double _workspaceZoom = 1.0;
+        private Vector _savedScrollOffset = Vector.Zero;
+        private bool _isRestoringScroll = false;
+        private bool _isConfirmingZoom = false;
         private string _workspaceBgImagePath = string.Empty;
         private Bitmap? _workspaceBgBitmap;
         private SettingsWindow? _settingsWindow;
@@ -673,12 +677,104 @@ namespace AvaloniaMdiApp
         {
             WorkspaceViewport.SizeChanged += (s, e) =>
             {
+                if (e.NewSize.Width > 50 && e.NewSize.Height > 50 && WindowState != WindowState.Minimized)
+                {
+                    if ((_savedScrollOffset.X > 0 || _savedScrollOffset.Y > 0) &&
+                        WorkspaceScroller.Offset.X == 0 && WorkspaceScroller.Offset.Y == 0)
+                    {
+                        _isRestoringScroll = true;
+                        Dispatcher.UIThread.Post(() =>
+                        {
+                            try
+                            {
+                                if (WorkspaceScroller != null)
+                                {
+                                    WorkspaceScroller.Offset = _savedScrollOffset;
+                                }
+                            }
+                            finally
+                            {
+                                Dispatcher.UIThread.Post(() => _isRestoringScroll = false, DispatcherPriority.Background);
+                            }
+                        }, DispatcherPriority.Loaded);
+                    }
+                }
                 AtualizarDimensoesCanvasWorkspace();
                 foreach (var win in _ativasJanelas)
                 {
                     win.AtualizarTamanhoSeMaximizado();
                 }
             };
+
+            // Previne que o ScrollViewer role para (0,0) automaticamente quando o Canvas ou o host recebem foco
+            WorkspaceScroller.AddHandler(RequestBringIntoViewEvent, (s, e) =>
+            {
+                if (e.TargetObject == Workspace || e.TargetObject == WorkspaceZoomHost || e.TargetObject == this)
+                {
+                    e.Handled = true;
+                }
+            }, RoutingStrategies.Tunnel);
+
+            // Rastreia continuamente a posição real de rolagem do usuário no Workspace
+            WorkspaceScroller.PropertyChanged += (s, e) =>
+            {
+                if (e.Property == ScrollViewer.OffsetProperty && e.NewValue is Vector offset)
+                {
+                    if (!_isRestoringScroll && WindowState != WindowState.Minimized &&
+                        WorkspaceViewport.Bounds.Width > 50 && WorkspaceViewport.Bounds.Height > 50)
+                    {
+                        _savedScrollOffset = offset;
+                    }
+                }
+            };
+
+            // Restaura a posição de rolagem quando a janela do aplicativo sai do estado minimizado
+            PropertyChanged += (s, e) =>
+            {
+                if (e.Property == WindowStateProperty && e.NewValue is WindowState state)
+                {
+                    if (state != WindowState.Minimized && (_savedScrollOffset.X > 0 || _savedScrollOffset.Y > 0))
+                    {
+                        _isRestoringScroll = true;
+                        Dispatcher.UIThread.Post(() =>
+                        {
+                            try
+                            {
+                                if (WorkspaceScroller != null)
+                                {
+                                    WorkspaceScroller.Offset = _savedScrollOffset;
+                                }
+                            }
+                            finally
+                            {
+                                Dispatcher.UIThread.Post(() => _isRestoringScroll = false, DispatcherPriority.Background);
+                            }
+                        }, DispatcherPriority.Loaded);
+                    }
+                }
+            };
+
+            // Configuração dos controles de zoom digitável (HUD)
+            BtnHudZoomReset.DoubleTapped += (s, e) =>
+            {
+                e.Handled = true;
+                AplicarZoomWorkspace(1.0);
+            };
+
+            TxtHudZoomInput.KeyDown += (s, e) =>
+            {
+                if (e.Key == Key.Enter)
+                {
+                    e.Handled = true;
+                    ConfirmarEdicaoZoom();
+                }
+                else if (e.Key == Key.Escape)
+                {
+                    e.Handled = true;
+                    CancelarEdicaoZoom();
+                }
+            };
+            TxtHudZoomInput.LostFocus += (s, e) => ConfirmarEdicaoZoom();
 
             // Atalho Ctrl + Roda do Mouse para Zoom In / Zoom Out no Workspace
             WorkspaceViewport.AddHandler(PointerWheelChangedEvent, (s, e) =>
@@ -713,7 +809,6 @@ namespace AvaloniaMdiApp
 
                 if (isDirectWorkspace || !isInsideWindow)
                 {
-                    Workspace.Focus();
                     if (_modoVinculoLinhaAtivo)
                     {
                         CancelarModoVinculoLinha(notificar: true);
@@ -786,6 +881,7 @@ namespace AvaloniaMdiApp
                     WorkspaceScroller.Offset = new Vector(
                         Math.Max(0, _panOffsetStart.X - diff.X),
                         Math.Max(0, _panOffsetStart.Y - diff.Y));
+                    _savedScrollOffset = WorkspaceScroller.Offset;
                     return;
                 }
 
@@ -1181,6 +1277,53 @@ namespace AvaloniaMdiApp
             AplicarZoomWorkspace(1.0);
         }
 
+        private void WorkspaceZoomButton_Click(object? sender, RoutedEventArgs e)
+        {
+            IniciarEdicaoZoom();
+        }
+
+        private void IniciarEdicaoZoom()
+        {
+            int pct = (int)Math.Round(_workspaceZoom * 100);
+            TxtHudZoomInput.Text = $"{pct}";
+            BtnHudZoomReset.IsVisible = false;
+            TxtHudZoomInput.IsVisible = true;
+            TxtHudZoomInput.Focus();
+            TxtHudZoomInput.SelectAll();
+        }
+
+        private void ConfirmarEdicaoZoom()
+        {
+            if (_isConfirmingZoom || !TxtHudZoomInput.IsVisible) return;
+            _isConfirmingZoom = true;
+            try
+            {
+                string raw = (TxtHudZoomInput.Text ?? "").Replace("%", "").Trim();
+                if (double.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out double val) ||
+                    double.TryParse(raw, NumberStyles.Any, CultureInfo.CurrentCulture, out val))
+                {
+                    val = Math.Clamp(val, 25, 200);
+                    AplicarZoomWorkspace(val / 100.0);
+                }
+                else
+                {
+                    BtnHudZoomReset.Content = $"{(int)Math.Round(_workspaceZoom * 100)}%";
+                }
+                TxtHudZoomInput.IsVisible = false;
+                BtnHudZoomReset.IsVisible = true;
+            }
+            finally
+            {
+                _isConfirmingZoom = false;
+            }
+        }
+
+        private void CancelarEdicaoZoom()
+        {
+            TxtHudZoomInput.IsVisible = false;
+            BtnHudZoomReset.IsVisible = true;
+        }
+
         private void AplicarZoomWorkspace(double novoZoom)
         {
             _workspaceZoom = Math.Clamp(Math.Round(novoZoom, 2), 0.25, 2.00);
@@ -1500,8 +1643,8 @@ namespace AvaloniaMdiApp
             // Com a largura média do botão (~130px -> metade ~65px) e respiro (~15px):
             // Margem horizontal segura = 265px
             // Margem vertical segura = 155px
-            double marginX = 265;
-            double marginY = 155;
+            double marginX = Math.Min(340, overlayW * 0.40);
+            double marginY = Math.Min(220, overlayH * 0.40);
 
             double clampedX = overlayW >= marginX * 2
                 ? Math.Clamp(center.X, marginX, overlayW - marginX)
@@ -1514,7 +1657,7 @@ namespace AvaloniaMdiApp
             Point clampedCenter = new Point(clampedX, clampedY);
 
             bool hasConnections = _conexoesAtivas.Any(c => c.FromWindow == win || c.ToWindow == win);
-            var radialMenu = new RadialWindowMenu(win, clampedCenter, hasConnections);
+            var radialMenu = new RadialWindowMenu(win, clampedCenter, hasConnections, new Size(overlayW, overlayH));
             radialMenu.OnClosed += () => FecharMenuCircular();
 
             RadialMenuCanvas.Children.Add(radialMenu);
@@ -1875,6 +2018,13 @@ namespace AvaloniaMdiApp
                 btn.BorderBrush = borderBrush;
             }
 
+            if (TxtHudZoomInput != null)
+            {
+                TxtHudZoomInput.Background = _isDarkMode ? ThemePalette.DarkContentBg : ThemePalette.LightContentBg;
+                TxtHudZoomInput.Foreground = textPrimary;
+                TxtHudZoomInput.BorderBrush = ThemePalette.Accent;
+            }
+
             AppTaskBar.AplicarTema(_isDarkMode);
             _settingsWindow?.AplicarTema(_isDarkMode);
             AplicarEstiloModal();
@@ -2112,6 +2262,18 @@ namespace AvaloniaMdiApp
                 ZIndexManager.BringToFront(ultimaAberta);
             }
 
+            if (ws.ScrollOffsetX > 0 || ws.ScrollOffsetY > 0)
+            {
+                _savedScrollOffset = new Vector(ws.ScrollOffsetX, ws.ScrollOffsetY);
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (WorkspaceScroller != null)
+                    {
+                        WorkspaceScroller.Offset = _savedScrollOffset;
+                    }
+                }, DispatcherPriority.Loaded);
+            }
+
             AtualizarDimensoesCanvasWorkspace();
         }
 
@@ -2121,6 +2283,8 @@ namespace AvaloniaMdiApp
             ws.LastModifiedUtc = DateTime.UtcNow;
             ws.BackgroundImagePath = _workspaceBgImagePath ?? string.Empty;
             ws.WorkspaceZoom = _workspaceZoom;
+            ws.ScrollOffsetX = _savedScrollOffset.X;
+            ws.ScrollOffsetY = _savedScrollOffset.Y;
             ws.SavedWindows.Clear();
 
             foreach (var win in _ativasJanelas)
