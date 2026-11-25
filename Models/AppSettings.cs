@@ -136,7 +136,7 @@ namespace AvaloniaMdiApp
         public bool AutoExpandSidebarsOnHover { get; set; } = true;
         public bool AutoCheckUpdatesOnStartup { get; set; } = true;
         public bool HasSeenWelcome { get; set; } = false;
-        public string GitHubRepository { get; set; } = "ToltalTouch/Janela_multitarefa";
+        public string GitHubRepository { get; set; } = "ToltalTouch/Gerenciador_MDI_Portatil";
         public string LastInstalledTag { get; set; } = "v1.0.0";
         public string ActiveWorkspaceId { get; set; } = string.Empty;
         public List<WorkspaceData> Workspaces { get; set; } = new();

@@ -35,20 +35,86 @@ namespace AvaloniaMdiApp
         public string TagName { get; set; } = string.Empty;
     }
 
+    public class InformacoesArquivoAtual
+    {
+        public string Versao { get; set; } = "1.0.0";
+        public string NomeArquivo { get; set; } = "AvaloniaMdiApp.exe";
+        public string CaminhoCompleto { get; set; } = string.Empty;
+        public long TamanhoBytes { get; set; }
+        public DateTime DataModificacao { get; set; }
+        public string TamanhoFormatado => FormatarTamanho(TamanhoBytes);
+
+        public static string FormatarTamanho(long bytes)
+        {
+            if (bytes <= 0) return "0 MB";
+            double mb = bytes / (1024.0 * 1024.0);
+            return $"{mb:F1} MB";
+        }
+    }
+
     /// <summary>
     /// Serviço leve para verificar tags/releases no GitHub e baixar automaticamente novas versões.
     /// </summary>
     public static class GitHubUpdateService
     {
-        public const string DefaultRepository = "ToltalTouch/Janela_multitarefa";
+        public const string DefaultRepository = "ToltalTouch/Gerenciador_MDI_Portatil";
 
         private static readonly HttpClient Http = CriarHttpClient();
+
+        public static InformacoesArquivoAtual ObterInformacoesArquivoAtual()
+        {
+            string currentExe = Environment.ProcessPath ?? Assembly.GetExecutingAssembly().Location;
+            string versao = ObterVersaoAtual();
+            string nome = Path.GetFileName(currentExe);
+            long tamanho = 0;
+            DateTime data = DateTime.Now;
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(currentExe) && File.Exists(currentExe))
+                {
+                    var fi = new FileInfo(currentExe);
+                    tamanho = fi.Length;
+                    data = fi.LastWriteTime;
+                }
+            }
+            catch { }
+
+            return new InformacoesArquivoAtual
+            {
+                Versao = versao,
+                NomeArquivo = string.IsNullOrWhiteSpace(nome) ? "AvaloniaMdiApp.exe" : nome,
+                CaminhoCompleto = currentExe,
+                TamanhoBytes = tamanho,
+                DataModificacao = data
+            };
+        }
+
+        public static void LimparPastasResiduaisUpdates()
+        {
+            try
+            {
+                string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                string legacyUpdates = Path.Combine(baseDir, "Updates");
+                if (Directory.Exists(legacyUpdates))
+                {
+                    Directory.Delete(legacyUpdates, recursive: true);
+                }
+
+                string tempUpdates = Path.Combine(Path.GetTempPath(), "GerenciadorMdi_Update");
+                if (Directory.Exists(tempUpdates))
+                {
+                    Directory.Delete(tempUpdates, recursive: true);
+                }
+            }
+            catch { }
+        }
 
         private static HttpClient CriarHttpClient()
         {
             var client = new HttpClient
             {
-                Timeout = TimeSpan.FromSeconds(30)
+                Timeout = TimeSpan.FromSeconds(15)
             };
             client.DefaultRequestHeaders.UserAgent.ParseAdd("GerenciadorMdiPortatil-Updater/1.0");
             client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
@@ -68,7 +134,11 @@ namespace AvaloniaMdiApp
             if (string.IsNullOrWhiteSpace(raw))
                 return DefaultRepository;
 
-            // Aceita URL completa (ex: https://github.com/ToltalTouch/Janela_multitarefa.git) ou "owner/repo"
+            // Redirecionamento de compatibilidade para o novo nome do repositório
+            if (raw.Contains("Janela_multitarefa", StringComparison.OrdinalIgnoreCase))
+                return "ToltalTouch/Gerenciador_MDI_Portatil";
+
+            // Aceita URL completa (ex: https://github.com/ToltalTouch/Gerenciador_MDI_Portatil.git) ou "owner/repo"
             var match = Regex.Match(raw, @"github\.com/([^/\s]+/[^/\s\.]+)", RegexOptions.IgnoreCase);
             if (match.Success)
                 return match.Groups[1].Value;
@@ -306,8 +376,9 @@ namespace AvaloniaMdiApp
             try
             {
                 string safeTag = Regex.Replace(release.TagName, @"[^a-zA-Z0-9._-]", "_");
-                string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-                string updateDir = Path.Combine(baseDir, "Updates", safeTag);
+                // Baixa na pasta temporária do sistema, evitando poluir o diretório do aplicativo com pastas de versões
+                string tempUpdatesRoot = Path.Combine(Path.GetTempPath(), "GerenciadorMdi_Update");
+                string updateDir = Path.Combine(tempUpdatesRoot, safeTag);
                 Directory.CreateDirectory(updateDir);
 
                 string fileName = string.IsNullOrWhiteSpace(release.AssetName)
@@ -395,7 +466,7 @@ namespace AvaloniaMdiApp
                     DownloadedFilePath = targetFile,
                     ExtractedDirectory = extractedDir,
                     ExecutablePath = executablePath,
-                    Message = $"Versão {release.TagName} baixada com sucesso em:\n{updateDir}"
+                    Message = $"Versão {release.TagName} baixada com sucesso (armazenamento temporário)."
                 };
             }
             catch (Exception ex)
@@ -414,27 +485,26 @@ namespace AvaloniaMdiApp
             try
             {
                 string appDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                string currentProcessExe = Environment.ProcessPath ?? Path.Combine(appDir, "AvaloniaMdiApp.exe");
+                string targetExe = currentProcessExe;
+                string tempUpdatesRoot = Path.Combine(Path.GetTempPath(), "GerenciadorMdi_Update");
 
                 if (OperatingSystem.IsWindows() && !string.IsNullOrWhiteSpace(resultado.ExecutablePath) && File.Exists(resultado.ExecutablePath))
                 {
                     bool hasExtractedDir = !string.IsNullOrWhiteSpace(resultado.ExtractedDirectory) && Directory.Exists(resultado.ExtractedDirectory);
                     string sourceDir = hasExtractedDir ? (Path.GetDirectoryName(resultado.ExecutablePath) ?? resultado.ExtractedDirectory) : string.Empty;
                     string sourceFile = resultado.ExecutablePath;
-                    string exeName = !string.IsNullOrWhiteSpace(resultado.ExecutablePath)
-                        ? Path.GetFileName(resultado.ExecutablePath)
-                        : (Path.GetFileName(Environment.ProcessPath) ?? "AvaloniaMdiApp.exe");
-                    string targetExe = Path.Combine(appDir, exeName);
 
                     int pid = Environment.ProcessId;
 
                     // Script em PowerShell usando -EncodedCommand (Base64 UTF-16LE):
-                    // Elimina completamente problemas de encoding de caracteres (como 'Portátil' virando 'Port├¡til')
-                    // e implementa laço de espera para liberação de arquivos bloqueados pelo processo atual.
+                    // Substitui diretamente o executável atual em execução, eliminando pastas residuais e duplicadas.
                     string psScript = $@"
 $targetExe = '{targetExe.Replace("'", "''")}'
 $appDir = '{appDir.Replace("'", "''")}'
 $sourceDir = '{sourceDir.Replace("'", "''")}'
 $sourceFile = '{sourceFile.Replace("'", "''")}'
+$tempRoot = '{tempUpdatesRoot.Replace("'", "''")}'
 $hasDir = {(hasExtractedDir ? "$true" : "$false")}
 
 try {{
@@ -458,6 +528,13 @@ for ($i = 0; $i -lt 15; $i++) {{
     }}
 }}
 
+# Limpeza automática de pastas temporárias de download e resíduos de versões antigas
+try {{
+    if (Test-Path -LiteralPath $tempRoot) {{ Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue }}
+    $legacy = Join-Path $appDir ""Updates""
+    if (Test-Path -LiteralPath $legacy) {{ Remove-Item -LiteralPath $legacy -Recurse -Force -ErrorAction SilentlyContinue }}
+}} catch {{}}
+
 if (Test-Path -LiteralPath $targetExe) {{
     Start-Process -FilePath $targetExe -WorkingDirectory $appDir
 }}
@@ -476,6 +553,8 @@ if (Test-Path -LiteralPath $targetExe) {{
                     {
                         sbBat.AppendLine($"copy /Y \"{sourceFile}\" \"{targetExe}\" >nul");
                     }
+                    sbBat.AppendLine($"if exist \"{tempUpdatesRoot}\" rmdir /s /q \"{tempUpdatesRoot}\" >nul 2>&1");
+                    sbBat.AppendLine($"if exist \"{Path.Combine(appDir, "Updates")}\" rmdir /s /q \"{Path.Combine(appDir, "Updates")}\" >nul 2>&1");
                     sbBat.AppendLine($"start \"\" \"{targetExe}\"");
 
                     string batPath = Path.Combine(Path.GetTempPath(), "atualizar_gerenciador_mdi.cmd");
@@ -508,9 +587,26 @@ if (Test-Path -LiteralPath $targetExe) {{
 
                 if (OperatingSystem.IsLinux() && !string.IsNullOrWhiteSpace(resultado.ExecutablePath) && File.Exists(resultado.ExecutablePath))
                 {
+                    string shScript = $@"#!/bin/bash
+sleep 1
+cp -f '{resultado.ExecutablePath}' '{targetExe}'
+chmod +x '{targetExe}'
+rm -rf '{tempUpdatesRoot}'
+rm -rf '{Path.Combine(appDir, "Updates")}'
+nohup '{targetExe}' >/dev/null 2>&1 &
+";
+                    string shPath = Path.Combine(Path.GetTempPath(), "atualizar_gerenciador_mdi.sh");
+                    File.WriteAllText(shPath, shScript);
+                    try
+                    {
+                        File.SetUnixFileMode(shPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+                    }
+                    catch { }
+
                     Process.Start(new ProcessStartInfo
                     {
-                        FileName = resultado.ExecutablePath,
+                        FileName = "bash",
+                        Arguments = shPath,
                         UseShellExecute = true
                     });
                     return true;

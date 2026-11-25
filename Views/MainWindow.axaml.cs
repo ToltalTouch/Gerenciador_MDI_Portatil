@@ -80,10 +80,12 @@ namespace AvaloniaMdiApp
         private DispatcherTimer? _leftSidebarCloseTimer;
         private DispatcherTimer? _rightSidebarOpenTimer;
         private DispatcherTimer? _rightSidebarCloseTimer;
+        private Border? _defaultModalCard;
 
         public MainWindow()
         {
             InitializeComponent();
+            _defaultModalCard = ModalCard;
 
             try
             {
@@ -102,6 +104,16 @@ namespace AvaloniaMdiApp
                 if (e.Property == Visual.IsVisibleProperty)
                 {
                     AtualizarSuspensaoNavegadores();
+                }
+            };
+
+            // Segurança: clique fora do card no overlay escuro fecha o modal e restaura o card padrão
+            ModalOverlay.PointerPressed += (s, e) =>
+            {
+                if (e.Source == ModalOverlay)
+                {
+                    ModalOverlay.IsVisible = false;
+                    GarantirModalCardPadrao();
                 }
             };
 
@@ -514,7 +526,7 @@ namespace AvaloniaMdiApp
                 _settings.HasSeenWelcome = true;
                 SettingsManager.Salvar(_settings);
                 ModalOverlay.IsVisible = false;
-                ModalOverlay.Child = null;
+                GarantirModalCardPadrao();
             };
 
             var card = new Border
@@ -536,6 +548,14 @@ namespace AvaloniaMdiApp
 
             ModalOverlay.Child = card;
             ModalOverlay.IsVisible = true;
+        }
+
+        private void GarantirModalCardPadrao()
+        {
+            if (ModalOverlay != null && _defaultModalCard != null && ModalOverlay.Child != _defaultModalCard)
+            {
+                ModalOverlay.Child = _defaultModalCard;
+            }
         }
 
         // ==================== ZOOM OUT / IN E PAN DO WORKSPACE ====================
@@ -787,6 +807,66 @@ namespace AvaloniaMdiApp
                 }
             }, RoutingStrategies.Tunnel);
 
+            // Intercepta Pan do Workspace (Botão de Rolar / Meio do mouse ou Barra de Espaço + Botão Esquerdo)
+            // em qualquer ponto da tela, inclusive em cima de janelas, sem transferir foco nem ativar a janela
+            WorkspaceViewport.AddHandler(InputElement.PointerPressedEvent, (s, e) =>
+            {
+                var point = e.GetCurrentPoint(WorkspaceViewport);
+                bool isMiddle = point.Properties.IsMiddleButtonPressed;
+                bool isLeftWithSpace = point.Properties.IsLeftButtonPressed && _isSpaceKeyDown;
+
+                if (isMiddle || isLeftWithSpace)
+                {
+                    _isPanningWorkspace = true;
+                    _panPointerStart = point.Position;
+                    _panOffsetStart = WorkspaceScroller.Offset;
+                    Workspace.Cursor = new Cursor(StandardCursorType.Hand);
+                    e.Pointer.Capture(WorkspaceViewport);
+                    e.Handled = true;
+                    return;
+                }
+
+                var sourceCtrl = e.Source as Control;
+                bool isInsideWindow = sourceCtrl != null && sourceCtrl.FindAncestorOfType<DraggableWindow>() != null;
+                bool isHud = sourceCtrl != null && (sourceCtrl == WorkspaceHud || sourceCtrl.FindAncestorOfType<Border>() == WorkspaceHud);
+                bool isRadial = sourceCtrl != null && (sourceCtrl == RadialMenuOverlay || sourceCtrl.FindAncestorOfType<Panel>() == RadialMenuOverlay);
+
+                if (!isInsideWindow && !isHud && !isRadial)
+                {
+                    TopLevel.GetTopLevel(this)?.FocusManager?.ClearFocus();
+                    Workspace.Focus();
+                }
+            }, RoutingStrategies.Tunnel, handledEventsToo: true);
+
+            WorkspaceViewport.AddHandler(InputElement.PointerMovedEvent, (s, e) =>
+            {
+                if (_isPanningWorkspace)
+                {
+                    var currentPos = e.GetPosition(WorkspaceViewport);
+                    var diff = currentPos - _panPointerStart;
+                    WorkspaceScroller.Offset = new Vector(
+                        Math.Max(0, _panOffsetStart.X - diff.X),
+                        Math.Max(0, _panOffsetStart.Y - diff.Y));
+                    _savedScrollOffset = WorkspaceScroller.Offset;
+                    e.Handled = true;
+                }
+            }, RoutingStrategies.Tunnel, handledEventsToo: true);
+
+            WorkspaceViewport.AddHandler(InputElement.PointerReleasedEvent, (s, e) =>
+            {
+                if (_isPanningWorkspace)
+                {
+                    var point = e.GetCurrentPoint(WorkspaceViewport);
+                    if (!point.Properties.IsMiddleButtonPressed && !_isSpaceKeyDown)
+                    {
+                        _isPanningWorkspace = false;
+                        Workspace.Cursor = Cursor.Default;
+                        e.Pointer.Capture(null);
+                        e.Handled = true;
+                    }
+                }
+            }, RoutingStrategies.Tunnel, handledEventsToo: true);
+
             // Inicializa a caixa visual de seleção retangular (marquee / rubberband)
             _selectionMarquee = new Border
             {
@@ -809,6 +889,8 @@ namespace AvaloniaMdiApp
 
                 if (isDirectWorkspace || !isInsideWindow)
                 {
+                    TopLevel.GetTopLevel(this)?.FocusManager?.ClearFocus();
+                    Workspace.Focus();
                     if (_modoVinculoLinhaAtivo)
                     {
                         CancelarModoVinculoLinha(notificar: true);
@@ -1867,6 +1949,7 @@ namespace AvaloniaMdiApp
 
         private void AplicarEstiloModal()
         {
+            GarantirModalCardPadrao();
             ModalCard.Background = _isDarkMode ? ThemePalette.DarkWindowBg : ThemePalette.LightWindowBg;
             ModalCard.BorderBrush = _isDarkMode ? ThemePalette.DarkBorderActive : ThemePalette.LightBorderActive;
             ModalTitle.Foreground = _isDarkMode ? ThemePalette.DarkTextPrimary : ThemePalette.LightTextPrimary;
@@ -4118,6 +4201,8 @@ namespace AvaloniaMdiApp
         {
             try
             {
+                _settingsWindow?.DefinirEstadoVerificandoAtualizacao(true, "Consultando última versão no GitHub...");
+
                 if (!silenciosoSeAtualizado)
                 {
                     ToastNotification.Mostrar(Workspace, "Consultando última tag de Release no GitHub...", "info");
@@ -4128,6 +4213,7 @@ namespace AvaloniaMdiApp
 
                 if (release == null)
                 {
+                    _settingsWindow?.DefinirEstadoVerificandoAtualizacao(false, "Nenhuma tag ou release encontrada no repositório.", "error");
                     if (!silenciosoSeAtualizado)
                     {
                         MostrarModalConfigurarRepoUpdate(repo, "Nenhuma tag ou release encontrada neste repositório ainda.");
@@ -4135,17 +4221,31 @@ namespace AvaloniaMdiApp
                     return;
                 }
 
-                if (release.IsNewer || !silenciosoSeAtualizado)
+                if (release.IsNewer)
                 {
+                    _settingsWindow?.DefinirEstadoVerificandoAtualizacao(false, $"Nova versão {release.TagName} disponível!", "success");
                     MostrarModalAtualizacaoGitHub(release, repo);
+                }
+                else
+                {
+                    _settingsWindow?.DefinirEstadoVerificandoAtualizacao(false, $"Você já está na versão mais recente ({release.TagName}).", "success");
+                    if (!silenciosoSeAtualizado)
+                    {
+                        MostrarModalAtualizacaoGitHub(release, repo);
+                    }
                 }
             }
             catch
             {
+                _settingsWindow?.DefinirEstadoVerificandoAtualizacao(false, "Não foi possível conectar ao GitHub Releases.", "error");
                 if (!silenciosoSeAtualizado)
                 {
                     ToastNotification.Mostrar(Workspace, "Não foi possível conectar ao GitHub Releases.", "warning");
                 }
+            }
+            finally
+            {
+                _settingsWindow?.DefinirEstadoVerificandoAtualizacao(false, manterMensagemSeNula: true);
             }
         }
 
@@ -4182,6 +4282,12 @@ namespace AvaloniaMdiApp
                 ? $"Nova versão disponível no GitHub! (Atual: {release.CurrentVersion} → Nova Tag: {release.TagName})"
                 : $"Você já está na versão/tag mais recente ({release.TagName}).";
 
+            string tamanhoStr = release.AssetSizeBytes > 0
+                ? $" ({InformacoesArquivoAtual.FormatarTamanho(release.AssetSizeBytes)})"
+                : string.Empty;
+
+            string localExe = Path.GetFileName(Environment.ProcessPath ?? "AvaloniaMdiApp.exe");
+
             string resumoNotas = string.IsNullOrWhiteSpace(release.Notes)
                 ? string.Empty
                 : $"\n\nNotas da versão:\n{(release.Notes.Length > 220 ? release.Notes[..220] + "..." : release.Notes)}";
@@ -4193,14 +4299,15 @@ namespace AvaloniaMdiApp
             ModalMessage.Text =
                 $"{statusVersao}\n" +
                 $"Repositório: {repo}\n" +
-                $"Pacote: {release.AssetName}" +
+                $"Pacote Remoto: {release.AssetName}{tamanhoStr}\n" +
+                $"Arquivo Local: {localExe}" +
                 resumoNotas;
 
             ModalInputBox.Text = repo;
             ModalInputBox.IsVisible = false;
             ModalButtonsPanel.Children.Clear();
 
-            var btnFechar = CriarBotaoModal("Depois", isPrimary: false, isDanger: false);
+            var btnFechar = CriarBotaoModal(release.IsNewer ? "Depois" : "Fechar", isPrimary: false, isDanger: false);
             btnFechar.Click += (s, e) => ModalOverlay.IsVisible = false;
 
             string labelDownload = release.IsNewer ? "Baixar e Atualizar Agora" : "Baixar Novamente";
@@ -4222,7 +4329,7 @@ namespace AvaloniaMdiApp
                     SalvarTodosWorkspacesNoDisco();
 
                     ModalTitle.Text = $"Download Concluído ({release.TagName})";
-                    ModalMessage.Text = $"{resultado.Message}\n\nDeseja aplicar e abrir a nova versão agora?";
+                    ModalMessage.Text = $"A nova versão foi baixada e está pronta para ser aplicada.\n\nAo clicar em 'Aplicar e Reiniciar', o executável antigo será substituído diretamente pelo novo e o sistema será reiniciado automaticamente sem deixar pastas de download acumuladas.";
                     ModalButtonsPanel.Children.Clear();
 
                     var btnAbrirPasta = CriarBotaoModal("Apenas Fechar", isPrimary: false, isDanger: false);

@@ -8,6 +8,12 @@ namespace AvaloniaMdiApp
         [STAThread]
         public static void Main(string[] args)
         {
+            try
+            {
+                GitHubUpdateService.LimparPastasResiduaisUpdates();
+            }
+            catch { }
+
             if (OperatingSystem.IsLinux())
             {
                 Environment.SetEnvironmentVariable("GDK_BACKEND", "x11");

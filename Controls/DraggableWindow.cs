@@ -580,9 +580,16 @@ namespace AvaloniaMdiApp
             };
 
             // Garante que QUALQUER clique ou foco em qualquer parte da janela (texto, botões, barras, bordas)
-            // ative e traga imediatamente esta janela para a frente de todas as outras (sobreposição total)
+            // ative e traga imediatamente esta janela para a frente de todas as outras (sobreposição total).
+            // O botão do meio do mouse (scroll click) é reservado para pan do workspace e NÃO foca nem ativa a janela.
             AddHandler(InputElement.PointerPressedEvent, (s, e) =>
             {
+                var point = e.GetCurrentPoint(this);
+                if (point.Properties.IsMiddleButtonPressed)
+                {
+                    return;
+                }
+
                 ZIndexManager.BringToFront(this);
                 OnWindowClicked?.Invoke(this);
             }, RoutingStrategies.Tunnel, handledEventsToo: true);
@@ -1463,6 +1470,12 @@ namespace AvaloniaMdiApp
 
         private void OnWindowPointerPressed(object? sender, PointerPressedEventArgs e)
         {
+            var point = e.GetCurrentPoint(this);
+            if (point.Properties.IsMiddleButtonPressed)
+            {
+                return;
+            }
+
             ZIndexManager.BringToFront(this);
             OnWindowClicked?.Invoke(this);
 

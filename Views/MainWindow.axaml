@@ -450,7 +450,7 @@
             <LayoutTransformControl Name="WorkspaceZoomHost"
                                     HorizontalAlignment="Left"
                                     VerticalAlignment="Top">
-              <Canvas Name="Workspace" Background="#0F172A" ClipToBounds="True" Focusable="False"/>
+              <Canvas Name="Workspace" Background="#0F172A" ClipToBounds="True" Focusable="True"/>
             </LayoutTransformControl>
           </ScrollViewer>
 

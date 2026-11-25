@@ -42,6 +42,7 @@ namespace AvaloniaMdiApp
         private readonly ToggleSwitch _autoExpandSidebarToggle;
         private readonly ToggleSwitch _autoUpdateToggle;
         private readonly Button _btnCheckUpdateNow;
+        private readonly TextBlock _lblUpdateStatus;
         private readonly Button _btnCreateShortcut;
         private readonly ComboBox _cmbLayoutScale;
         private readonly ComboBox _cmbMainWindowSize;
@@ -315,7 +316,31 @@ namespace AvaloniaMdiApp
                 FontSize = 11.5,
                 VerticalContentAlignment = VerticalAlignment.Center
             };
-            _btnCheckUpdateNow.Click += (s, e) => OnCheckUpdatesRequested?.Invoke();
+
+            _lblUpdateStatus = new TextBlock
+            {
+                FontSize = 11,
+                IsVisible = false,
+                TextWrapping = TextWrapping.Wrap,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                TextAlignment = TextAlignment.Right,
+                MaxWidth = 260
+            };
+
+            var panelUpdateManual = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Spacing = 4
+            };
+            panelUpdateManual.Children.Add(_btnCheckUpdateNow);
+            panelUpdateManual.Children.Add(_lblUpdateStatus);
+
+            _btnCheckUpdateNow.Click += (s, e) =>
+            {
+                DefinirEstadoVerificandoAtualizacao(true, "Consultando última versão no GitHub...");
+                OnCheckUpdatesRequested?.Invoke();
+            };
 
             _btnCreateShortcut = new Button
             {
@@ -337,11 +362,31 @@ namespace AvaloniaMdiApp
                 CriarDivisor(),
                 CriarLinhaItem("Atalho do Aplicativo", "Criar atalho oficial com ícone na Área de Trabalho", _btnCreateShortcut)
             ));
+            var infoArquivo = GitHubUpdateService.ObterInformacoesArquivoAtual();
+            var badgeVersao = new Border
+            {
+                Background = new SolidColorBrush(Color.FromArgb(40, 59, 130, 246)),
+                BorderBrush = ThemePalette.Accent,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(10, 4),
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = new TextBlock
+                {
+                    Text = $"v{infoArquivo.Versao}",
+                    FontSize = 11,
+                    FontWeight = FontWeight.Bold,
+                    Foreground = ThemePalette.Accent
+                }
+            };
+
             panelGeral.Children.Add(CriarCabecalhoSecao("ATUALIZAÇÕES DO PROGRAMA"));
             panelGeral.Children.Add(CriarCardAgrupado(
+                CriarLinhaItem("Versão Atual em Execução", $"{infoArquivo.NomeArquivo} ({infoArquivo.TamanhoFormatado}) • Atualizado em {infoArquivo.DataModificacao:dd/MM/yyyy HH:mm}", badgeVersao),
+                CriarDivisor(),
                 CriarLinhaItem("Checar ao Iniciar", "Verificar se há novas versões no GitHub Releases ao abrir", _autoUpdateToggle),
                 CriarDivisor(),
-                CriarLinhaItem("Verificação Manual", "Checar agora se existe uma versão mais recente", _btnCheckUpdateNow)
+                CriarLinhaItem("Verificação Manual", "Consulta leve via GitHub API (sem baixar arquivos antecipadamente)", panelUpdateManual)
             ));
             panelGeral.Children.Add(CriarCabecalhoSecao("MENUS LATERAIS"));
             panelGeral.Children.Add(CriarCardAgrupado(
@@ -1143,6 +1188,40 @@ namespace AvaloniaMdiApp
                 System.IO.File.WriteAllText(shortcutPath, $"[InternetShortcut]\nURL=file:///{exePath.Replace('\\', '/')}\nIconIndex=0\nIconFile={exePath}\n");
             }
             catch { }
+        }
+
+        public void DefinirEstadoVerificandoAtualizacao(bool verificando, string? mensagem = null, string? tipo = null, bool manterMensagemSeNula = false)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                _btnCheckUpdateNow.IsEnabled = !verificando;
+                if (verificando)
+                {
+                    _btnCheckUpdateNow.Content = AppIcons.WithText(AppIcons.Refresh, "Verificando...", 12, 6, ThemePalette.DarkTextPrimary);
+                    _lblUpdateStatus.IsVisible = true;
+                    _lblUpdateStatus.Text = mensagem ?? "Consultando versões no GitHub...";
+                    _lblUpdateStatus.Foreground = ThemePalette.Accent;
+                }
+                else
+                {
+                    _btnCheckUpdateNow.Content = AppIcons.WithText(AppIcons.Refresh, "Verificar Agora", 12, 6, ThemePalette.DarkTextPrimary);
+                    if (!string.IsNullOrWhiteSpace(mensagem))
+                    {
+                        _lblUpdateStatus.IsVisible = true;
+                        _lblUpdateStatus.Text = mensagem;
+                        _lblUpdateStatus.Foreground = tipo switch
+                        {
+                            "success" => new SolidColorBrush(Color.Parse("#10B981")),
+                            "error" => new SolidColorBrush(Color.Parse("#EF4444")),
+                            _ => ThemePalette.Accent
+                        };
+                    }
+                    else if (!manterMensagemSeNula)
+                    {
+                        _lblUpdateStatus.IsVisible = false;
+                    }
+                }
+            });
         }
 
         public void Fechar()
