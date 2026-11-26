@@ -127,8 +127,11 @@ namespace AvaloniaMdiApp
 
             RadialMenuOverlay.PointerPressed += (s, e) =>
             {
-                FecharMenuCircular();
-                e.Handled = true;
+                if (e.Source == RadialMenuOverlay || e.Source == RadialMenuCanvas)
+                {
+                    FecharMenuCircular();
+                    e.Handled = true;
+                }
             };
 
             RootDock.PointerPressed += (s, e) =>
@@ -726,13 +729,10 @@ namespace AvaloniaMdiApp
                 }
             };
 
-            // Previne que o ScrollViewer role para (0,0) automaticamente quando o Canvas ou o host recebem foco
+            // Previne que o ScrollViewer role automaticamente em qualquer evento de RequestBringIntoView
             WorkspaceScroller.AddHandler(RequestBringIntoViewEvent, (s, e) =>
             {
-                if (e.TargetObject == Workspace || e.TargetObject == WorkspaceZoomHost || e.TargetObject == this)
-                {
-                    e.Handled = true;
-                }
+                e.Handled = true;
             }, RoutingStrategies.Tunnel);
 
             // Rastreia continuamente a posição real de rolagem do usuário no Workspace
@@ -827,14 +827,13 @@ namespace AvaloniaMdiApp
                 }
 
                 var sourceCtrl = e.Source as Control;
+                bool isRadial = sourceCtrl != null && (sourceCtrl == RadialMenuOverlay || sourceCtrl == RadialMenuCanvas || RadialMenuOverlay.IsVisualAncestorOf(sourceCtrl));
+                bool isHud = sourceCtrl != null && (sourceCtrl == WorkspaceHud || WorkspaceHud.IsVisualAncestorOf(sourceCtrl));
                 bool isInsideWindow = sourceCtrl != null && sourceCtrl.FindAncestorOfType<DraggableWindow>() != null;
-                bool isHud = sourceCtrl != null && (sourceCtrl == WorkspaceHud || sourceCtrl.FindAncestorOfType<Border>() == WorkspaceHud);
-                bool isRadial = sourceCtrl != null && (sourceCtrl == RadialMenuOverlay || sourceCtrl.FindAncestorOfType<Panel>() == RadialMenuOverlay);
 
                 if (!isInsideWindow && !isHud && !isRadial)
                 {
                     TopLevel.GetTopLevel(this)?.FocusManager?.ClearFocus();
-                    Workspace.Focus();
                 }
             }, RoutingStrategies.Tunnel, handledEventsToo: true);
 
@@ -890,7 +889,6 @@ namespace AvaloniaMdiApp
                 if (isDirectWorkspace || !isInsideWindow)
                 {
                     TopLevel.GetTopLevel(this)?.FocusManager?.ClearFocus();
-                    Workspace.Focus();
                     if (_modoVinculoLinhaAtivo)
                     {
                         CancelarModoVinculoLinha(notificar: true);
